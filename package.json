@@ -1,0 +1,12 @@
+{
+  "name": "datapath-root",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --prefix datapath-app",
+    "build": "npm run build --prefix datapath-app",
+    "preview": "npm run preview --prefix datapath-app"
+  },
+  "dependencies": {
+    "firebase": "^12.12.0"
+  }
+}

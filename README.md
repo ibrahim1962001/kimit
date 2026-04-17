@@ -1,21 +1,55 @@
-# 📊 Sales Performance Analysis Dashboard
+# DataPath Analyzer - Autonomous Data Intelligence Platform
 
-An interactive Power BI dashboard designed to track and analyze sales performance, regions, and product categories using an MS Access database as the primary source.
+## Quick Start
 
-## 🚀 Project Overview
-This project transforms raw sales data into actionable insights. It helps business owners understand:
-* **Top Performing Cities:** Which regions generate the most revenue.
-* **Category Analysis:** Sales distribution across Bikes, Clothing, and Accessories.
-* **Time Trends:** Sales growth and fluctuations over the years.
+### Backend (FastAPI)
 
-## 🛠️ Tools & Technologies
-* **Power BI:** Data Visualization & Modeling.
-* **MS Access:** Relational Database source.
-* **DAX:** Calculated measures for KPIs (Net Sales, Gross Sales, etc.).
+```bash
+cd backend
+pip install -r requirements.txt
+python main.py
+```
 
-## 📁 Files & Links
-Due to GitHub file size limits, you can access the full project files below:
-* **Download Power BI (.pbix):https://drive.google.com/file/d/1GxM1emhkdvoxqaNuGqpKS4SXGUeG9N6T/view?usp=sharing
-* **Download Database (.accdb):https://drive.google.com/file/d/1htlBxx30nfwGPwFdsy3cqBbHy_SJUE-k/view?usp=sharing
-## 📸 Dashboard Preview
-![Dashboard Screenshot](dashboard-preview.png)
+The API will run at `http://localhost:8000`
+
+### Frontend
+
+```bash
+cd datapath-app
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173` in your browser.
+
+## Features
+
+- Upload CSV / XLS / XLSX files directly in the browser
+- Automatic data cleaning and duplicate detection
+- AI-driven insights and chat assistant via Groq API
+- Interactive dashboard with charts and data health scoring
+- Export cleaned data as CSV or JSON
+- Arabic and English bilingual support
+
+## Firebase / Deployment
+
+- Firebase Hosting is configured in `firebase.json`
+- Frontend output directory is `datapath-app/dist`
+- Deploy with:
+
+```bash
+firebase deploy --only hosting
+```
+
+## Important Notes
+
+- The frontend already includes a Firebase config file at `datapath-app/src/firebase.ts`
+- The AI backend uses a Groq API key from `backend/.env`
+
+## Project Structure
+
+- `backend/` — FastAPI server and AI endpoints
+- `datapath-app/` — React + Vite frontend application
+- `firebase.json` — Firebase Hosting configuration
+- `.firebaserc` — Firebase project alias
+- `report.md` — project data persistence report
