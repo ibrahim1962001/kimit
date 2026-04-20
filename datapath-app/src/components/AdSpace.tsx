@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 
 export interface AdProvider {
   id: string;
@@ -19,165 +19,132 @@ interface AdSpaceProps {
   rootMargin?: string;
 }
 
-// مُعرّف فريد لكل نسخة من المكوّن لتفادي تعارض id الـ div الإعلاني
-let instanceCounter = 0;
+// بناء HTML كامل للـ iframe لكل بانر معزول
+const buildAdIframeHtml = (adCode: string): string => `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      background: transparent;
+      overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  ${adCode}
+</body>
+</html>`;
 
 export const AdSpace: React.FC<AdSpaceProps> = ({
   type,
   className = '',
   providers = [],
   minHeight,
-  onLoad,
-  onError,
   lazyLoad = false,
-  rootMargin = '200px'
+  rootMargin = '300px',
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [hasError, setHasError] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(!lazyLoad);
-  // instanceId يضمن div id فريد حتى لو نفس الكود الإعلاني
-  const instanceId = useRef<number>(++instanceCounter).current;
+  const [iframeHtml, setIframeHtml] = useState<string | null>(null);
 
+  // Lazy load via IntersectionObserver
   useEffect(() => {
-    if (!lazyLoad || isLoaded) return;
-
+    if (!lazyLoad || isVisible) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setIsVisible(true);
-            observer.disconnect();
-          }
-        });
+        if (entries[0].isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
       },
       { rootMargin }
     );
-
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
-    }
-
+    if (wrapperRef.current) observer.observe(wrapperRef.current);
     return () => observer.disconnect();
-  }, [lazyLoad, isLoaded, rootMargin]);
+  }, [lazyLoad, isVisible, rootMargin]);
 
+  // اختيار provider وبناء محتوى الـ iframe
   useEffect(() => {
-    if (!isVisible || !containerRef.current || providers.length === 0 || isLoaded) return;
+    if (!isVisible || iframeHtml) return;
+    const enabled = providers.filter((p) => p.enabled);
+    if (enabled.length === 0) return;
 
-    const enabledProviders = providers.filter(p => p.enabled);
-    if (enabledProviders.length === 0) {
-      console.warn('AdSpace: No enabled providers available', providers);
-      setHasError(true);
-      onError?.();
-      return;
+    // اختيار عشوائي بالوزن
+    const totalWeight = enabled.reduce((s, p) => s + p.weight, 0);
+    let rand = Math.random() * totalWeight;
+    let selected = enabled[0];
+    for (const p of enabled) {
+      if (rand < p.weight) { selected = p; break; }
+      rand -= p.weight;
     }
 
-    // اختيار Provider عشوائي بالوزن
-    const totalWeight = enabledProviders.reduce((acc, p) => acc + p.weight, 0);
-    let random = Math.random() * totalWeight;
-    let selectedProvider = enabledProviders[0];
-    for (const p of enabledProviders) {
-      if (random < p.weight) { selectedProvider = p; break; }
-      random -= p.weight;
-    }
+    setIframeHtml(buildAdIframeHtml(selected.code));
+  }, [isVisible, providers, iframeHtml]);
 
-    // استبدال id الحاوية لتفادي التعارض بين نسخ متعددة على نفس الصفحة
-    const uniqueId = `ad-container-${instanceId}`;
-    const adCode = selectedProvider.code.replace(
-      /id="container-[^"]*"/g,
-      `id="${uniqueId}"`
-    );
-
-    try {
-      containerRef.current.innerHTML = adCode;
-      // إعادة تشغيل الـ scripts يدوياً لأن innerHTML لا يُنفّذها
-      const scripts = Array.from(containerRef.current.querySelectorAll('script'));
-      scripts.forEach((oldScript) => {
-        const newScript = document.createElement('script');
-        for (let i = 0; i < oldScript.attributes.length; i++) {
-          const attr = oldScript.attributes[i];
-          newScript.setAttribute(attr.name, attr.value);
-        }
-        if (oldScript.textContent) newScript.text = oldScript.textContent;
-        oldScript.parentNode?.replaceChild(newScript, oldScript);
-      });
-      setIsLoaded(true);
-      onLoad?.();
-    } catch (error) {
-      console.error('AdSpace: Failed to render ad', error);
-      setHasError(true);
-      onError?.();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isVisible, providers, isLoaded]);
-
-  const getDefaultHeight = (adType: string): number => {
-    switch (adType) {
+  const defaultHeight = () => {
+    switch (type) {
       case 'horizontal': return 100;
       case 'vertical':   return 400;
       case 'square':     return 280;
-      case 'responsive': return 280;
-      default:           return 280;
+      default:           return 120;
     }
   };
 
+  const height = minHeight ?? defaultHeight();
+
   return (
     <div
+      ref={wrapperRef}
       className={`ad-space ${className}`}
       data-ad-type={type}
-      data-loaded={isLoaded}
       style={{
         width: '100%',
-        minHeight: minHeight ?? getDefaultHeight(type),
+        minHeight: height,
+        borderRadius: 14,
+        overflow: 'hidden',
+        position: 'relative',
+        background: 'rgba(255,255,255,0.015)',
+        border: '1px solid rgba(255,255,255,0.05)',
+        margin: '10px 0',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'rgba(255,255,255,0.018)',
-        border: '1px solid rgba(255,255,255,0.05)',
-        borderRadius: '14px',
-        overflow: 'hidden',
-        position: 'relative',
-        margin: '10px 0',
       }}
     >
-      {/* Loading shimmer */}
-      {!isLoaded && !hasError && (
+      {iframeHtml ? (
+        <iframe
+          srcDoc={iframeHtml}
+          sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+          style={{
+            width: '100%',
+            height: `${height}px`,
+            border: 'none',
+            display: 'block',
+          }}
+          title="Advertisement"
+          loading="lazy"
+        />
+      ) : isVisible ? (
+        /* spinner بينما يُحمَّل */
         <div style={{
-          position: 'absolute', inset: 0,
           display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: 10,
+          alignItems: 'center', gap: 8,
           color: 'rgba(255,255,255,0.07)', fontSize: 10,
           letterSpacing: '1px', textTransform: 'uppercase',
         }}>
           <div style={{
-            width: 34, height: 34,
-            border: '2px solid rgba(255,255,255,0.08)',
-            borderTopColor: 'rgba(16,185,129,0.4)',
+            width: 28, height: 28,
+            border: '2px solid rgba(255,255,255,0.06)',
+            borderTopColor: 'rgba(16,185,129,0.35)',
             borderRadius: '50%', animation: 'spin 1s linear infinite',
           }} />
-          <span>Advertisement</span>
+          <span>Ad</span>
         </div>
-      )}
-
-      {/* Error placeholder */}
-      {hasError && (
-        <div style={{
-          color: 'rgba(255,255,255,0.06)', fontSize: 11,
-          textAlign: 'center', padding: 20,
-        }}>
-          <span>Ad unavailable</span>
-        </div>
-      )}
-
-      {/* Ad content */}
-      <div
-        ref={containerRef}
-        style={{
-          display: isLoaded ? 'block' : 'none',
-          width: '100%',
-          minHeight: 'inherit',
-        }}
-      />
+      ) : null}
     </div>
   );
 };
