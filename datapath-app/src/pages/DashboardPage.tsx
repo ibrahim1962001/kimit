@@ -1,4 +1,6 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
+import { analyzeDataset } from '../lib/dataUtils';
 import { DataChart } from '../components/DataChart';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -45,12 +47,13 @@ const T = {
   }
 };
 
-export const DashboardPage: React.FC<Props> = ({ info, lang }) => {
+export const DashboardPage: React.FC<Props> = ({ info: initialInfo, lang }) => {
   const dashRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
   
   // Filtering Logic
   const [filters, setFilters] = useState<Record<string, string>>({});
+  const [info, setInfo] = useState<DatasetInfo>(initialInfo);
   
   // Custom Builder Logic
   const [customCharts, setCustomCharts] = useState<ChartInfo[]>([]);
@@ -76,6 +79,13 @@ export const DashboardPage: React.FC<Props> = ({ info, lang }) => {
       const res = await generateExecutiveSummary(info, apiKey, lang);
       setSummary(res);
       confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#10b981', '#6366f1'] });
+
+      // تصدير كمنف إكسيل فوراً
+      const ws = XLSX.utils.aoa_to_sheet([["Kimit AI - Smart Summary"], [res]]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Summary");
+      XLSX.writeFile(wb, `${info.filename.replace(/\.[^/.]+$/, "")}_AI_Summary.xlsx`);
+      
     } catch (e) {
       console.error(e);
     } finally {
@@ -88,13 +98,21 @@ export const DashboardPage: React.FC<Props> = ({ info, lang }) => {
   const totalCells = Math.max(1, info.rows * info.columns.length);
   const healthPercent = Math.max(0, Math.round(100 - ((info.totalNulls / totalCells) * 100) - ((info.duplicates / info.rows) * 100) - (info.anomalies.length * 0.5)));
 
-  // Apply Filters to data for charts
-  const filteredData = info.workData.filter(row => {
-    return Object.entries(filters).every(([col, val]) => !val || String(row[col]) === val);
-  });
+  // Re-calculate DataInfo when filters change
+  useEffect(() => {
+    const active = Object.values(filters).some(v => v);
+    if (!active) {
+      setInfo(initialInfo);
+      return;
+    }
+    const filteredWorkData = initialInfo.workData.filter(row => {
+      return Object.entries(filters).every(([col, val]) => !val || String(row[col]) === val);
+    });
+    setInfo(analyzeDataset(new File([], initialInfo.filename), filteredWorkData));
+  }, [filters, initialInfo]);
 
   const getUniqueValues = (col: string) => {
-    const vals = Array.from(new Set(info.workData.map(r => String(r[col]))));
+    const vals = Array.from(new Set(initialInfo.workData.map(r => String(r[col]))));
     return vals.slice(0, 50).sort(); // Limit to 50 unique values for UI safety
   };
 
@@ -103,7 +121,7 @@ export const DashboardPage: React.FC<Props> = ({ info, lang }) => {
     
     // Aggregation logic
     const agg: Record<string, number> = {};
-    filteredData.forEach(r => {
+    info.workData.forEach(r => {
       const key = String(r[builder.x]);
       const val = Number(r[builder.y]) || 0;
       agg[key] = (agg[key] || 0) + val;
@@ -127,7 +145,7 @@ export const DashboardPage: React.FC<Props> = ({ info, lang }) => {
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Kemet_Dashboard_${info.filename}.pdf`);
+      pdf.save(`Kimit_Dashboard_${info.filename}.pdf`);
     } catch (e) {
       console.error(e);
     }
