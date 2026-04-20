@@ -352,6 +352,16 @@ export const DashboardPage: React.FC<Props> = ({ info, lang }) => {
               ))}
             </div>
           )}
+
+          {/* Bottom Ad space in the Insights sidebar to fill empty vertical space */}
+          <div className="dashboard-ad-vertical" style={{ marginTop: 20 }}>
+            <AdSpace
+              type="vertical"
+              providers={AD_PROVIDERS.filter(p => p.id === 'native_banner')}
+              minHeight={400}
+              lazyLoad
+            />
+          </div>
         </div>
       </div>
       </div>
