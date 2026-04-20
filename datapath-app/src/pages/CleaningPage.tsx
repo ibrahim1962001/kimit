@@ -2,6 +2,8 @@ import React from 'react';
 import { ShieldCheck, Sparkles, EyeOff } from 'lucide-react';
 import type { DatasetInfo, Lang } from '../types';
 import { analyzeDataset } from '../lib/dataUtils';
+import { AdSpace } from '../components/AdSpace';
+import { AD_PROVIDERS } from '../config/adConfig';
 
 interface Props { info: DatasetInfo; lang: Lang; onClean: () => void; onUpdate?: (info: DatasetInfo) => void; }
 
@@ -51,8 +53,15 @@ export const CleaningPage: React.FC<Props> = ({ info, lang, onClean, onUpdate })
     onUpdate(analyzeDataset(dummyFile, newData));
   };
 
+  const cleaningAdProvider = AD_PROVIDERS.filter(p => p.id === 'adsterra_main');
+
   return (
     <div className="page">
+      {/* بانر إعلاني أعلى صفحة التنقية */}
+      <div className="cleaning-ad-top">
+        <AdSpace type="responsive" providers={cleaningAdProvider} minHeight={90} />
+      </div>
+
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div><h2 className="page-title">{t.title}</h2><p className="page-sub">{t.sub}</p></div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>

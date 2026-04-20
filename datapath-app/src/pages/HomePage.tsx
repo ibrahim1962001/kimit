@@ -2,7 +2,7 @@ import React from 'react';
 import { DropZone } from '../components/DropZone';
 import { BarChart2, Search, Zap, Brain, Globe, Lock } from 'lucide-react';
 import { AdSpace } from '../components/AdSpace';
-import { getActiveAdProviders, getAdProviderById } from '../config/adConfig';
+import { AD_PROVIDERS } from '../config/adConfig';
 import type { Lang } from '../types';
 import logoImg from '../assets/logo.png';
 
@@ -57,11 +57,15 @@ const T = {
   }
 };
 
+// كل بانر يأخذ provider واحد مستقل لتفادي تعارض div id
+const banner1 = AD_PROVIDERS.filter(p => p.id === 'adsterra_main');
+const banner2 = AD_PROVIDERS.filter(p => p.id === 'native_banner');
+const banner3 = AD_PROVIDERS.filter(p => p.id === 'social_banner');
+
 export const HomePage: React.FC<Props> = ({ lang, onFile }) => {
   const t = T[lang];
   const lines = t.title.split('\n');
-  const nativeAd = getAdProviderById('native_banner');
-  const socialAd = getAdProviderById('social_banner');
+
   return (
     <div className="home-page">
       <div className="home-hero">
@@ -75,14 +79,23 @@ export const HomePage: React.FC<Props> = ({ lang, onFile }) => {
         </h1>
         <p className="hero-sub">{t.sub}</p>
         <DropZone lang={lang} onFile={onFile} />
-        {socialAd && (
-          <div className="home-social-banner">
-            <AdSpace type="horizontal" providers={[socialAd]} minHeight={110} />
-          </div>
-        )}
+
+        {/* بانر 1 - تحت منطقة الرفع مباشرة */}
         <div className="home-ad-container">
-          <AdSpace type="horizontal" providers={nativeAd ? [nativeAd] : getActiveAdProviders()} minHeight={90} />
+          <AdSpace type="responsive" providers={banner1} minHeight={100} />
         </div>
+
+        {/* بانر 2 */}
+        <div className="home-ad-container">
+          <AdSpace type="responsive" providers={banner2} minHeight={100} />
+        </div>
+
+        {/* بانر 3 */}
+        <div className="home-ad-container">
+          <AdSpace type="responsive" providers={banner3} minHeight={100} />
+        </div>
+
+        {/* Feature Cards */}
         <div className="features-grid">
           {t.features.map((f, i) => (
             <div key={i} className="feature-card">
@@ -91,18 +104,9 @@ export const HomePage: React.FC<Props> = ({ lang, onFile }) => {
               <div className="feature-desc">{f.desc}</div>
             </div>
           ))}
-         </div>
-
-        {/* Ad Break - Horizontal Banner */}
-        <div className="home-ad-container">
-          <AdSpace
-            type="horizontal"
-            providers={getActiveAdProviders()}
-            minHeight={90}
-          />
         </div>
 
-        {/* How to use section */}
+        {/* How to use */}
         <div className="how-to-section">
           <h2>{t.howTo.title}</h2>
           <ul className="how-to-list">
@@ -115,7 +119,11 @@ export const HomePage: React.FC<Props> = ({ lang, onFile }) => {
           </ul>
         </div>
 
-        {/* Creator Footer */}
+        {/* بانر أسفل الصفحة */}
+        <div className="home-ad-container home-ad-bottom">
+          <AdSpace type="responsive" providers={banner1} minHeight={100} lazyLoad />
+        </div>
+
         <div className="creator-footer">
           <p>
             {t.creator} <strong>IBRAHIM SABREY</strong>

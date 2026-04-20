@@ -8,7 +8,7 @@ import { generateExecutiveSummary, speakText } from '../lib/aiService';
 import { motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { AdSpace } from '../components/AdSpace';
-import { getActiveAdProviders } from '../config/adConfig';
+import { AD_PROVIDERS } from '../config/adConfig';
 
 interface Props { info: DatasetInfo; lang: Lang; }
 
@@ -64,7 +64,9 @@ export const DashboardPage: React.FC<Props> = ({ info, lang }) => {
 
   const t = T[lang];
 
-  const adProviders = getActiveAdProviders();
+  // providers منفصلة لكل بانر
+  const topAdProvider = AD_PROVIDERS.filter(p => p.id === 'native_banner');
+  const sidebarAdProvider = AD_PROVIDERS.filter(p => p.id === 'social_banner');
 
   const handleFetchSummary = async () => {
     const apiKey = localStorage.getItem('groq_key') || '';
@@ -164,8 +166,8 @@ export const DashboardPage: React.FC<Props> = ({ info, lang }) => {
         {/* Top Banner Ad */}
         <div className="dashboard-ad-top">
           <AdSpace
-            type="horizontal"
-            providers={adProviders}
+            type="responsive"
+            providers={topAdProvider}
             minHeight={90}
           />
         </div>
@@ -277,8 +279,8 @@ export const DashboardPage: React.FC<Props> = ({ info, lang }) => {
             {/* Side Square Ad */}
             <div className="dashboard-ad-square">
               <AdSpace
-                type="square"
-                providers={adProviders}
+                type="responsive"
+                providers={sidebarAdProvider}
                 minHeight={250}
               />
             </div>

@@ -19,6 +19,9 @@ interface AdSpaceProps {
   rootMargin?: string;
 }
 
+// مُعرّف فريد لكل نسخة من المكوّن لتفادي تعارض id الـ div الإعلاني
+let instanceCounter = 0;
+
 export const AdSpace: React.FC<AdSpaceProps> = ({
   type,
   className = '',
@@ -33,6 +36,8 @@ export const AdSpace: React.FC<AdSpaceProps> = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [isVisible, setIsVisible] = useState(!lazyLoad);
+  // instanceId يضمن div id فريد حتى لو نفس الكود الإعلاني
+  const instanceId = useRef<number>(++instanceCounter).current;
 
   useEffect(() => {
     if (!lazyLoad || isLoaded) return;
@@ -60,69 +65,59 @@ export const AdSpace: React.FC<AdSpaceProps> = ({
     if (!isVisible || !containerRef.current || providers.length === 0 || isLoaded) return;
 
     const enabledProviders = providers.filter(p => p.enabled);
-    if (enabledProviders.length === 0) return;
+    if (enabledProviders.length === 0) {
+      console.warn('AdSpace: No enabled providers available', providers);
+      setHasError(true);
+      onError?.();
+      return;
+    }
 
-    // Weighted random selection
+    // اختيار Provider عشوائي بالوزن
     const totalWeight = enabledProviders.reduce((acc, p) => acc + p.weight, 0);
     let random = Math.random() * totalWeight;
     let selectedProvider = enabledProviders[0];
-
     for (const p of enabledProviders) {
-      if (random < p.weight) {
-        selectedProvider = p;
-        break;
-      }
+      if (random < p.weight) { selectedProvider = p; break; }
       random -= p.weight;
     }
 
-    // Render ad and execute scripts if present
+    // استبدال id الحاوية لتفادي التعارض بين نسخ متعددة على نفس الصفحة
+    const uniqueId = `adsterra-container-${instanceId}`;
+    const adCode = selectedProvider.code.replace(
+      /id="container-[^"]+"/g,
+      `id="${uniqueId}"`
+    );
+
     try {
-      containerRef.current.innerHTML = selectedProvider.code;
-      const scripts = containerRef.current.querySelectorAll('script');
+      containerRef.current.innerHTML = adCode;
+      // إعادة تشغيل الـ scripts يدوياً لأن innerHTML لا يُنفّذها
+      const scripts = Array.from(containerRef.current.querySelectorAll('script'));
       scripts.forEach((oldScript) => {
         const newScript = document.createElement('script');
-        // Copy all attributes from the original script tag.
-        for (let i = 0; i < oldScript.attributes.length; i += 1) {
+        for (let i = 0; i < oldScript.attributes.length; i++) {
           const attr = oldScript.attributes[i];
           newScript.setAttribute(attr.name, attr.value);
         }
-        if (oldScript.textContent) {
-          newScript.text = oldScript.textContent;
-        }
+        if (oldScript.textContent) newScript.text = oldScript.textContent;
         oldScript.parentNode?.replaceChild(newScript, oldScript);
       });
       setIsLoaded(true);
       onLoad?.();
     } catch (error) {
-      console.error('AdSpace: Failed to load ad', error);
+      console.error('AdSpace: Failed to render ad', error);
       setHasError(true);
       onError?.();
     }
-  }, [providers, type, minHeight, onLoad, onError, isVisible, isLoaded]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVisible, providers, isLoaded]);
 
   const getDefaultHeight = (adType: string): number => {
     switch (adType) {
-      case 'horizontal': return 90;
-      case 'vertical': return 400;
-      case 'square': return 250;
-      case 'responsive': return 250;
-      default: return 250;
-    }
-  };
-
-  const placeholderStyle: React.CSSProperties = {
-    color: 'rgba(255,255,255,0.08)',
-    fontSize: '11px',
-    textAlign: 'center',
-    padding: '20px'
-  };
-
-  const getAdTypeDisplay = (): string => {
-    switch (type) {
-      case 'horizontal': return '728x90';
-      case 'vertical': return '160x600';
-      case 'square': return '250x250';
-      default: return 'Responsive';
+      case 'horizontal': return 100;
+      case 'vertical':   return 400;
+      case 'square':     return 280;
+      case 'responsive': return 280;
+      default:           return 280;
     }
   };
 
@@ -133,55 +128,54 @@ export const AdSpace: React.FC<AdSpaceProps> = ({
       data-loaded={isLoaded}
       style={{
         width: '100%',
-        minHeight: minHeight || getDefaultHeight(type),
+        minHeight: minHeight ?? getDefaultHeight(type),
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'rgba(255, 255, 255, 0.02)',
-        border: '1px solid rgba(255, 255, 255, 0.05)',
-        borderRadius: '12px',
+        background: 'rgba(255,255,255,0.018)',
+        border: '1px solid rgba(255,255,255,0.05)',
+        borderRadius: '14px',
         overflow: 'hidden',
         position: 'relative',
-        margin: '10px 0'
+        margin: '10px 0',
       }}
     >
+      {/* Loading shimmer */}
       {!isLoaded && !hasError && (
         <div style={{
-          ...placeholderStyle,
-          width: '100%',
-          height: '100%',
-          position: 'absolute',
-          inset: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexDirection: 'column',
-          gap: '12px'
+          position: 'absolute', inset: 0,
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 10,
+          color: 'rgba(255,255,255,0.07)', fontSize: 10,
+          letterSpacing: '1px', textTransform: 'uppercase',
         }}>
           <div style={{
-            width: '40px',
-            height: '40px',
-            border: '2px solid rgba(255,255,255,0.1)',
-            borderTopColor: 'rgba(16,185,129,0.5)',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite'
+            width: 34, height: 34,
+            border: '2px solid rgba(255,255,255,0.08)',
+            borderTopColor: 'rgba(16,185,129,0.4)',
+            borderRadius: '50%', animation: 'spin 1s linear infinite',
           }} />
-          <span style={{ letterSpacing: '1px', textTransform: 'uppercase', fontSize: '10px' }}>
-            Loading {getAdTypeDisplay()} ad...
-          </span>
+          <span>Advertisement</span>
         </div>
       )}
+
+      {/* Error placeholder */}
       {hasError && (
-        <div style={placeholderStyle}>
+        <div style={{
+          color: 'rgba(255,255,255,0.06)', fontSize: 11,
+          textAlign: 'center', padding: 20,
+        }}>
           <span>Ad unavailable</span>
         </div>
       )}
+
+      {/* Ad content */}
       <div
         ref={containerRef}
         style={{
-          display: isLoaded ? 'flex' : 'none',
+          display: isLoaded ? 'block' : 'none',
           width: '100%',
-          height: '100%'
+          minHeight: 'inherit',
         }}
       />
     </div>

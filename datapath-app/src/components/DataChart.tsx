@@ -82,7 +82,7 @@ export const DataChart: React.FC<Props> = ({ chart }) => {
           handleStyle: { color: '#6366f1' }
         }
       ],
-      series: [] as Record<string, any>[]
+      series: [] as Record<string, unknown>[]
     };
 
     if (isPie) {

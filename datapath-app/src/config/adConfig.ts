@@ -5,20 +5,30 @@ import type { AdProvider } from '../components/AdSpace';
  * Weight: نسبة الظهور (كلما زادت زادت فرصة الظهور)
  * Enabled: تفعيل/تعطيل الإعلان
  */
+// كود الإعلان الوحيد المؤكد - يستخدم في جميع البانرات
+const WORKING_AD_CODE = `<script async="async" data-cfasync="false" src="https://pl29177405.profitablecpmratenetwork.com/1a777b2003bc5c410fd28c0bb40954b1/invoke.js"></script>
+<div id="container-1a777b2003bc5c410fd28c0bb40954b1"></div>`;
+
 export const AD_PROVIDERS: AdProvider[] = [
+  {
+    id: 'adsterra_main',
+    name: 'Adsterra Main Banner',
+    code: WORKING_AD_CODE,
+    weight: 100,
+    enabled: true
+  },
   {
     id: 'native_banner',
     name: 'Native Banner',
-    code: `<script async="async" data-cfasync="false" src="https://pl29177405.profitablecpmratenetwork.com/1a777b2003bc5c410fd28c0bb40954b1/invoke.js"></script>
-<div id="container-1a777b2003bc5c410fd28c0bb40954b1"></div>`,
-    weight: 70,
+    code: WORKING_AD_CODE,
+    weight: 100,
     enabled: true
   },
   {
     id: 'social_banner',
     name: 'Social Banner',
-    code: `<script src="https://pl29177408.profitablecpmratenetwork.com/8f/52/4b/8f524b47fb209e3b639335c819fba560.js"></script>`,
-    weight: 30,
+    code: WORKING_AD_CODE,
+    weight: 100,
     enabled: true
   }
 ];

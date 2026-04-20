@@ -268,16 +268,19 @@ html, body, #root {
 .creator-footer p { color: #64748b; font-size: 14px; }
 .creator-footer strong { color: var(--primary); letter-spacing: 1px; font-size: 15px; }
 
-/* Home Page Ad Container */
+/* Home Page Ad Containers */
 .home-ad-container {
-  max-width: 728px;
-  margin: 40px auto;
   width: 100%;
+  max-width: 100%;
+  margin: 16px auto;
+}
+.home-ad-bottom {
+  margin-top: 32px;
 }
 
 @media (max-width: 768px) {
   .home-ad-container {
-    display: none; /* Hide on mobile to improve UX */
+    display: none;
   }
 }
 .feature-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
@@ -418,9 +421,10 @@ html, body, #root {
 .charts-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; width: 100%; }
 
 .insights-section { display: flex; flex-direction: column; gap: 18px; }
-.dashboard-ad-top, .dashboard-ad-square { border-radius: 22px; padding: 18px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); }
-.dashboard-ad-top { margin-bottom: 20px; }
-.dashboard-ad-square { min-height: 260px; }
+.dashboard-ad-top,
+.dashboard-ad-square { border-radius: 14px; padding: 8px; background: transparent; }
+.dashboard-ad-top { margin-bottom: 20px; width: 100%; }
+.dashboard-ad-square { min-height: 260px; width: 100%; }
 
 .insight-block { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 18px; }
 .insight-block-title { margin-bottom: 14px; }
@@ -443,8 +447,14 @@ html, body, #root {
 
 .insights-section { gap: 18px; }
 .data-health-box { padding: 28px 20px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; min-height: 180px; }
-.dashboard-ad-top, .dashboard-ad-square { border-radius: 18px; padding: 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); }
+.dashboard-ad-top, .dashboard-ad-square { border-radius: 14px; padding: 8px; background: transparent; }
 .dashboard-ad-top { margin-bottom: 20px; }
+
+/* Cleaning Page Ad */
+.cleaning-ad-top {
+  margin-bottom: 20px;
+  width: 100%;
+}
 
 .msg-row { display: flex; gap: 12px; margin-bottom: 14px; align-items: flex-start; }
 .msg-row.user { justify-content: flex-end; }
@@ -1135,9 +1145,12 @@ html, body, #root {
   text-transform: uppercase;
 }
 
-/* Mobile: hide large horizontal ads */
+/* Mobile: hide horizontal ads but keep responsive ones small */
 @media (max-width: 768px) {
-  .ad-space[data-type="horizontal"] {
+  .ad-space[data-ad-type="horizontal"] {
+    display: none !important;
+  }
+  .cleaning-ad-top {
     display: none !important;
   }
 }
@@ -1152,7 +1165,16 @@ html, body, #root {
 /* Desktop: show all ads */
 @media (min-width: 992px) {
   .ad-space {
-    margin: 15px 0;
+    margin: 12px 0;
+  }
+  .home-ad-container {
+    max-width: 90%;
+  }
+  .dashboard-ad-top {
+    width: 100%;
+  }
+  .dashboard-ad-square {
+    width: 100%;
   }
 }
 
