@@ -69,8 +69,10 @@ export const HomePage: React.FC<Props> = ({ lang, onFile }) => {
   return (
     <div className="home-page">
       <div className="home-hero">
-        <div className="home-logo-container">
-          <img src={logoImg} alt="Kimit Logo" className="home-logo" />
+        <div className="home-logo-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
+          <div style={{ width: '80px', height: '60px', overflow: 'hidden', display: 'flex', justifyContent: 'center' }}>
+            <img src={logoImg} alt="Kimit Logo" className="home-logo" />
+          </div>
           <span className="home-site-name">Kimit AI Studio</span>
         </div>
         <div className="hero-badge">{t.badge}</div>

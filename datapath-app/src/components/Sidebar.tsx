@@ -40,16 +40,28 @@ export const Sidebar: React.FC<Props> = ({ tab, lang, hasData, onTab, onLang, on
         <X size={28} />
       </button>
 
-      <div className="sidebar-logo" style={{ padding: '20px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '15px' }}>
-        <img 
-          src="/logo.png" 
-          alt="KEMET" 
-          style={{ width: '100%', maxHeight: '120px', objectFit: 'contain', padding: '0 10px', mixBlendMode: 'screen' }} 
-          onError={(e) => {
-             // If image fails, show a stylized placeholder library-style
-             (e.target as HTMLImageElement).src = "https://img.icons8.com/clouds/200/egyptian-pyramids.png";
-          }}
-        />
+      <div className="sidebar-logo" style={{ padding: '20px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '15px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ width: '100%', height: '70px', overflow: 'hidden', display: 'flex', justifyContent: 'center' }}>
+          <img 
+            src="/logo.png" 
+            alt="Kimit Logo" 
+            style={{ width: '100px', height: '100px', objectFit: 'cover', objectPosition: 'top', mixBlendMode: 'screen' }} 
+            onError={(e) => {
+               (e.target as HTMLImageElement).src = "https://img.icons8.com/clouds/200/egyptian-pyramids.png";
+            }}
+          />
+        </div>
+        <span style={{ 
+          fontSize: '18px', 
+          fontWeight: 900, 
+          letterSpacing: '-0.5px',
+          background: 'linear-gradient(135deg, #fff 30%, #10b981 100%)', 
+          WebkitBackgroundClip: 'text', 
+          WebkitTextFillColor: 'transparent',
+          marginTop: '2px'
+        }}>
+          Kimit AI Studio
+        </span>
       </div>
 
       <nav className="sidebar-nav">

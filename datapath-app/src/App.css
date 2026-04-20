@@ -201,11 +201,11 @@ html, body, #root {
   animation: fadeInDown 0.8s ease-out;
 }
 .home-logo {
-  width: 64px;
-  height: 64px;
-  object-fit: contain;
+  width: 90px;
+  height: 90px;
+  object-fit: cover;
+  object-position: top;
   mix-blend-mode: screen;
-  filter: drop-shadow(0 0 15px rgba(16, 185, 129, 0.4));
 }
 .home-site-name {
   font-size: 32px;
