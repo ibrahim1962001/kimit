@@ -4,7 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { HomePage } from './pages/HomePage';
 import { DashboardPage } from './pages/DashboardPage';
 import { CleaningPage } from './pages/CleaningPage';
-import { ChatPanel } from './components/ChatPanel';
+import { OpenRouterChat } from './components/OpenRouterChat';
 import { ExportPage } from './pages/ExportPage';
 import { EditorSidebar } from './components/EditorSidebar';
 import { AboutUsPage } from './pages/AboutUsPage';
@@ -28,7 +28,6 @@ function App() {
   const [loadMsg, setLoadMsg] = useState('');
   const [progress, setProgress] = useState(0);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
-  const [apiKey] = useState(() => localStorage.getItem('groq_key') || '');
 
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
     setToast({ msg, type });
@@ -70,11 +69,6 @@ function App() {
   const handleClose = () => { setDataset(null); setTab('home'); };
   const toggleLang = () => setLang(l => l === 'ar' ? 'en' : 'ar');
   
-  const handleApplyAction = (action: string) => {
-    if (action === 'clean' && dataset) {
-      handleClean();
-    }
-  };
 
   return (
     <div className={`app ${lang === 'en' ? 'ltr' : 'rtl'} flex flex-col min-h-screen relative`}>
@@ -114,17 +108,7 @@ function App() {
         {tab === 'home' && <HomePage lang={lang} onFile={handleFile} />}
         {tab === 'dashboard' && dataset && <DashboardPage info={dataset} lang={lang} />}
         {tab === 'cleaning' && dataset && <CleaningPage info={dataset} lang={lang} onClean={handleClean} onUpdate={setDataset} />}
-        {tab === 'chat' && (
-          <div className="page">
-            <div className="page-header">
-              <div>
-                <h2 className="page-title">{lang === 'ar' ? 'المستشار الذكي' : 'AI Consultant'}</h2>
-                <p className="page-sub">{lang === 'ar' ? 'اسألني أي شيء' : 'Ask me anything'}</p>
-              </div>
-            </div>
-            <ChatPanel lang={lang} dataset={dataset} apiKey={apiKey} onApplyAction={handleApplyAction} />
-          </div>
-        )}
+        {tab === 'chat' && <OpenRouterChat />}
         {tab === 'export' && dataset && <ExportPage info={dataset} lang={lang} />}
         {tab === 'about' && <AboutUsPage lang={lang} />}
         {tab === 'privacy' && <PrivacyPage lang={lang} />}
