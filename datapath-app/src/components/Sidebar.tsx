@@ -1,9 +1,10 @@
 import React from 'react';
-import { LayoutDashboard, Shield, MessageCircle, Download, Home, Globe, X, Table, HelpCircle, Info, ShieldCheck, BookOpen, ArrowRightLeft, LogIn } from 'lucide-react';
+import { LayoutDashboard, Shield, MessageCircle, Download, Home, Globe, X, Table, HelpCircle, Info, ShieldCheck, BookOpen, ArrowRightLeft, User, LogOut } from 'lucide-react';
 import { AdSpace } from './AdSpace';
 import { getActiveAdProviders } from '../config/adConfig';
 import type { Lang } from '../types';
-import type { User as FirebaseUser } from 'firebase/auth';
+import { type User as FirebaseUser, signOut } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 
 type Tab = 'home' | 'dashboard' | 'cleaning' | 'chat' | 'export' | 'about' | 'privacy' | 'faq' | 'guide' | 'compare';
 
@@ -107,6 +108,37 @@ export const Sidebar: React.FC<Props> = ({ tab, lang, hasData, onTab, onLang, on
         <span className="site-name">Kimit AI Studio</span>
       </div>
 
+      {/* User Profile / Login Section */}
+      <div className="sidebar-profile-section">
+        {currentUser ? (
+          <div className="sidebar-user-card">
+            {currentUser.photoURL ? (
+              <img src={currentUser.photoURL} alt="User" className="sidebar-avatar" referrerPolicy="no-referrer" />
+            ) : (
+              <div className="sidebar-avatar-placeholder"><User size={16} /></div>
+            )}
+            <div className="sidebar-user-info">
+              <span className="sidebar-user-name" title={currentUser.displayName || currentUser.email || ''}>
+                {currentUser.displayName || (currentUser.email ? currentUser.email.split('@')[0] : 'مستخدم')}
+              </span>
+              <button className="sidebar-logout-btn" onClick={() => signOut(auth)} title={isAr ? 'تسجيل الخروج' : 'Sign out'}>
+                <LogOut size={14} />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button className="sidebar-login-btn-top" onClick={onLoginClick}>
+            <div className="sidebar-login-icon">
+              <User size={16} />
+            </div>
+            <div className="sidebar-login-texts">
+              <span className="sidebar-login-title">{isAr ? 'تسجيل الدخول' : 'Sign In'}</span>
+              <span className="sidebar-login-sub">{isAr ? 'للوصول لجميع الميزات' : 'Unlock all features'}</span>
+            </div>
+          </button>
+        )}
+      </div>
+
       <nav className="sidebar-nav">
         <div className="nav-section">
           {mainItems.map(renderBtn)}
@@ -134,17 +166,7 @@ export const Sidebar: React.FC<Props> = ({ tab, lang, hasData, onTab, onLang, on
             <span>{t.close}</span>
           </button>
         )}
-        {/* زر تسجيل الدخول — يظهر فقط عندما لا يكون المستخدم مسجلاً */}
-        {!currentUser && onLoginClick && (
-          <button
-            id="sidebar-login-btn"
-            className="sidebar-login-btn"
-            onClick={onLoginClick}
-          >
-            <LogIn size={15} />
-            <span>{isAr ? 'تسجيل الدخول' : 'Sign In'}</span>
-          </button>
-        )}
+        {/* زر تسجيل الدخول تم نقله للأعلى */}
         <button className="lang-toggle" onClick={onLang}>
           <Globe size={15} />
           <span>{isAr ? 'English' : 'عربي'}</span>
