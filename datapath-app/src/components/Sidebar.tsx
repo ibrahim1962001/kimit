@@ -51,7 +51,7 @@ const T = {
   },
 };
 
-const mainItems: { tab: Tab; icon: any; key: string }[] = [
+const mainItems: { tab: Tab; icon: React.ElementType; key: string }[] = [
   { tab: 'home', icon: Home, key: 'home' },
   { tab: 'dashboard', icon: LayoutDashboard, key: 'dashboard' },
   { tab: 'cleaning', icon: Shield, key: 'cleaning' },
@@ -60,7 +60,7 @@ const mainItems: { tab: Tab; icon: any; key: string }[] = [
   { tab: 'export', icon: Download, key: 'export' },
 ];
 
-const supportItems: { tab: Tab; icon: any; key: string }[] = [
+const supportItems: { tab: Tab; icon: React.ElementType; key: string }[] = [
   { tab: 'guide', icon: BookOpen, key: 'guide' },
   { tab: 'faq', icon: HelpCircle, key: 'faq' },
   { tab: 'about', icon: Info, key: 'about' },
@@ -71,7 +71,7 @@ export const Sidebar: React.FC<Props> = ({ tab, lang, hasData, onTab, onLang, on
   const t = T[lang];
   const isAr = lang === 'ar';
 
-  const renderBtn = (item: { tab: Tab; icon: any; key: string }) => {
+  const renderBtn = (item: { tab: Tab; icon: React.ElementType; key: string }) => {
     const Icon = item.icon;
     const label = t[item.key as keyof typeof t];
     const dataNeeded = ['dashboard', 'cleaning', 'export'].includes(item.tab);
