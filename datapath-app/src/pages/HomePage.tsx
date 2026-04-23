@@ -60,7 +60,6 @@ const T = {
 // كل بانر يأخذ provider واحد مستقل لتفادي تعارض div id
 const banner1 = AD_PROVIDERS.filter(p => p.id === 'adsterra_main');
 const banner2 = AD_PROVIDERS.filter(p => p.id === 'native_banner');
-const banner3 = AD_PROVIDERS.filter(p => p.id === 'social_banner');
 
 export const HomePage: React.FC<Props> = ({ lang, onFile }) => {
   const t = T[lang];
@@ -69,8 +68,8 @@ export const HomePage: React.FC<Props> = ({ lang, onFile }) => {
   return (
     <div className="home-page">
       <div className="home-hero">
-        <div className="home-logo-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
-          <div style={{ width: '80px', height: '60px', overflow: 'hidden', display: 'flex', justifyContent: 'center' }}>
+        <div className="home-logo-container">
+          <div className="logo-img-wrapper">
             <img src={logoImg} alt="Kimit Logo" className="home-logo" />
           </div>
           <span className="home-site-name">Kimit AI Studio</span>
@@ -82,19 +81,9 @@ export const HomePage: React.FC<Props> = ({ lang, onFile }) => {
         <p className="hero-sub">{t.sub}</p>
         <DropZone lang={lang} onFile={onFile} />
 
-        {/* بانر 1 - تحت منطقة الرفع مباشرة */}
+        {/* Ad 1 */}
         <div className="home-ad-container">
           <AdSpace type="responsive" providers={banner1} minHeight={100} />
-        </div>
-
-        {/* بانر 2 */}
-        <div className="home-ad-container">
-          <AdSpace type="responsive" providers={banner2} minHeight={100} />
-        </div>
-
-        {/* بانر 3 */}
-        <div className="home-ad-container">
-          <AdSpace type="responsive" providers={banner3} minHeight={100} />
         </div>
 
         {/* Feature Cards */}
@@ -107,6 +96,12 @@ export const HomePage: React.FC<Props> = ({ lang, onFile }) => {
             </div>
           ))}
         </div>
+
+        {/* Ad 2 */}
+        <div className="home-ad-container">
+          <AdSpace type="responsive" providers={banner2} minHeight={100} />
+        </div>
+
 
         {/* How to use */}
         <div className="how-to-section">

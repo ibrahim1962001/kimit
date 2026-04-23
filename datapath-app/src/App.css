@@ -338,6 +338,40 @@ html, body, #root {
 .mobile-menu-btn:hover { background: rgba(16, 185, 129, 0.2); transform: scale(1.05) rotate(5deg); box-shadow: 0 8px 25px rgba(16, 185, 129, 0.2); }
 .ltr .mobile-menu-btn { right: auto; left: 20px; }
 
+/* =========================================
+   HOME PAGE
+========================================= */
+.home-page { padding: 48px 40px; }
+.home-hero { max-width: 860px; margin: 0 auto; text-align: center; display: flex; flex-direction: column; align-items: center; }
+.home-logo-container {
+  display: flex; flex-direction: column; align-items: center; gap: 15px; margin-bottom: 30px;
+}
+.logo-img-wrapper {
+  width: 80px; height: 80px; display: flex; justify-content: center; overflow: hidden;
+}
+.home-logo {
+  width: 120px; height: 120px; object-fit: cover; object-position: top;
+}
+.home-site-name {
+  font-size: 32px; font-weight: 900; letter-spacing: -1px;
+  background: linear-gradient(135deg, #fff 30%, var(--primary) 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2);
+  color: var(--primary); padding: 6px 16px; border-radius: 100px;
+  font-size: 13px; font-weight: 600; margin-bottom: 24px;
+}
+.hero-title {
+  font-size: clamp(40px, 6vw, 72px); font-weight: 900; line-height: 1.1; margin-bottom: 20px;
+  background: linear-gradient(135deg, #ffffff 30%, var(--primary) 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  white-space: pre-wrap;
+}
+.hero-sub { font-size: 17px; color: var(--muted); margin-bottom: 40px; line-height: 1.75; max-width: 600px; }
+
+
 /* FEATURES GRID */
 .features-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 36px; }
 .feature-card {
@@ -396,3 +430,33 @@ html, body, #root {
   .charts-grid { grid-template-columns: 1fr; }
   .page { padding: 24px 18px; }
 }
+
+/* =========================================
+   DASHBOARD & STATS
+========================================= */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+.stat-box {
+  background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+  border-radius: 16px; padding: 22px 18px; text-align: center;
+  position: relative; overflow: hidden; transition: all 0.25s;
+}
+.stat-val { font-size: 36px; font-weight: 900; margin-bottom: 5px; color: var(--primary); }
+.stat-label { font-size: 12px; color: var(--muted); font-weight: 500; }
+
+.dash-layout { display: grid; grid-template-columns: 1fr 340px; gap: 24px; width: 100%; }
+@media (max-width: 1100px) { .dash-layout { grid-template-columns: 1fr; } }
+
+.chart-card {
+  background: var(--card); backdrop-filter: blur(10px);
+  border: 1px solid var(--border); border-radius: 16px; padding: 20px;
+  transition: all 0.25s;
+}
+.chart-card:hover { transform: translateY(-3px); }
+
+/* CHAT STYLES */
+.chat-panel { display: flex; flex-direction: column; height: calc(100vh - 160px); }
+.chat-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; padding: 20px 0; }
+.msg-row { display: flex; gap: 12px; margin-bottom: 10px; }
+.msg-bubble { max-width: 80%; padding: 12px 16px; border-radius: 18px; background: rgba(255,255,255,0.05); }
+.msg-row.user { justify-content: flex-end; }
+.msg-row.user .msg-bubble { background: var(--primary); color: #fff; }
