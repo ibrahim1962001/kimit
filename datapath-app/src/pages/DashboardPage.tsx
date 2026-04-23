@@ -112,6 +112,17 @@ export const DashboardPage: React.FC<Props> = ({ info: initialInfo, lang }) => {
     setInfo(analyzeDataset(new File([], initialInfo.filename), filteredWorkData));
   }, [filters, initialInfo]);
 
+  // Phase 2.1: Proactive Insights
+  useEffect(() => {
+    if (!summary && !loadingSummary) {
+      const apiKey = localStorage.getItem('groq_key');
+      if (apiKey) {
+        handleFetchSummary();
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const getUniqueValues = (col: string) => {
     const vals = Array.from(new Set(initialInfo.workData.map(r => String(r[col]))));
     return vals.slice(0, 50).sort(); // Limit to 50 unique values for UI safety

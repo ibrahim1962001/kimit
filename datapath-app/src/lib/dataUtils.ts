@@ -149,15 +149,22 @@ export function analyzeDataset(file: File, data: DataRow[]): DatasetInfo {
   for (const col of numCols.slice(0, 15)) {
     const vals = getNumericVals(sampleData, col);
     if (vals.length < 10) continue;
-    const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
-    const std = Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length);
-    if (std === 0) continue;
-    const outliers = vals.filter(v => Math.abs((v - mean) / std) > 3).length;
+    
+    // Phase 2.2: IQR Method for Anomaly Detection
+    const sorted = [...vals].sort((a, b) => a - b);
+    const q1 = sorted[Math.floor(sorted.length * 0.25)];
+    const q3 = sorted[Math.floor(sorted.length * 0.75)];
+    const iqr = q3 - q1;
+    const lowerBound = q1 - 1.5 * iqr;
+    const upperBound = q3 + 1.5 * iqr;
+    
+    const outliers = vals.filter(v => v < lowerBound || v > upperBound).length;
+    
     if (outliers > 0) {
       anomalies.push({
         column: col, count: outliers * (rowCount / sampleData.length),
         severity: outliers > vals.length * 0.05 ? 'high' : 'medium',
-        description: `Approximately ${Math.round(outliers * (rowCount / sampleData.length))} outliers detected`,
+        description: `Approximately ${Math.round(outliers * (rowCount / sampleData.length))} outliers detected (IQR method)`,
       });
     }
   }
