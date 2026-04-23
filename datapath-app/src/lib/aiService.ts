@@ -1,7 +1,8 @@
 import type { DatasetInfo, Lang } from '../types';
 
 // Set this via environment or UI rather than hardcoding a real key.
-const DEFAULT_API_KEY = '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';
+const LLAMA_API_KEY = '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';
+const NEMOTRON_API_KEY = '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';
 
 export interface ChatParams {
   question: string;
@@ -9,11 +10,16 @@ export interface ChatParams {
   apiKey?: string;
   dataset: DatasetInfo | null;
   lang: Lang;
+  aiModel?: 'llama' | 'nemotron'; // Added to allow choosing the model
 }
 
 export async function askAI(params: ChatParams): Promise<string> {
-  const { question, history, apiKey, dataset, lang } = params;
-  const activeApiKey = apiKey || DEFAULT_API_KEY;
+  const { question, history, apiKey, dataset, lang, aiModel = 'nemotron' } = params;
+  
+  // Select key and model based on the chosen aiModel
+  const defaultKeyForModel = aiModel === 'nemotron' ? NEMOTRON_API_KEY : LLAMA_API_KEY;
+  const activeApiKey = apiKey || defaultKeyForModel;
+  const targetModelStr = aiModel === 'nemotron' ? 'nvidia/llama-3.1-nemotron-70b-instruct' : 'meta-llama/llama-3.3-70b-instruct';
 
   const systemPrompt = `
 You are DataPath AI, a premium world-class Data Analyst and General AI Assistant.
@@ -47,7 +53,7 @@ RULES:
       'X-Title': 'Kimit AI Studio',
     },
     body: JSON.stringify({
-      model: 'meta-llama/llama-3.3-70b-instruct',
+      model: targetModelStr,
       messages: [{ role: 'system', content: systemPrompt }, ...messages],
       temperature: 0.7,
       max_tokens: 1024,
