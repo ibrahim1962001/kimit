@@ -65,6 +65,14 @@ const MODELS: ModelConfig[] = [
     icon: <Code2 size={14} />,
     badge: 'كودينج'
   },
+  {
+    id: 'nvidia/llama-3.1-nemotron-70b-instruct',
+    name: 'Nemotron 3 Super',
+    description: 'قوي ومتقدم من انفيديا',
+    vision: false,
+    icon: <Brain size={14} />,
+    badge: 'NVIDIA'
+  },
 ];
 
 const SUGGESTED_PROMPTS = [
@@ -95,7 +103,9 @@ export const OpenRouterChat: React.FC<{ dataset?: DatasetInfo | null, onFileUplo
   const docInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const API_KEY = import.meta.env.VITE_OPENROUTER_KEY || '';
+  const DEFAULT_KEY = import.meta.env.VITE_OPENROUTER_KEY || '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';
+  const NEMOTRON_KEY = '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';
+  const API_KEY = selectedModel.id.includes('nemotron') ? NEMOTRON_KEY : DEFAULT_KEY;
 
   // Listen for auth state changes and load chat history
   useEffect(() => {
