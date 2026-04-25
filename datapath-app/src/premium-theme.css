@@ -1,497 +1,388 @@
-/* =====================================================
-   KIMIT AI STUDIO — PREMIUM THEME v2
-   Stacks on top of App.css — no class names changed
-   ===================================================== */
+/* =============================================
+   KIMIT AI STUDIO — PREMIUM THEME v3
+   Full visual overhaul + animations
+   ============================================= */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Noto+Sans+Arabic:wght@400;500;700;800;900&display=swap');
 
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&display=swap');
-
-/* ── Design Tokens upgrade ───────────────────────── */
+/* ── 1. TOKENS ─────────────────────────────── */
 :root {
-  --primary:        #00e5a0;
-  --primary-glow:   rgba(0, 229, 160, 0.22);
-  --primary-dark:   #00b87a;
-  --secondary:      #7c6aff;
-  --secondary-glow: rgba(124, 106, 255, 0.2);
-  --accent:         #f5b731;
+  --primary:        #00ffaa;
+  --primary-glow:   rgba(0,255,170,0.35);
+  --primary-dark:   #00cc88;
+  --secondary:      #7b61ff;
+  --secondary-glow: rgba(123,97,255,0.35);
+  --accent:         #ffcc00;
   --danger:         #ff4d6a;
-
-  --bg:             #070d1a;
-  --bg-gradient:    radial-gradient(ellipse 120% 80% at 50% -10%,
-                      rgba(0,229,160,0.06) 0%, transparent 60%),
-                    radial-gradient(ellipse 80% 60% at 90% 100%,
-                      rgba(124,106,255,0.07) 0%, transparent 55%),
-                    #070d1a;
-
-  --card:           rgba(255,255,255,0.028);
-  --card-hover:     rgba(255,255,255,0.05);
-  --surface:        rgba(255,255,255,0.032);
-  --border:         rgba(255,255,255,0.07);
-  --border-hover:   rgba(0,229,160,0.35);
-
-  --text:           #edf2ff;
-  --text-dim:       #8899b4;
-  --muted:          #526070;
-  --brand:          #00e5a0;
-
-  --radius-sm:  12px;
-  --radius-md:  18px;
-  --radius-lg:  26px;
-  --radius-xl:  36px;
-
-  --shadow-sm:  0 2px 8px rgba(0,0,0,0.18);
-  --shadow-md:  0 6px 20px rgba(0,0,0,0.28);
-  --shadow-lg:  0 16px 48px rgba(0,0,0,0.40);
-  --shadow-glow: 0 0 32px rgba(0,229,160,0.14);
-
-  --glass-bg:     rgba(255,255,255,0.03);
-  --glass-border: rgba(255,255,255,0.07);
+  --bg:             #04080f;
+  --bg-gradient:
+    radial-gradient(ellipse 80% 60% at 15% 10%, rgba(123,97,255,0.18) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 50% at 85% 90%, rgba(0,255,170,0.14) 0%, transparent 55%),
+    #04080f;
+  --card:    rgba(255,255,255,0.038);
+  --surface: rgba(255,255,255,0.038);
+  --border:  rgba(255,255,255,0.09);
+  --text:    #e8f4ff;
+  --text-dim:#7a9ab8;
+  --muted:   #3d5570;
+  --brand:   #00ffaa;
+  --glass-bg:     rgba(255,255,255,0.038);
+  --glass-border: rgba(255,255,255,0.09);
 }
 
-/* ── Base typography upgrade ─────────────────────── */
-html, body, #root {
-  font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', 'Inter', system-ui, sans-serif !important;
-  background: var(--bg-gradient) !important;
-  letter-spacing: -0.01em;
+/* ── 2. GLOBAL FONT ────────────────────────── */
+html, body, #root, button, input, select, textarea {
+  font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', system-ui, sans-serif !important;
 }
 
-/* ── Ambient orbs — more premium ─────────────────── */
+/* ── 3. ANIMATED BACKGROUND ORBS ──────────── */
+body { background: var(--bg-gradient) !important; }
+
 .app::before {
   background:
-    radial-gradient(ellipse 55% 45% at 8%  15%, rgba(0,229,160,0.10) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 40% at 92% 85%, rgba(124,106,255,0.10) 0%, transparent 60%),
-    radial-gradient(ellipse 40% 35% at 50% 50%, rgba(0,15,40,0.5) 0%, transparent 100%) !important;
-  filter: blur(70px) !important;
+    radial-gradient(ellipse 65% 55% at 15% 15%, rgba(123,97,255,0.22) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 50% at 85% 85%, rgba(0,255,170,0.18) 0%, transparent 55%),
+    radial-gradient(ellipse 45% 40% at 50% 50%, rgba(0,20,50,0.6)    0%, transparent 70%) !important;
+  animation: orb-drift 16s ease-in-out infinite alternate !important;
+  filter: blur(55px) !important;
+}
+@keyframes orb-drift {
+  0%   { transform: scale(1)    translate(0px, 0px)    rotate(0deg);   opacity: 0.8; }
+  33%  { transform: scale(1.08) translate(20px,-15px)  rotate(2deg);   opacity: 1;   }
+  66%  { transform: scale(0.95) translate(-15px,20px)  rotate(-2deg);  opacity: 0.9; }
+  100% { transform: scale(1.05) translate(10px,-10px)  rotate(1deg);   opacity: 1;   }
 }
 
-/* ── Sidebar — glassmorphism ultra ──────────────── */
+/* ── 4. PAGE ENTRY ANIMATION ───────────────── */
+.page, .home-page {
+  animation: page-slide-in 0.6s cubic-bezier(0.16,1,0.3,1) both !important;
+}
+@keyframes page-slide-in {
+  from { opacity:0; transform: translateY(28px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+
+/* ── 5. SIDEBAR ────────────────────────────── */
 @media (min-width: 900px) {
   .sidebar {
-    background: rgba(6, 12, 28, 0.72) !important;
-    backdrop-filter: blur(48px) saturate(220%) !important;
-    -webkit-backdrop-filter: blur(48px) saturate(220%) !important;
-    border: 1px solid rgba(255,255,255,0.065) !important;
+    background: linear-gradient(160deg,
+      rgba(10,14,32,0.92) 0%,
+      rgba(5,8,20,0.96)   100%) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-top: 1px solid rgba(255,255,255,0.13) !important;
     border-radius: 28px !important;
     box-shadow:
-      0 24px 56px rgba(0,0,0,0.45),
-      inset 0 1px 0 rgba(255,255,255,0.08),
-      inset 0 -1px 0 rgba(0,0,0,0.2) !important;
+      0 28px 80px rgba(0,0,0,0.6),
+      inset 1px 1px 0 rgba(255,255,255,0.09),
+      0 0 0 1px rgba(123,97,255,0.06) !important;
   }
 }
 
-/* Sidebar logo glow */
+/* Sidebar logo pulse */
 .logo-icon {
-  background: linear-gradient(135deg, var(--primary), var(--secondary)) !important;
-  box-shadow: 0 0 24px var(--primary-glow), 0 0 8px rgba(124,106,255,0.2) !important;
+  background: linear-gradient(135deg, #00ffaa, #7b61ff) !important;
   border-radius: 14px !important;
+  animation: logo-float 4s ease-in-out infinite, logo-glow 4s ease-in-out infinite !important;
+  box-shadow: 0 0 0 0 rgba(0,255,170,0) !important;
+}
+@keyframes logo-float {
+  0%,100% { transform: translateY(0px); }
+  50%      { transform: translateY(-4px); }
+}
+@keyframes logo-glow {
+  0%,100% { box-shadow: 0 0 18px rgba(0,255,170,0.4), 0 0 6px rgba(123,97,255,0.3); }
+  50%      { box-shadow: 0 0 36px rgba(0,255,170,0.7), 0 0 18px rgba(123,97,255,0.5); }
 }
 
-/* Nav buttons — smoother premium active */
+/* Nav button active */
 .nav-btn.active {
-  background: linear-gradient(135deg,
-    rgba(0,229,160,0.13) 0%,
-    rgba(124,106,255,0.07) 100%) !important;
-  border-color: rgba(0,229,160,0.22) !important;
-  box-shadow: 0 4px 20px rgba(0,229,160,0.08) !important;
+  background: linear-gradient(135deg,rgba(0,255,170,0.14),rgba(123,97,255,0.08)) !important;
+  border-color: rgba(0,255,170,0.3) !important;
   color: #fff !important;
+  box-shadow: 0 0 20px rgba(0,255,170,0.08) !important;
 }
 .nav-btn.active::after {
-  background: linear-gradient(to bottom, var(--primary), var(--secondary)) !important;
-  box-shadow: 0 0 12px var(--primary-glow) !important;
+  background: linear-gradient(to bottom, #00ffaa, #7b61ff) !important;
+  box-shadow: 0 0 16px rgba(0,255,170,0.6) !important;
+  width: 3px !important;
 }
+.nav-btn.active .nav-icon { color: #00ffaa !important; }
 .nav-btn:hover:not(.disabled) {
-  background: rgba(255,255,255,0.045) !important;
+  background: rgba(255,255,255,0.05) !important;
   border-color: rgba(255,255,255,0.12) !important;
+  transform: translateX(-5px) !important;
 }
-.nav-btn.active .nav-icon { color: var(--primary) !important; }
+.ltr .nav-btn:hover:not(.disabled) { transform: translateX(5px) !important; }
 
-/* ── Primary button — premium gradient pill ──────── */
+/* ── 6. PRIMARY BUTTON — pulse + sweep ──────── */
 .btn-primary {
-  background: linear-gradient(135deg, var(--primary) 0%, #00c98a 60%, var(--primary-dark) 100%) !important;
-  border: 1px solid rgba(255,255,255,0.12) !important;
-  border-radius: 99px !important;
-  box-shadow:
-    0 6px 24px rgba(0,229,160,0.28),
-    0 1px 0 rgba(255,255,255,0.2) inset !important;
-  font-family: 'Plus Jakarta Sans', inherit !important;
-  font-weight: 700 !important;
-  letter-spacing: -0.01em !important;
-  transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1) !important;
+  background: linear-gradient(135deg, #00ffaa, #00cc88) !important;
   color: #021a0e !important;
+  border: 1px solid rgba(255,255,255,0.2) !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.01em !important;
+  border-radius: 99px !important;
+  position: relative !important;
+  overflow: hidden !important;
+  animation: btn-glow 2.5s ease-in-out infinite !important;
+  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), filter 0.3s !important;
 }
-.btn-primary:hover {
-  transform: translateY(-3px) scale(1.03) !important;
-  box-shadow:
-    0 14px 36px rgba(0,229,160,0.38),
-    0 1px 0 rgba(255,255,255,0.3) inset !important;
-  filter: brightness(1.08) !important;
+.btn-primary::before {
+  content: '';
+  position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+  animation: btn-sweep 2.5s ease-in-out infinite;
 }
+@keyframes btn-sweep {
+  0%   { left: -100%; }
+  50%, 100% { left: 150%; }
+}
+@keyframes btn-glow {
+  0%,100% { box-shadow: 0 6px 24px rgba(0,255,170,0.35), inset 0 1px 0 rgba(255,255,255,0.2); }
+  50%      { box-shadow: 0 8px 40px rgba(0,255,170,0.60), inset 0 1px 0 rgba(255,255,255,0.3); }
+}
+.btn-primary:hover { transform: translateY(-4px) scale(1.05) !important; filter: brightness(1.12) !important; }
 .btn-primary:active { transform: translateY(0) scale(0.97) !important; }
 
-/* ── Page titles ─────────────────────────────────── */
-.page-title {
-  font-size: 28px !important;
-  font-weight: 900 !important;
-  background: linear-gradient(135deg, #fff 10%, #8899b4 100%) !important;
-  -webkit-background-clip: text !important;
-  background-clip: text !important;
-  -webkit-text-fill-color: transparent !important;
-  letter-spacing: -0.5px !important;
-}
-
-/* ── KPI stat boxes — glowing accent borders ─────── */
-.stat-box {
-  border-radius: 20px !important;
-  padding: 22px 18px !important;
-  background: rgba(255,255,255,0.025) !important;
-  backdrop-filter: blur(16px) !important;
-  border: 1px solid rgba(255,255,255,0.06) !important;
-  transition: all 0.3s ease !important;
+/* ── 7. CARDS — glass + shimmer ─────────────── */
+.chart-card, .feature-card, .export-card, .insight-box, .stat-box, .col-card, .clean-banner {
+  background: rgba(255,255,255,0.036) !important;
+  backdrop-filter: blur(28px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(200%) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
   position: relative !important;
   overflow: hidden !important;
 }
-.stat-box::before {
+/* Shimmer sweep on all cards */
+.chart-card::after, .feature-card::after, .stat-box::after {
   content: '';
-  position: absolute; top: 0; left: 0; right: 0;
-  height: 2px;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  border-radius: 20px 20px 0 0;
+  position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
+  background: linear-gradient(105deg, transparent, rgba(255,255,255,0.055), transparent);
+  animation: card-shimmer 5s ease-in-out infinite;
+  pointer-events: none;
 }
-.stat-box:hover { transform: translateY(-4px) !important; }
-.stat-box:hover::before { opacity: 1; }
-.stat-box.green  { border-color: rgba(0,229,160,0.2) !important; background: rgba(0,229,160,0.045) !important; }
-.stat-box.green::before  { background: linear-gradient(90deg, transparent, #00e5a0, transparent); }
-.stat-box.blue   { border-color: rgba(124,106,255,0.2) !important; background: rgba(124,106,255,0.045) !important; }
-.stat-box.blue::before   { background: linear-gradient(90deg, transparent, #7c6aff, transparent); }
-.stat-box.yellow { border-color: rgba(245,183,49,0.2) !important; background: rgba(245,183,49,0.045) !important; }
-.stat-box.yellow::before { background: linear-gradient(90deg, transparent, #f5b731, transparent); }
-.stat-box.red    { border-color: rgba(255,77,106,0.2) !important; background: rgba(255,77,106,0.045) !important; }
-.stat-box.red::before    { background: linear-gradient(90deg, transparent, #ff4d6a, transparent); }
+.chart-card:nth-child(2)::after  { animation-delay: 0.8s; }
+.chart-card:nth-child(3)::after  { animation-delay: 1.6s; }
+.feature-card:nth-child(2)::after { animation-delay: 1s; }
+.feature-card:nth-child(3)::after { animation-delay: 2s; }
+@keyframes card-shimmer {
+  0%    { left:-100%; opacity:0; }
+  15%   { opacity:1; }
+  50%,100% { left:160%; opacity:0; }
+}
 
-.stat-val   { font-size: 30px !important; font-weight: 900 !important; letter-spacing: -1px !important; }
-.stat-label { font-size: 12px !important; font-weight: 600 !important; color: var(--text-dim) !important; letter-spacing: 0.02em !important; }
-
-/* ── Chart cards — premium glass ────────────────── */
+/* Chart card hover */
 .chart-card {
-  background: rgba(255,255,255,0.025) !important;
-  backdrop-filter: blur(24px) !important;
-  -webkit-backdrop-filter: blur(24px) !important;
-  border: 1px solid rgba(255,255,255,0.065) !important;
   border-radius: 24px !important;
-  box-shadow:
-    0 8px 32px rgba(0,0,0,0.28),
-    inset 0 1px 0 rgba(255,255,255,0.06) !important;
-  overflow: visible !important;
-  transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1) !important;
+  transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1), border-color 0.3s, box-shadow 0.4s !important;
 }
 .chart-card:hover {
-  transform: translateY(-6px) !important;
-  border-color: rgba(0,229,160,0.2) !important;
-  box-shadow:
-    0 20px 48px rgba(0,0,0,0.36),
-    0 0 0 1px rgba(0,229,160,0.12),
-    inset 0 1px 0 rgba(255,255,255,0.1) !important;
+  transform: translateY(-8px) scale(1.02) !important;
+  border-color: rgba(0,255,170,0.3) !important;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.45), 0 0 40px rgba(0,255,170,0.08) !important;
 }
 
-/* Chart header */
-.chart-header {
-  padding: 18px 20px 10px !important;
-}
-.chart-title {
-  font-size: 14px !important;
-  font-weight: 800 !important;
-  color: #e2e8f0 !important;
-  letter-spacing: -0.02em !important;
-}
-.chart-type-badge {
-  background: rgba(255,255,255,0.055) !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
-  border-radius: 999px !important;
-  color: var(--text-dim) !important;
-  font-size: 10px !important;
-  font-weight: 800 !important;
-  letter-spacing: 0.08em !important;
-  padding: 5px 12px !important;
-}
-
-/* Chart download button */
-.chart-download-btn {
-  background: rgba(255,255,255,0.06) !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
-  border-radius: 10px !important;
-  color: var(--text-dim) !important;
-  padding: 7px !important;
-  cursor: pointer !important;
-  transition: all 0.2s !important;
-}
-.chart-download-btn:hover {
-  background: rgba(0,229,160,0.12) !important;
-  border-color: rgba(0,229,160,0.3) !important;
-  color: var(--primary) !important;
-}
-.chart-download-btn.active {
-  background: rgba(245,183,49,0.15) !important;
-  border-color: rgba(245,183,49,0.3) !important;
-  color: #f5b731 !important;
-}
-
-/* ── Dropzone — premium dashed glow ──────────────── */
-.dropzone {
-  border: 2px dashed rgba(0,229,160,0.18) !important;
-  border-radius: 28px !important;
-  background: rgba(0,229,160,0.015) !important;
-  backdrop-filter: blur(16px) !important;
-  transition: all 0.35s ease !important;
-}
-.dropzone:hover {
-  border-color: rgba(0,229,160,0.55) !important;
-  background: rgba(0,229,160,0.04) !important;
-  box-shadow: 0 0 48px rgba(0,229,160,0.10), 0 0 0 1px rgba(0,229,160,0.12) !important;
-}
-.dropzone-title { font-size: 22px !important; font-weight: 900 !important; color: #fff !important; }
-
-/* ── Feature cards on home ───────────────────────── */
+/* Feature card hover */
 .feature-card {
-  background: rgba(255,255,255,0.025) !important;
-  border: 1px solid rgba(255,255,255,0.065) !important;
   border-radius: 28px !important;
-  backdrop-filter: blur(20px) !important;
-  box-shadow: 0 8px 28px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.05) !important;
-  transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1) !important;
+  transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1), border-color 0.3s, box-shadow 0.4s !important;
+  animation: float-card 6s ease-in-out infinite !important;
+}
+.feature-card:nth-child(2) { animation-delay: 1s !important; }
+.feature-card:nth-child(3) { animation-delay: 2s !important; }
+@keyframes float-card {
+  0%,100% { transform: translateY(0px); }
+  50%      { transform: translateY(-6px); }
 }
 .feature-card:hover {
-  border-color: rgba(0,229,160,0.35) !important;
-  background: rgba(0,229,160,0.04) !important;
-  transform: translateY(-10px) scale(1.03) !important;
-  box-shadow: 0 24px 52px rgba(0,0,0,0.36), 0 0 30px rgba(0,229,160,0.12) !important;
+  transform: translateY(-14px) scale(1.04) !important;
+  border-color: rgba(0,255,170,0.4) !important;
+  box-shadow: 0 30px 70px rgba(0,0,0,0.5), 0 0 50px rgba(0,255,170,0.12) !important;
+  animation: none !important;
 }
 .feature-icon {
-  background: rgba(0,229,160,0.1) !important;
+  background: rgba(0,255,170,0.12) !important;
+  color: #00ffaa !important;
   border-radius: 14px !important;
-  color: var(--primary) !important;
+  transition: transform 0.3s, background 0.3s !important;
 }
-.feature-title { color: #fff !important; font-weight: 800 !important; }
-.feature-desc  { color: var(--text-dim) !important; font-size: 12.5px !important; }
-
-/* ── Hero section ─────────────────────────────────── */
-.hero-badge {
-  background: rgba(0,229,160,0.08) !important;
-  border: 1px solid rgba(0,229,160,0.2) !important;
-  color: var(--primary) !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.02em !important;
-}
-.hero-title {
-  background: linear-gradient(135deg, #fff 0%, #c4d0e8 60%, #8899b4 100%) !important;
-  -webkit-background-clip: text !important;
-  background-clip: text !important;
-  -webkit-text-fill-color: transparent !important;
-  letter-spacing: -2.5px !important;
-}
-.home-site-name {
-  background: linear-gradient(135deg, #fff 20%, var(--primary) 100%) !important;
-  -webkit-background-clip: text !important;
-  background-clip: text !important;
-  -webkit-text-fill-color: transparent !important;
+.feature-card:hover .feature-icon {
+  transform: scale(1.15) rotate(8deg) !important;
+  background: rgba(0,255,170,0.22) !important;
 }
 
-/* ── Insight boxes ────────────────────────────────── */
-.insight-box {
-  background: rgba(255,255,255,0.025) !important;
-  border: 1px solid rgba(255,255,255,0.07) !important;
-  border-radius: 20px !important;
-  backdrop-filter: blur(16px) !important;
-}
-.insight-box.data-health-box { border-color: rgba(0,229,160,0.18) !important; }
-
-/* ── Slicers bar ─────────────────────────────────── */
-.slicers-bar {
-  background: rgba(255,255,255,0.025) !important;
-  border: 1px solid rgba(255,255,255,0.065) !important;
-  border-radius: 18px !important;
-  backdrop-filter: blur(16px) !important;
-}
-.slicers-bar select {
-  background: rgba(255,255,255,0.04) !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
-  border-radius: 12px !important;
-  color: #e2e8f0 !important;
-  padding: 10px 14px !important;
-}
-
-/* ── Builder panel ───────────────────────────────── */
-.builder-panel {
-  background: rgba(255,255,255,0.025) !important;
-  border: 1px solid rgba(255,255,255,0.065) !important;
-  border-radius: 20px !important;
-  backdrop-filter: blur(16px) !important;
-}
-.builder-panel select {
-  background: rgba(255,255,255,0.04) !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
-  border-radius: 12px !important;
-  color: #e2e8f0 !important;
-}
-
-/* ── Export cards ────────────────────────────────── */
-.export-card {
-  background: rgba(255,255,255,0.025) !important;
-  border: 1px solid rgba(255,255,255,0.065) !important;
-  border-radius: 24px !important;
-  backdrop-filter: blur(16px) !important;
-  transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1) !important;
-}
-.export-card:hover {
-  border-color: rgba(0,229,160,0.3) !important;
-  transform: translateY(-8px) !important;
-  box-shadow: 0 20px 48px rgba(0,0,0,0.36) !important;
-}
-.export-btn {
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark)) !important;
-  border-radius: 14px !important;
-  font-weight: 700 !important;
-  color: #021a0e !important;
-  border: none !important;
-  padding: 13px 20px !important;
-}
-
-/* ── Cleaning page banner ────────────────────────── */
-.clean-banner {
-  background: rgba(255,255,255,0.025) !important;
-  border: 1px solid rgba(255,255,255,0.07) !important;
+/* ── 8. KPI STAT BOXES ──────────────────────── */
+.stat-box {
   border-radius: 22px !important;
-  backdrop-filter: blur(16px) !important;
+  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.3s !important;
+}
+.stat-box:hover { transform: translateY(-6px) !important; }
+.stat-box.green  { border-color: rgba(0,255,170,0.25) !important; background: rgba(0,255,170,0.05) !important; }
+.stat-box.blue   { border-color: rgba(123,97,255,0.25) !important; background: rgba(123,97,255,0.05) !important; }
+.stat-box.yellow { border-color: rgba(255,204,0,0.25) !important;  background: rgba(255,204,0,0.05) !important; }
+.stat-box.red    { border-color: rgba(255,77,106,0.25) !important; background: rgba(255,77,106,0.05) !important; }
+.stat-val   { font-weight: 900 !important; letter-spacing: -1.5px !important; font-size: 30px !important; }
+.stat-label { font-size: 11px !important; font-weight: 700 !important; letter-spacing: 0.05em !important; color: var(--text-dim) !important; }
+
+/* ── 9. DROPZONE ─────────────────────────────── */
+.dropzone {
+  border: 2px dashed rgba(0,255,170,0.2) !important;
+  border-radius: 28px !important;
+  background: rgba(0,255,170,0.015) !important;
+  backdrop-filter: blur(20px) !important;
+  animation: dropzone-breathe 4s ease-in-out infinite !important;
+}
+@keyframes dropzone-breathe {
+  0%,100% { border-color: rgba(0,255,170,0.15); box-shadow: 0 0 0 rgba(0,255,170,0); }
+  50%      { border-color: rgba(0,255,170,0.35); box-shadow: 0 0 30px rgba(0,255,170,0.06); }
+}
+.dropzone:hover {
+  border-color: #00ffaa !important;
+  box-shadow: 0 0 60px rgba(0,255,170,0.15), 0 0 0 1px rgba(0,255,170,0.15) !important;
+  animation: none !important;
 }
 
-/* ── Data table ──────────────────────────────────── */
-.data-table th {
-  background: rgba(0,229,160,0.05) !important;
-  border-bottom: 1px solid rgba(0,229,160,0.15) !important;
-  color: var(--primary) !important;
-  font-size: 11px !important;
-  font-weight: 800 !important;
-  letter-spacing: 0.08em !important;
-  text-transform: uppercase !important;
+/* ── 10. HERO TITLE GRADIENT ANIMATION ──────── */
+.hero-title {
+  background: linear-gradient(135deg, #ffffff 0%, #a0d4ff 40%, #00ffaa 70%, #7b61ff 100%) !important;
+  background-size: 300% 300% !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  animation: title-gradient 6s ease-in-out infinite !important;
 }
-.data-table tr:hover td { background: rgba(255,255,255,0.025) !important; }
-.data-table td {
-  border-bottom: 1px solid rgba(255,255,255,0.04) !important;
-  color: #c8d8e8 !important;
-  font-size: 13px !important;
+@keyframes title-gradient {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
-/* ── Column profile cards ────────────────────────── */
-.col-card {
-  background: rgba(255,255,255,0.025) !important;
-  border: 1px solid rgba(255,255,255,0.065) !important;
-  border-radius: 20px !important;
-  backdrop-filter: blur(16px) !important;
-  transition: all 0.3s ease !important;
+.hero-badge {
+  background: rgba(0,255,170,0.1) !important;
+  border: 1px solid rgba(0,255,170,0.25) !important;
+  color: #00ffaa !important;
+  animation: badge-pulse 3s ease-in-out infinite !important;
 }
-.col-card:hover {
-  border-color: rgba(0,229,160,0.25) !important;
-  transform: translateY(-4px) !important;
+@keyframes badge-pulse {
+  0%,100% { box-shadow: 0 0 0 rgba(0,255,170,0); }
+  50%      { box-shadow: 0 0 20px rgba(0,255,170,0.2); }
 }
 
-/* ── Section title line ──────────────────────────── */
+.home-site-name {
+  background: linear-gradient(135deg, #fff 30%, #00ffaa 100%) !important;
+  -webkit-background-clip: text !important; background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+/* ── 11. SECTION TITLE ──────────────────────── */
 .section-title {
-  font-size: 11px !important;
-  font-weight: 800 !important;
-  letter-spacing: 0.14em !important;
   color: var(--muted) !important;
-  text-transform: uppercase !important;
+  letter-spacing: 0.14em !important;
+  font-weight: 800 !important;
+  font-size: 11px !important;
 }
 .section-title::after {
-  background: linear-gradient(to right, rgba(255,255,255,0.07), transparent) !important;
+  background: linear-gradient(to right, rgba(0,255,170,0.25), transparent) !important;
 }
 
-/* ── Mobile header bar ───────────────────────────── */
-.nav-header {
-  background: rgba(7,13,26,0.85) !important;
-  backdrop-filter: blur(24px) !important;
-  -webkit-backdrop-filter: blur(24px) !important;
-  border-bottom: 1px solid rgba(255,255,255,0.065) !important;
-}
-.nav-tab.active {
-  color: var(--primary) !important;
-  border-bottom-color: var(--primary) !important;
+/* ── 12. PAGE TITLE GLOW ────────────────────── */
+.page-title {
+  background: linear-gradient(135deg, #fff 0%, #a0c4e8 100%) !important;
+  -webkit-background-clip: text !important; background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  font-size: 28px !important; font-weight: 900 !important; letter-spacing: -0.5px !important;
 }
 
-/* ── Scrollbar — premium thin ────────────────────── */
+/* ── 13. DATA TABLE ─────────────────────────── */
+.data-table th {
+  background: rgba(0,255,170,0.05) !important;
+  color: #00ffaa !important;
+  border-bottom: 1px solid rgba(0,255,170,0.18) !important;
+  font-size: 11px !important; font-weight: 800 !important; letter-spacing: 0.1em !important; text-transform: uppercase !important;
+}
+.data-table tr { transition: background 0.2s !important; }
+.data-table tr:hover td { background: rgba(0,255,170,0.04) !important; }
+.data-table td { border-bottom: 1px solid rgba(255,255,255,0.04) !important; font-size: 13px !important; }
+
+/* ── 14. SCROLLBAR ───────────────────────────── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb {
-  background: rgba(0,229,160,0.25);
-  border-radius: 99px;
-}
-::-webkit-scrollbar-thumb:hover { background: rgba(0,229,160,0.45); }
+::-webkit-scrollbar-thumb { background: rgba(0,255,170,0.3); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,255,170,0.55); }
+::selection { background: rgba(0,255,170,0.25); color: #fff; }
 
-/* ── Selection color ─────────────────────────────── */
-::selection { background: rgba(0,229,160,0.25); color: #fff; }
-
-/* ── Input / Select global ───────────────────────── */
-input, select, textarea {
-  font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', system-ui !important;
-  background: rgba(255,255,255,0.04) !important;
-  border: 1px solid rgba(255,255,255,0.09) !important;
-  color: var(--text) !important;
-  border-radius: 12px !important;
-  transition: border-color 0.2s, box-shadow 0.2s !important;
-}
+/* ── 15. INPUT / SELECT FOCUS ───────────────── */
 input:focus, select:focus, textarea:focus {
   outline: none !important;
-  border-color: rgba(0,229,160,0.4) !important;
-  box-shadow: 0 0 0 3px rgba(0,229,160,0.08) !important;
+  border-color: rgba(0,255,170,0.45) !important;
+  box-shadow: 0 0 0 3px rgba(0,255,170,0.1) !important;
 }
 
-/* ── OR input / chat pill ────────────────────────── */
-.or-input-row {
-  background: rgba(7,13,26,0.88) !important;
-  border: 1px solid rgba(255,255,255,0.09) !important;
-  backdrop-filter: blur(32px) !important;
-  border-radius: 28px !important;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.04) !important;
-}
-
-/* ── Google Sheets picker button ────────────────── */
-.gsheets-btn {
-  background: linear-gradient(135deg, rgba(0,229,160,0.12), rgba(124,106,255,0.08)) !important;
-  border: 1px solid rgba(0,229,160,0.25) !important;
-  border-radius: 14px !important;
-  color: var(--primary) !important;
-  font-weight: 700 !important;
-  transition: all 0.3s ease !important;
-}
-.gsheets-btn:hover {
-  background: linear-gradient(135deg, rgba(0,229,160,0.2), rgba(124,106,255,0.14)) !important;
-  border-color: rgba(0,229,160,0.45) !important;
-  box-shadow: 0 6px 20px rgba(0,229,160,0.18) !important;
-  transform: translateY(-2px) !important;
-}
-
-/* ── Sidebar version badge ───────────────────────── */
-.sidebar-footer {
-  border-top: 1px solid rgba(255,255,255,0.06) !important;
-}
-
-/* ── Insight severity badges ────────────────────── */
-.sev-badge.high   { background: rgba(255,77,106,0.12)  !important; color: #ff4d6a !important; border: 1px solid rgba(255,77,106,0.2) !important; }
-.sev-badge.medium { background: rgba(245,183,49,0.12)  !important; color: #f5b731 !important; border: 1px solid rgba(245,183,49,0.2) !important; }
-
-/* ── How-to steps ────────────────────────────────── */
-.how-to-section {
-  background: rgba(255,255,255,0.025) !important;
-  border: 1px solid rgba(255,255,255,0.065) !important;
-  backdrop-filter: blur(16px) !important;
+/* ── 16. EXPORT CARDS ───────────────────────── */
+.export-card {
   border-radius: 24px !important;
+  transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1), border-color 0.3s, box-shadow 0.4s !important;
 }
-.how-to-step {
-  background: rgba(255,255,255,0.02) !important;
-  border: 1px solid rgba(255,255,255,0.05) !important;
-  border-radius: 18px !important;
+.export-card:hover {
+  transform: translateY(-10px) !important;
+  border-color: rgba(0,255,170,0.35) !important;
+  box-shadow: 0 28px 70px rgba(0,0,0,0.45), 0 0 40px rgba(0,255,170,0.1) !important;
 }
-.how-to-step-number {
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark)) !important;
-  color: #021a0e !important;
-  font-weight: 900 !important;
+.export-btn {
+  background: linear-gradient(135deg, #00ffaa, #00cc88) !important;
+  color: #021a0e !important; border: none !important;
+  border-radius: 14px !important; font-weight: 800 !important;
+  transition: transform 0.2s, filter 0.2s !important;
 }
+.export-btn:hover { transform: translateY(-2px) !important; filter: brightness(1.1) !important; }
+
+/* ── 17. SLICERS + BUILDER ──────────────────── */
+.slicers-bar, .builder-panel {
+  background: rgba(255,255,255,0.03) !important;
+  border: 1px solid rgba(255,255,255,0.075) !important;
+  border-radius: 20px !important;
+  backdrop-filter: blur(20px) !important;
+}
+.slicers-bar select, .builder-panel select {
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid rgba(255,255,255,0.09) !important;
+  border-radius: 12px !important; color: var(--text) !important;
+}
+
+/* ── 18. FLOAT UP ANIMATION ─────────────────── */
+@keyframes floatUp {
+  from { opacity:0; transform: translateY(40px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+.card-base { animation: floatUp 0.7s cubic-bezier(0.16,1,0.3,1) both !important; }
+
+/* ── 19. MOBILE NAV ─────────────────────────── */
+.nav-header {
+  background: rgba(4,8,15,0.88) !important;
+  backdrop-filter: blur(28px) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.07) !important;
+}
+.nav-tab.active { color: #00ffaa !important; border-bottom-color: #00ffaa !important; }
+
+/* ── 20. INSIGHT BOXES ──────────────────────── */
+.insight-box {
+  background: rgba(255,255,255,0.03) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 20px !important;
+  backdrop-filter: blur(20px) !important;
+}
+.insight-box.data-health-box { border-color: rgba(0,255,170,0.2) !important; }
+.sev-badge.high   { background: rgba(255,77,106,0.12) !important; color: #ff4d6a !important; border: 1px solid rgba(255,77,106,0.25) !important; border-radius: 8px !important; }
+.sev-badge.medium { background: rgba(255,204,0,0.12)  !important; color: #ffcc00 !important; border: 1px solid rgba(255,204,0,0.25)  !important; border-radius: 8px !important; }
+
+/* ── 21. HOW-TO STEPS ───────────────────────── */
+.how-to-section { background: rgba(255,255,255,0.03) !important; border: 1px solid rgba(255,255,255,0.07) !important; border-radius: 24px !important; backdrop-filter: blur(20px) !important; }
+.how-to-step { background: rgba(255,255,255,0.02) !important; border: 1px solid rgba(255,255,255,0.05) !important; border-radius: 18px !important; transition: transform 0.3s, border-color 0.3s !important; }
+.how-to-step:hover { transform: translateX(-6px) !important; border-color: rgba(0,255,170,0.2) !important; }
+.ltr .how-to-step:hover { transform: translateX(6px) !important; }
+.how-to-step-number { background: linear-gradient(135deg, #00ffaa, #00cc88) !important; color: #021a0e !important; font-weight: 900 !important; }
+
+/* ── 22. CHART TYPE BADGE ───────────────────── */
+.chart-type-badge { background: rgba(255,255,255,0.06) !important; border: 1px solid rgba(255,255,255,0.09) !important; border-radius: 99px !important; font-weight: 800 !important; letter-spacing: 0.08em !important; font-size: 10px !important; }
+.chart-download-btn { background: rgba(255,255,255,0.05) !important; border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 10px !important; cursor: pointer !important; transition: all 0.2s !important; }
+.chart-download-btn:hover { background: rgba(0,255,170,0.12) !important; border-color: rgba(0,255,170,0.3) !important; color: #00ffaa !important; }
+.chart-download-btn.active { background: rgba(255,204,0,0.15) !important; border-color: rgba(255,204,0,0.35) !important; color: #ffcc00 !important; }
