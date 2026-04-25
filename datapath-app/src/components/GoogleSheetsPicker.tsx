@@ -83,10 +83,7 @@ export const GoogleSheetsPicker: React.FC<Props> = ({ onFile, lang = 'ar' }) => 
       try {
         const client = window.google.accounts.oauth2.initTokenClient({
           client_id: GOOGLE_CLIENT_ID,
-          scope: [
-            'https://www.googleapis.com/auth/drive.readonly',
-            'https://www.googleapis.com/auth/spreadsheets.readonly',
-          ].join(' '),
+          scope: 'https://www.googleapis.com/auth/drive.file',
           callback: (resp) => {
             if (resp.access_token) {
               setAccessToken(resp.access_token);
