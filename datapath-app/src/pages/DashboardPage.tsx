@@ -4,9 +4,9 @@ import { analyzeDataset } from '../lib/dataUtils';
 import { DataChart } from '../components/DataChart';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
-import { Download, Filter, Plus, Trash2, Maximize2, Volume2, FileText, Loader2 } from 'lucide-react';
-import type { DatasetInfo, Lang, ChartInfo } from '../types';
-import { generateExecutiveSummary, speakText } from '../lib/aiService';
+import { Download, Filter, Plus, Trash2, Maximize2, FileText, Loader2 } from 'lucide-react';
+import { generateExecutiveSummary } from '../lib/aiService';
+import type { DatasetInfo, Lang, ChartInfo, SummaryReport } from '../types';
 import { motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { AdSpace } from '../components/AdSpace';
@@ -14,6 +14,7 @@ import { AD_PROVIDERS } from '../config/adConfig';
 import { DataPreview } from '../components/DataPreview';
 import { CreatorFooter } from '../components/CreatorFooter';
 import { useMediaQuery } from 'react-responsive';
+import { Copy, AlertTriangle, AlertCircle, Lightbulb, TrendingUp, CheckCircle, Brain } from 'lucide-react';
 
 interface Props { info: DatasetInfo; lang: Lang; }
 
@@ -67,7 +68,7 @@ export const DashboardPage: React.FC<Props> = ({ info: initialInfo, lang }) => {
   // Advanced Features
   const [presentationMode, setPresentationMode] = useState(false);
   const [theme, setTheme] = useState('emerald');
-  const [summary, setSummary] = useState<string>('');
+  const [summary, setSummary] = useState<SummaryReport | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
 
   const t = T[lang];
@@ -82,40 +83,89 @@ export const DashboardPage: React.FC<Props> = ({ info: initialInfo, lang }) => {
     try {
       const res = await generateExecutiveSummary(info, apiKey, lang);
       setSummary(res);
-      confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#10b981', '#6366f1'] });
-
-      // Generate PDF after showing summary
-      setTimeout(async () => {
-        try {
-          const tempDiv = document.createElement('div');
-          tempDiv.style.padding = '30px';
-          tempDiv.style.background = '#ffffff';
-          tempDiv.style.color = '#050a14';
-          tempDiv.style.width = '800px';
-          tempDiv.style.fontFamily = '"Plus Jakarta Sans", "Noto Sans Arabic", sans-serif';
-          tempDiv.innerHTML = `<h2 style="color: #00cc88; border-bottom: 2px solid #eee; padding-bottom: 10px;">Kimit AI - Smart Summary</h2>
-                               <div style="white-space: pre-wrap; font-size: 15px; line-height: 1.8; margin-top: 20px;" dir="${lang === 'ar' ? 'rtl' : 'ltr'}">${res}</div>`;
-          document.body.appendChild(tempDiv);
-          const canvas = await html2canvas(tempDiv, { scale: 2, useCORS: true });
-          document.body.removeChild(tempDiv);
-          
-          const imgData = canvas.toDataURL('image/png');
-          const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-          const pdfWidth = pdf.internal.pageSize.getWidth();
-          const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-          pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-          pdf.save(`${info.filename.replace(/\.[^/.]+$/, "")}_AI_Summary.pdf`);
-        } catch (pdfErr) {
-          console.error('PDF Generation Error:', pdfErr);
-        } finally {
-          setLoadingSummary(false);
-        }
-      }, 500);
-      
+      if (!res.isLocal) {
+        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#10b981', '#6366f1'] });
+      }
     } catch (e: unknown) {
       console.error(e);
-      const msg = e instanceof Error ? e.message : String(e);
-      alert(lang === 'ar' ? 'حدث خطأ أثناء توليد الملخص: ' + msg : 'Error generating summary: ' + msg);
+      // Fallback is already handled inside generateExecutiveSummary, this catch is just for safety
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
+
+  const handleCopyReport = () => {
+    if (!summary) return;
+    const reportText = `
+Executive Summary:
+${summary.executiveSummary}
+
+Top Insights:
+${summary.insights.map(i => '- ' + i).join('\n')}
+
+Warnings & Anomalies:
+${summary.warnings.map(i => '- ' + i).join('\n')}
+
+Data Quality Issues:
+${summary.qualityIssues.map(i => '- ' + i).join('\n')}
+
+Actionable Recommendations:
+${summary.recommendations.map(i => '- ' + i).join('\n')}
+
+Suggested Opportunities:
+${summary.opportunities.map(i => '- ' + i).join('\n')}
+    `.trim();
+    navigator.clipboard.writeText(reportText);
+    alert(lang === 'ar' ? 'تم نسخ التقرير' : 'Report copied to clipboard');
+  };
+
+  const handleSummaryPDF = async () => {
+    if (!summary) return;
+    setLoadingSummary(true);
+    try {
+      const tempDiv = document.createElement('div');
+      tempDiv.style.padding = '30px';
+      tempDiv.style.background = '#0f172a';
+      tempDiv.style.color = '#f8fafc';
+      tempDiv.style.width = '800px';
+      tempDiv.style.fontFamily = '"Plus Jakarta Sans", "Noto Sans Arabic", sans-serif';
+      
+      let html = `<h2 style="color: #10b981; border-bottom: 2px solid #334155; padding-bottom: 10px; margin-bottom: 20px;">Kimit AI - Smart Analytics Report</h2>`;
+      if (summary.isLocal) html += `<p style="color: #f59e0b; font-weight: bold;">[Local Analysis Mode]</p>`;
+      
+      html += `
+        <div dir="${lang === 'ar' ? 'rtl' : 'ltr'}">
+          <h3 style="color: #38bdf8;">Executive Summary</h3>
+          <p style="font-size: 14px;">${summary.executiveSummary}</p>
+          
+          <h3 style="color: #a855f7; margin-top: 20px;">Top Insights</h3>
+          <ul style="font-size: 14px;">${summary.insights.map(i => `<li style="margin-bottom: 8px;">${i}</li>`).join('')}</ul>
+          
+          <h3 style="color: #f59e0b; margin-top: 20px;">Warnings & Anomalies</h3>
+          <ul style="font-size: 14px;">${summary.warnings.map(i => `<li style="margin-bottom: 8px;">${i}</li>`).join('')}</ul>
+          
+          <h3 style="color: #ef4444; margin-top: 20px;">Data Quality</h3>
+          <ul style="font-size: 14px;">${summary.qualityIssues.map(i => `<li style="margin-bottom: 8px;">${i}</li>`).join('')}</ul>
+          
+          <h3 style="color: #10b981; margin-top: 20px;">Recommendations</h3>
+          <ul style="font-size: 14px;">${summary.recommendations.map(i => `<li style="margin-bottom: 8px;">${i}</li>`).join('')}</ul>
+        </div>
+      `;
+      
+      tempDiv.innerHTML = html;
+      document.body.appendChild(tempDiv);
+      const canvas = await html2canvas(tempDiv, { scale: 2, useCORS: true, backgroundColor: '#0f172a' });
+      document.body.removeChild(tempDiv);
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`${info.filename.replace(/\.[^/.]+$/, "")}_Smart_Report.pdf`);
+    } catch (pdfErr) {
+      console.error('PDF Generation Error:', pdfErr);
+    } finally {
       setLoadingSummary(false);
     }
   };
@@ -389,31 +439,92 @@ export const DashboardPage: React.FC<Props> = ({ info: initialInfo, lang }) => {
             </div>
 
             <div className="section-title" style={{ marginTop: 20 }}>{t.insights}</div>
-          <div className="insight-box summary" style={{ position: 'relative' }}>
+          <div className="insight-box summary" style={{ position: 'relative', padding: summary ? '0' : '20px', background: summary ? 'transparent' : 'var(--card-bg)', border: summary ? 'none' : '1px solid var(--border)' }}>
             {!summary ? (
-              <button 
-                onClick={handleFetchSummary} 
-                disabled={loadingSummary}
-                style={{ width: '100%', padding: '15px', background: 'rgba(16,185,129,0.1)', border: '1px dashed var(--primary)', borderRadius: '10px', color: 'var(--primary)', cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-              >
-                {loadingSummary ? (<><Loader2 size={18} className="spin" style={{ animation: 'spin 1s linear infinite' }} /> {lang === 'ar' ? 'جاري التوليد...' : 'Generating...'}</>) : (lang === 'ar' ? 'توليد ملخص ذكي فوراً ✨' : 'Generate Smart Summary ✨')}
-              </button>
+              <>
+                <button 
+                  onClick={handleFetchSummary} 
+                  disabled={loadingSummary}
+                  style={{ width: '100%', padding: '15px', background: 'rgba(16,185,129,0.1)', border: '1px dashed var(--primary)', borderRadius: '10px', color: 'var(--primary)', cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                >
+                  {loadingSummary ? (<><Loader2 size={18} className="spin" style={{ animation: 'spin 1s linear infinite' }} /> {lang === 'ar' ? 'جاري التوليد...' : 'Generating...'}</>) : (lang === 'ar' ? 'توليد تقرير ذكي شامل ✨' : 'Generate Smart Report ✨')}
+                </button>
+                <p style={{ marginTop: 10, fontSize: 11, opacity: 0.6, textAlign: 'center' }}>
+                  {lang === 'ar'
+                    ? `${info.rows.toLocaleString()} سجل · ${numCols} عمود رقمي · ${txtCols} عمود نصي`
+                    : `${info.rows.toLocaleString()} rows · ${numCols} numeric cols · ${txtCols} text cols`
+                  }
+                </p>
+              </>
             ) : (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <div style={{ position: 'absolute', top: 10, right: 10 }}>
-                  <button onClick={() => speakText(summary, lang)} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer' }}>
-                    <Volume2 size={18} />
-                  </button>
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="structured-report">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {summary.isLocal ? (
+                      <span style={{ fontSize: 11, background: '#f59e0b', color: '#000', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold' }}>Local Analysis — No AI</span>
+                    ) : (
+                      <span style={{ fontSize: 11, background: 'var(--primary)', color: '#000', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold' }}>AI Generated ✨</span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button onClick={handleCopyReport} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: 12 }}>
+                      <Copy size={14} /> {lang === 'ar' ? 'نسخ' : 'Copy'}
+                    </button>
+                    <button onClick={handleSummaryPDF} disabled={loadingSummary} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(16,185,129,0.2)', border: 'none', color: 'var(--primary)', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: 12 }}>
+                      {loadingSummary ? <Loader2 size={14} className="spin" /> : <FileText size={14} />} PDF
+                    </button>
+                  </div>
                 </div>
-                <div style={{ whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.6 }}>{summary}</div>
+
+                <div className="report-card" style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '15px' }}>
+                  <h4 style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#38bdf8', marginBottom: 10, fontSize: 15 }}><Brain size={18} /> Executive Summary</h4>
+                  <p style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.9 }}>{summary.executiveSummary}</p>
+                </div>
+
+                <div className="report-card" style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '15px' }}>
+                  <h4 style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#a855f7', marginBottom: 10, fontSize: 15 }}><TrendingUp size={18} /> Top Insights</h4>
+                  <ol style={{ paddingInlineStart: 20, margin: 0, fontSize: 13, lineHeight: 1.6, opacity: 0.9 }}>
+                    {summary.insights.map((item, idx) => (
+                      <li key={idx} style={{ marginBottom: 6 }}><strong>{item.split(':')[0]}</strong>{item.includes(':') ? ':' + item.split(':').slice(1).join(':') : ''}</li>
+                    ))}
+                  </ol>
+                </div>
+
+                <div className="report-card" style={{ background: 'rgba(245, 158, 11, 0.05)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: '12px', padding: '20px', marginBottom: '15px' }}>
+                  <h4 style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#f59e0b', marginBottom: 10, fontSize: 15 }}><AlertTriangle size={18} /> Warnings & Anomalies</h4>
+                  <ul style={{ paddingInlineStart: 20, margin: 0, fontSize: 13, lineHeight: 1.6, color: '#fcd34d' }}>
+                    {summary.warnings.map((item, idx) => <li key={idx} style={{ marginBottom: 6 }}>{item}</li>)}
+                  </ul>
+                </div>
+
+                <div className="report-card" style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '12px', padding: '20px', marginBottom: '15px' }}>
+                  <h4 style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#ef4444', marginBottom: 10, fontSize: 15 }}><AlertCircle size={18} /> Data Quality Issues</h4>
+                  <ul style={{ paddingInlineStart: 20, margin: 0, fontSize: 13, lineHeight: 1.6, color: '#fca5a5' }}>
+                    {summary.qualityIssues.map((item, idx) => <li key={idx} style={{ marginBottom: 6 }}>{item}</li>)}
+                  </ul>
+                </div>
+
+                <div className="report-card" style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '12px', padding: '20px', marginBottom: '15px' }}>
+                  <h4 style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#10b981', marginBottom: 10, fontSize: 15 }}><CheckCircle size={18} /> Recommendations</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {summary.recommendations.map((item, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, background: 'rgba(16, 185, 129, 0.1)', padding: '10px 15px', borderRadius: '8px' }}>
+                        <span style={{ fontSize: 13, lineHeight: 1.6, color: '#d1fae5' }}>{item}</span>
+                        <button style={{ minWidth: '80px', background: '#10b981', border: 'none', color: '#000', fontSize: 11, fontWeight: 'bold', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer' }}>{lang === 'ar' ? 'تنفيذ' : 'Execute'}</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="report-card" style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px' }}>
+                  <h4 style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#60a5fa', marginBottom: 10, fontSize: 15 }}><Lightbulb size={18} /> Opportunities</h4>
+                  <ul style={{ paddingInlineStart: 20, margin: 0, fontSize: 13, lineHeight: 1.6, opacity: 0.9 }}>
+                    {summary.opportunities.map((item, idx) => <li key={idx} style={{ marginBottom: 6 }}>{item}</li>)}
+                  </ul>
+                </div>
+
               </motion.div>
             )}
-            <p style={{ marginTop: 10, fontSize: 11, opacity: 0.6 }}>
-              {lang === 'ar'
-                ? `${info.rows.toLocaleString()} سجل · ${numCols} عمود رقمي · ${txtCols} عمود نصي`
-                : `${info.rows.toLocaleString()} rows · ${numCols} numeric cols · ${txtCols} text cols`
-              }
-            </p>
           </div>
 
           {info.anomalies.length > 0 && (

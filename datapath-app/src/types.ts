@@ -69,3 +69,13 @@ export interface QuickQuestion {
   promptEn: string;
   category: 'data' | 'general' | 'analysis';
 }
+
+export interface SummaryReport {
+  isLocal: boolean;
+  executiveSummary: string;
+  insights: string[];
+  warnings: string[];
+  qualityIssues: string[];
+  recommendations: string[];
+  opportunities: string[];
+}
