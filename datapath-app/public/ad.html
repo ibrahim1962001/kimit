@@ -15,12 +15,20 @@
       align-items: center; 
       justify-content: center; 
     }
+    /* Hide any error messages */
+    .error-msg { display: none !important; }
   </style>
   <script>
     // Block any attempt by the ad script to navigate the top frame
     if (window.top !== window.self) {
-      Object.defineProperty(window, 'top', { get: function() { return window.self; } });
+      try {
+        Object.defineProperty(window, 'top', { get: function() { return window.self; } });
+      } catch(e) {}
     }
+    // Silence ALL script errors — never show "Script error" to user
+    window.onerror = function() { return true; };
+    window.addEventListener('error', function(e) { e.preventDefault(); e.stopPropagation(); return true; }, true);
+    window.addEventListener('unhandledrejection', function(e) { e.preventDefault(); });
   </script>
 </head>
 <body>

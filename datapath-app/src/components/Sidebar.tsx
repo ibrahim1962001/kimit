@@ -96,16 +96,16 @@ export const Sidebar: React.FC<Props> = ({ tab, lang, hasData, onTab, onLang, on
   return (
     <aside className={`sidebar ${isMobileOpen ? 'mobile-open' : ''}`}>
       <button
-        className="mobile-close-btn"
-        onClick={onCloseMobile}
-        onTouchEnd={(e) => { e.preventDefault(); onCloseMobile?.(); }}
+        className="sidebar-x-btn"
+        onClick={(e) => { e.stopPropagation(); onCloseMobile?.(); }}
+        onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); onCloseMobile?.(); }}
         style={{
           position: 'absolute',
           top: '16px',
           right: '16px',
           zIndex: 9999,
-          minWidth: '44px',
-          minHeight: '44px',
+          width: '44px',
+          height: '44px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -113,10 +113,12 @@ export const Sidebar: React.FC<Props> = ({ tab, lang, hasData, onTab, onLang, on
           pointerEvents: 'all',
           touchAction: 'manipulation',
           WebkitTapHighlightColor: 'transparent',
-          background: 'rgba(255,255,255,0.06)',
-          border: '1px solid rgba(255,255,255,0.1)',
+          background: 'rgba(255,255,255,0.1)',
+          border: '1px solid rgba(255,255,255,0.2)',
           borderRadius: '12px',
           color: '#fff',
+          fontSize: '20px',
+          padding: 0,
         }}
         aria-label="Close menu"
       >

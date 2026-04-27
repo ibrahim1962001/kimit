@@ -12,15 +12,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/modern-normalize/3.0.1/modern-normalize.min.css" />
   </head>
   <body>
-    <div id="error-catcher" style="color: red; padding: 20px; font-family: monospace;"></div>
-    <script>
-      window.onerror = function(message, source, lineno, colno, error) {
-        document.getElementById('error-catcher').innerText += '\nERROR: ' + message + '\n' + (error ? error.stack : '');
-      };
-      window.addEventListener('unhandledrejection', function(event) {
-        document.getElementById('error-catcher').innerText += '\nPROMISE REJECTION: ' + event.reason;
-      });
-    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
