@@ -1361,12 +1361,13 @@ html, body, #root {
   }
 }
 
+
 @media (max-width: 991px) and (min-width: 769px) {
   .col-grid { grid-template-columns: repeat(2, 1fr); }
   .charts-grid { grid-template-columns: 1fr; }
 }
 
-.mobile-menu-btn, .mobile-close-btn { display: none; }
+.mobile-menu-btn, .mobile-close-btn, .mobile-top-bar, .mobile-sidebar-overlay { display: none; }
 
 /* Tablet & Mobile (Hamburger Menu Style) */
 @media (max-width: 768px) {
@@ -2260,14 +2261,36 @@ html, body, #root {
 }
 
 /* =========================================
-   MOBILE RESPONSIVE — Comprehensive Fixes
+   MOBILE RESPONSIVE — Comprehensive Audit
+   Covers all 10 audit categories
 ========================================= */
 
 /* Chart cards: ensure pie is never clipped */
 .chart-card { overflow: visible; }
-.chart-body  { overflow: visible; }
+.chart-body  { overflow: visible; min-height: 200px; }
 
-/* Feature grid: 2 columns on mobile */
+/* Sidebar & home logo — blend away baked-in black background */
+.logo-icon img,
+.sidebar-logo img {
+  mix-blend-mode: screen;
+  filter: brightness(1.2) contrast(1.05);
+  background: transparent;
+}
+
+/* Reset any global box-sizing conflicts */
+*, *::before, *::after { box-sizing: border-box; }
+
+/* ─── ⑨ Performance: Respect prefers-reduced-motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ─── Small mobile (320–640px) ─── */
 @media (max-width: 640px) {
   .features-grid {
     grid-template-columns: repeat(2, 1fr) !important;
@@ -2291,38 +2314,62 @@ html, body, #root {
   .or-input-row  { border-radius: 24px; }
 }
 
+/* ─── Tablet (641–900px) ─── */
 @media (min-width: 641px) and (max-width: 900px) {
   .features-grid { grid-template-columns: repeat(2, 1fr) !important; }
   .charts-grid   { grid-template-columns: 1fr !important; }
   .kpi-grid      { grid-template-columns: repeat(2, 1fr) !important; }
 }
 
-/* Pie chart min-height fallback */
-.chart-body { min-height: 200px; }
-
-/* Sidebar & home logo — blend away baked-in black background */
-.logo-icon img,
-.sidebar-logo img {
-  mix-blend-mode: screen;
-  filter: brightness(1.2) contrast(1.05);
-  background: transparent;
-}
-
-/* =========================================
-   MOBILE CRITICAL OVERRIDES v2
-   (react-responsive + CSS backup)
-========================================= */
-
-/* Reset any Bootstrap/Tailwind global box-sizing conflicts */
-*, *::before, *::after { box-sizing: border-box; }
-
-/* Dashboard page padding on mobile */
+/* ─── MOBILE CRITICAL OVERRIDES (max-width: 768px) ─── */
 @media (max-width: 768px) {
-  .page { padding: 12px 10px !important; }
+
+  /* ── ① Layout & Overflow ── */
+  html, body {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+  }
+  .app {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+  }
+  .page {
+    padding: 12px 10px !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
   .dash-content-wrapper { padding: 0 !important; }
   .dashboard-preview-section { padding: 0 10px !important; margin-bottom: 14px !important; }
+  .main {
+    overflow-x: hidden !important;
+  }
 
-  /* KPI grid: 2 columns always */
+  /* ── ② Typography — min 14px body, 1.5 line-height for Arabic ── */
+  body {
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  p, span, div, li {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* ── ③ Buttons & Interactive — 44px min tap targets ── */
+  button, a, [role="button"] {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .nav-btn {
+    min-height: 44px !important;
+    padding: 10px 15px !important;
+  }
+  .btn-primary, .sidebar-close-btn, .lang-toggle, .excel-btn,
+  .filter-reset, .clean-action-btn, .clean-issue-btn, .clean-page-btn {
+    min-height: 44px !important;
+    min-width: 44px !important;
+  }
+
+  /* ── ④ Charts & Visualizations ── */
   .kpi-grid {
     display: grid !important;
     grid-template-columns: repeat(2, 1fr) !important;
@@ -2332,7 +2379,6 @@ html, body, #root {
   .stat-val  { font-size: 20px !important; }
   .stat-label { font-size: 11px !important; }
 
-  /* Charts: 1 column, no overflow */
   .charts-grid {
     display: grid !important;
     grid-template-columns: 1fr !important;
@@ -2347,7 +2393,6 @@ html, body, #root {
     overflow: visible !important;
   }
 
-  /* Dash layout: stack vertically */
   .dash-layout {
     display: flex !important;
     flex-direction: column !important;
@@ -2358,30 +2403,193 @@ html, body, #root {
     min-width: unset !important;
   }
 
-  /* Slicers bar: horizontal scroll */
+  /* ── ⑤ Tables & Data Grids ── */
+  .table-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100% !important;
+  }
+  .data-table {
+    min-width: 600px;
+  }
+  .data-table th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgba(10, 15, 30, 0.95);
+  }
+  .data-table td, .data-table th {
+    padding: 10px 12px !important;
+    white-space: nowrap;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ── ⑥ Forms & Inputs — 16px to prevent iOS zoom ── */
+  input, select, textarea {
+    font-size: 16px !important;
+    min-height: 44px;
+    border-radius: 10px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .or-chat-textarea, .or-input-row textarea {
+    font-size: 16px !important;
+  }
+
+  /* ── ⑦ Modals & Drawers ── */
+  .login-popup, .auth-modal, .modal-overlay .modal-content {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+    border-radius: 16px !important;
+  }
+  .editor-sidebar {
+    width: 100% !important;
+    max-width: 100vw !important;
+  }
+
+  /* Sidebar mobile drawer */
+  .sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: auto !important;
+    right: 0 !important;
+    width: 280px !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-direction: column !important;
+    padding: 20px !important;
+    padding-top: 70px !important;
+    z-index: 9000 !important;
+    border-right: none !important;
+    border-left: 1px solid var(--border) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .ltr .sidebar {
+    right: auto !important;
+    left: 0 !important;
+    transform: translateX(-100%);
+    border-left: none !important;
+    border-right: 1px solid var(--border) !important;
+  }
+  .sidebar.mobile-open {
+    transform: translateX(0) !important;
+    box-shadow: 0 0 50px rgba(0,0,0,0.5);
+  }
+
+  /* Mobile close button — always visible & tappable */
+  .mobile-close-btn {
+    display: flex !important;
+    position: absolute !important;
+    top: 16px !important;
+    right: 16px !important;
+    z-index: 9999 !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    pointer-events: all !important;
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 12px !important;
+    color: #fff !important;
+    cursor: pointer !important;
+  }
+  .mobile-close-btn:active {
+    background: rgba(255,255,255,0.15) !important;
+    transform: scale(0.95);
+  }
+
+  /* Mobile overlay — tappable to close */
+  .mobile-sidebar-overlay {
+    display: block !important;
+    position: fixed !important;
+    inset: 0 !important;
+    background: rgba(0, 0, 0, 0.5) !important;
+    backdrop-filter: blur(4px) !important;
+    z-index: 8000 !important;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Mobile top bar */
+  .mobile-top-bar {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    height: 60px;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 2000;
+  }
+  .mobile-menu-btn-icon {
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .sidebar-logo, .sidebar-footer { display: flex !important; margin-bottom: 20px !important; }
+  .sidebar-nav {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    height: auto !important;
+    margin: 0 !important;
+  }
+  .sidebar-nav button {
+    flex-direction: row !important;
+    padding: 12px 15px !important;
+    font-size: 14px !important;
+    justify-content: flex-start !important;
+    gap: 12px !important;
+    min-height: 44px !important;
+  }
+  .nav-label { display: block !important; font-size: 14px !important; opacity: 1 !important; }
+
+  .main {
+    margin: 0 !important;
+    padding: 70px 15px 15px !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+  }
+
   .slicers-bar {
     overflow-x: auto !important;
     flex-wrap: nowrap !important;
     gap: 10px !important;
     padding: 12px 10px !important;
+    -webkit-overflow-scrolling: touch;
   }
+  .slicers-bar > div { min-width: 140px; }
 
-  /* Builder panel: single column */
   .builder-row {
     flex-direction: column !important;
     gap: 10px !important;
   }
   .builder-panel { padding: 14px 12px !important; }
 
-  /* Navbar */
-  .nav-header { padding: 12px 14px !important; }
-  .nav-tabs    { gap: 4px !important; }
-  .nav-tab     { font-size: 11px !important; padding: 7px 10px !important; }
-
-  /* Home page */
-  .home-page  { padding: 20px 14px !important; }
-  .hero-title { font-size: clamp(24px, 8vw, 42px) !important; }
-  .hero-sub   { font-size: 13px !important; }
+  .hero-title { font-size: clamp(24px, 8vw, 42px) !important; white-space: normal; line-height: 1.2; text-align: center; }
+  .hero-sub   { font-size: 14px !important; text-align: center; }
   .features-grid {
     display: grid !important;
     grid-template-columns: repeat(2, 1fr) !important;
@@ -2392,11 +2600,12 @@ html, body, #root {
   .feature-title { font-size: 12px !important; }
   .feature-desc  { font-size: 10px !important; }
 
-  /* Dropzone */
   .dropzone { padding: 30px 14px !important; }
   .dz-formats { flex-wrap: wrap !important; gap: 6px !important; }
 
-  /* Floating chat pill */
+  .chat-panel { height: calc(100vh - 160px); }
+  .msg-bubble { max-width: 90%; font-size: 14px; }
+
   .or-input-row {
     border-radius: 22px !important;
     padding: 8px 8px 8px 14px !important;
@@ -2405,7 +2614,59 @@ html, body, #root {
     bottom: 14px !important;
   }
 
-  /* Insight section */
   .insight-box { margin-bottom: 12px !important; }
   .dashboard-ad-square { display: none !important; }
+
+  /* Ad containers visible on mobile */
+  .home-ad-container, .dashboard-ad-top {
+    display: block !important;
+  }
+  .cleaning-ad-top { display: none !important; }
+
+  /* ── ⑧ RTL Support ── */
+  .rtl .sidebar {
+    right: 0 !important;
+    left: auto !important;
+  }
+  .rtl .sidebar .mobile-close-btn {
+    right: 16px !important;
+    left: auto !important;
+  }
+  .ltr .sidebar .mobile-close-btn {
+    left: 16px !important;
+    right: auto !important;
+  }
+
+  /* ── ⑩ Safe Area & Notch ── */
+  .main {
+    padding-bottom: calc(15px + env(safe-area-inset-bottom)) !important;
+  }
+  .or-input-row {
+    bottom: calc(14px + env(safe-area-inset-bottom)) !important;
+  }
+  .sidebar {
+    padding-bottom: calc(20px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* ─── Extra Small Devices (320–480px) ─── */
+@media (max-width: 480px) {
+  .stats-row { grid-template-columns: 1fr; }
+  .stat-box { padding: 12px; }
+  .page-header button { width: 100%; justify-content: center; }
+  .table-wrap { margin: 0 -10px; width: calc(100% + 20px); border-radius: 0; }
+  .data-table { font-size: 12px; }
+  .data-table td, .data-table th { padding: 8px 10px; }
+
+  /* Even smaller feature cards */
+  .feature-card { min-height: 100px !important; }
+
+  /* Full-width buttons */
+  .btn-primary { width: 100%; }
+
+  /* Smaller hero */
+  .hero-title { font-size: clamp(22px, 8vw, 36px) !important; }
+
+  /* Sidebar narrower on very small screens */
+  .sidebar { width: 260px !important; }
 }
