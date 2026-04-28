@@ -200,10 +200,14 @@ export const OpenRouterChat: React.FC<{ dataset?: DatasetInfo | null, onFileUplo
 إذا كان الطلب يحتاج كود JavaScript معقد، ضع الكود داخل \`\`\`javascript ... \`\`\` وتأكد أنه يعيد (return) المصفوفة المعدلة.`;
 
       if (dataset) {
+        const sampleData = dataset.workData.slice(0, 3);
         systemPrompt += `\n\nالسياق الحالي للبيانات المرفوعة:\n` +
           `اسم الملف: ${dataset.filename}\n` +
           `عدد الصفوف: ${dataset.rows} | عدد الأعمدة: ${dataset.columns.length}\n` +
-          `قائمة الأعمدة: ${dataset.columns.map(c => `${c.name} (${c.type})`).join(', ')}`;
+          `قائمة الأعمدة: ${dataset.columns.map(c => `${c.name} (${c.type})`).join(', ')}\n` +
+          `عينة من البيانات الفعليّة (أول 3 صفوف لمعرفة الأسماء الحقيقية المخفية إذا كانت الأعمدة تسمى __EMPTY_1 الخ):\n` +
+          `${JSON.stringify(sampleData, null, 2)}\n\n` +
+          `ملاحظة هامة جداً 🚨: إذا طلب المستخدم تعديلاً معقداً جداً، أو كانت أسماء الأعمدة مشوهة (مثل __EMPTY) والمستخدم يشير لاسم حقيقي موجود في العينة، **لا تستخدم الـ JSON السريع**. بدلاً من ذلك، اكتب كود JavaScript بداخل \`\`\`javascript ... \`\`\` يستقبل المتغير \`data\` (وهو مصفوفة البيانات)، يحلل المشكلة، يطبق التعديل المطلوب بدقة، ويعيد \`return\` المصفوفة الجديدة.`;
       }
 
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
