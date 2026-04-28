@@ -130,7 +130,12 @@ ${summary.opportunities.map(i => '- ' + i).join('\n')}
       tempDiv.style.width = '800px';
       tempDiv.style.fontFamily = '"Plus Jakarta Sans", "Noto Sans Arabic", sans-serif';
       
-      let html = `<h2 style="color: #10b981; border-bottom: 2px solid #334155; padding-bottom: 10px; margin-bottom: 20px;">Kimit AI - Smart Analytics Report</h2>`;
+      let html = `
+        <div style="display: flex; align-items: center; gap: 15px; border-bottom: 2px solid #334155; padding-bottom: 10px; margin-bottom: 20px;">
+          <img src="/logo.png" alt="Kimit Logo" style="height: 40px; mix-blend-mode: screen;" />
+          <h2 style="color: #10b981; margin: 0;">Kimit AI - Smart Analytics Report</h2>
+        </div>
+      `;
       if (summary.isLocal) html += `<p style="color: #f59e0b; font-weight: bold;">[Local Analysis Mode]</p>`;
       
       html += `
