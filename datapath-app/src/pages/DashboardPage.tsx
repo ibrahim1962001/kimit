@@ -131,7 +131,7 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
           </div>
 
           {/* Data Grid Section */}
-          <div className="glass-panel" style={{ height: '65vh', minHeight: '400px', padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="glass-panel" style={{ height: '45vh', minHeight: '300px', padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
             <DataGrid data={info.workData} columns={info.columns.map(c => c.name)} externalFilter={activeChartFilter} />
           </div>
 

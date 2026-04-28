@@ -1383,12 +1383,16 @@ html, body, #root {
 }
 
 @media (max-width: 900px) {
-  .dash-main-grid { grid-template-columns: 1fr; gap: 20px; }
-  .charts-display-grid { grid-template-columns: 1fr; }
-  .dash-layout-container { padding: 15px 10px; }
-  .dash-header-wrap { flex-direction: column; align-items: flex-start; }
-  .builder-controls { grid-template-columns: 1fr !important; gap: 8px !important; }
-  .builder-controls .premium-button { width: 100%; justify-content: center; }
+  .dash-main-grid { grid-template-columns: 1fr; gap: 15px; }
+  .charts-display-grid { grid-template-columns: 1fr; gap: 12px; }
+  .dash-layout-container { padding: 12px 10px; }
+  .dash-header-wrap { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .builder-controls { grid-template-columns: 1fr !important; gap: 10px !important; }
+  .builder-controls .premium-button { width: 100%; justify-content: center; height: 50px; font-size: 14px; }
+  .glass-panel { padding: 12px !important; }
+  .kpi-mini-row { gap: 10px !important; }
+  .kpi-mini-row .glass-card { padding: 10px !important; }
+  .kpi-mini-row .glass-card div:first-child { font-size: 20px !important; }
 }
 
 .builder-controls {
@@ -1402,12 +1406,13 @@ html, body, #root {
   background: rgba(15, 23, 42, 0.6);
   border: 1px solid var(--border);
   color: #fff;
-  padding: 12px 14px;
+  padding: 10px 14px;
   border-radius: 12px;
   font-size: 14px;
   width: 100%;
   outline: none;
   transition: all 0.2s;
+  height: 46px;
 }
 
 .kimit-select:focus {
@@ -2837,4 +2842,23 @@ html, body, #root {
 }
 
 select option { background-color: #0f172a !important; color: #fff !important; }
+
+.premium-button {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: #000;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 12px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 8px 20px var(--primary-glow);
+  font-size: 14px;
+}
+.premium-button:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.1); box-shadow: 0 12px 25px var(--primary-glow); }
+.premium-button:active { transform: scale(0.95); }
+.premium-button.secondary { background: rgba(255,255,255,0.05); color: #fff; border: 1px solid var(--border); box-shadow: none; }
 
