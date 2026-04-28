@@ -70,8 +70,8 @@ export const OpenRouterChat: React.FC<{ dataset?: DatasetInfo | null, onFileUplo
   const docInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const DEFAULT_KEY = import.meta.env.VITE_OPENROUTER_KEY || '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';
-  const NEMOTRON_KEY = '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';
+  const DEFAULT_KEY = import.meta.env.VITE_OPENROUTER_KEY || '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';
+  const NEMOTRON_KEY = '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';
   const API_KEY = selectedModel.id.includes('nemotron') ? NEMOTRON_KEY : DEFAULT_KEY;
 
   // Listen for auth state changes and load chat history
