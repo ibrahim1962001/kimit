@@ -146,7 +146,7 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
                )}
             </div>
             
-            <div className="builder-controls" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 20 }}>
+            <div className="builder-controls">
                <select className="kimit-select" value={builder.x} onChange={e => setBuilder({...builder, x: e.target.value})}>
                  <option value="">X-Axis</option>
                  {info.columns.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
