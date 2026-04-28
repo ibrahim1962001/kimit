@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import ExcelJS from 'exceljs';
-import { exportPowerBICSV, generateDAXMeasures } from '../../lib/exportUtils';
+import { exportPowerBICSV } from '../../lib/exportUtils';
 import type { DataRow } from '../../types/index';
 
 interface ExportActionsProps {
@@ -81,18 +81,16 @@ export const ExportActions: React.FC<ExportActionsProps> = ({ data, columns, ele
     }
   };
 
-  const handlePowerBI = () => {
+  const exportForPowerBI = () => {
     exportPowerBICSV(data, "Kimit_PowerBI.csv");
   };
 
   const [daxCopied, setDaxCopied] = useState(false);
-  const handleDAX = async () => {
+  const copyDAX = async () => {
     const numericCols = columns
-      .filter(c => data.length > 0 && typeof data[0][c] === 'number')
-      .map(c => ({ name: c, type: 'numeric' as const, nullCount: 0, uniqueCount: 0 }));
+      .filter(c => data.length > 0 && typeof data[0][c] === 'number');
     
-    const measures = generateDAXMeasures(numericCols);
-    const daxString = measures.map(m => m.dax).join('\n\n');
+    const daxString = numericCols.map(c => `Total ${c} := SUM([${c}])`).join('\n');
     
     if (daxString) {
       await navigator.clipboard.writeText(daxString);
@@ -142,7 +140,7 @@ export const ExportActions: React.FC<ExportActionsProps> = ({ data, columns, ele
         Excel Data
       </button>
       <button 
-        onClick={handlePowerBI}
+        onClick={exportForPowerBI}
         style={{
           padding: '8px 16px',
           background: 'rgba(212,175,55,0.1)',
@@ -161,7 +159,7 @@ export const ExportActions: React.FC<ExportActionsProps> = ({ data, columns, ele
       </button>
 
       <button 
-        onClick={handleDAX}
+        onClick={copyDAX}
         style={{
           padding: '8px 16px',
           background: daxCopied ? 'rgba(16,185,129,0.1)' : 'rgba(255, 255, 255, 0.05)',

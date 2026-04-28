@@ -27,6 +27,12 @@ interface PieClickData {
   value?: number;
 }
 
+interface DotProps {
+  cx: number;
+  cy: number;
+  payload: Record<string, unknown>;
+}
+
 // ── Regression line calculator (OLS) ─────────────────────────────────────────
 interface RegressionResult {
   slope: number;
@@ -74,16 +80,35 @@ const ChartRenderer: React.FC<AnalysisChartProps> = ({ data, config, onFilter })
     return data.slice(0, isMobile ? 50 : 100);
   }, [data, config, isMobile]);
 
-  // ── Regression line data (only for line/scatter) ──────────
+  // ── Regression line data & Forecasting (next 3 points) ────
   const regressionData = useMemo(() => {
     if (!showRegression || (config.type !== 'line' && config.type !== 'scatter')) return null;
     const ys = chartData.map(d => Number((d as Record<string, unknown>)[config.yAxisKey]) || 0);
     const { slope, intercept } = calcLinearRegression(ys);
-    return chartData.map((d, i) => ({
+    
+    const extrapolated = [...chartData];
+    for (let i = 0; i < 3; i++) {
+      extrapolated.push({
+        [config.xAxisKey]: `Forecast ${i+1}`,
+        name: `Forecast ${i+1}`,
+      });
+    }
+
+    return extrapolated.map((d, i) => ({
       ...d,
       _regression: parseFloat((slope * i + intercept).toFixed(3)),
     }));
   }, [showRegression, config, chartData]);
+
+  // ── IQR Anomaly Thresholds ────────────────────────────────
+  const anomalyBounds = useMemo(() => {
+    const ys = chartData.map(d => Number((d as Record<string, unknown>)[config.yAxisKey]) || 0).sort((a,b) => a - b);
+    if (ys.length < 4) return { lower: -Infinity, upper: Infinity };
+    const q1 = ys[Math.floor(ys.length * 0.25)];
+    const q3 = ys[Math.floor(ys.length * 0.75)];
+    const iqr = q3 - q1;
+    return { lower: q1 - 1.5 * iqr, upper: q3 + 1.5 * iqr };
+  }, [chartData, config.yAxisKey]);
 
   if (!chartData || chartData.length === 0) {
     throw new Error('Insufficient data to render chart');
@@ -162,7 +187,13 @@ const ChartRenderer: React.FC<AnalysisChartProps> = ({ data, config, onFilter })
               dataKey={config.yAxisKey}
               stroke={config.color || COLORS[1]}
               strokeWidth={2}
-              dot={!isMobile}
+              dot={(props: unknown) => {
+                const p = props as DotProps;
+                const val = Number(p.payload[config.yAxisKey]);
+                const isAnomaly = val < anomalyBounds.lower || val > anomalyBounds.upper;
+                if (isAnomaly) return <circle cx={p.cx} cy={p.cy} r={4} fill="#ef4444" stroke="none" />;
+                return !isMobile ? <circle cx={p.cx} cy={p.cy} r={3} fill={config.color || COLORS[1]} stroke="none" /> : <></>;
+              }}
             />
             {/* OLS Regression trend line */}
             {showRegression && (
@@ -220,7 +251,14 @@ const ChartRenderer: React.FC<AnalysisChartProps> = ({ data, config, onFilter })
             <YAxis dataKey={config.yAxisKey} name={config.yAxisKey} {...commonYProps} />
             <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={tooltipStyle} />
             <Legend verticalAlign="bottom" height={36} iconType="circle" />
-            <Scatter name="Data" data={chartData} fill={config.color || COLORS[3]} />
+            <Scatter name="Data" data={activeData} fill={config.color || COLORS[3]}>
+              {activeData.map((entry, index) => {
+                const e = entry as Record<string, unknown>;
+                const val = Number(e[config.yAxisKey]);
+                const isAnomaly = val < anomalyBounds.lower || val > anomalyBounds.upper;
+                return <Cell key={`cell-${index}`} fill={isAnomaly ? '#ef4444' : (config.color || COLORS[3])} />;
+              })}
+            </Scatter>
             {/* Horizontal reference line at mean */}
             {showRegression && (() => {
               const ys = chartData.map(d => Number((d as Record<string, unknown>)[config.yAxisKey]) || 0);

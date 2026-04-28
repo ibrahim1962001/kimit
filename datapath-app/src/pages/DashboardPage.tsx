@@ -70,7 +70,7 @@ const GrowthBadge: React.FC<{ pct: number; trend: 'up' | 'down' | 'flat' }> = ({
 };
 
 export const DashboardPage: React.FC<Props> = ({ lang }) => {
-  const { info } = useKimitData();
+  const { info, rollback } = useKimitData();
   const {
     removeDuplicates, fillMissingValues, getHealthStats,
     outlierMap, allOutlierRowIndices, correlationMatrix, growthIndicators,
@@ -358,6 +358,9 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
               </button>
               <button onClick={fillMissingValues} className="action-row-btn">
                 <span>Auto-Fill Missing</span><Plus size={13} />
+              </button>
+              <button onClick={rollback} className="action-row-btn" style={{ marginTop: 8, background: 'rgba(239, 68, 68, 0.05)', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.1)' }}>
+                <span>Undo Last Action</span><AlertTriangle size={13} />
               </button>
             </div>
           </div>

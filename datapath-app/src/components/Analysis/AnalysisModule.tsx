@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useCsvParser } from '../../hooks/useCsvParser';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useKimitExtra } from '../../hooks/useKimitExtra';
+import { useKimitEngine } from '../../hooks/useKimitEngine';
 import { DataGrid } from './DataGrid';
 import { AnalysisChart } from './Charts';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -27,6 +28,7 @@ export const AnalysisModule: React.FC = () => {
   }, []);
 
   const { metadata, anomalies, healthScore } = useAnalytics(data, columns);
+  const { outlierMap, correlationMatrix } = useKimitEngine();
   const { isGeneratingInsights, insights, generateInsights, parseNlqQuery } = useKimitExtra(data, columns);
   const [nlqFilter, setNlqFilter] = useState<Array<{ id: string, value: { operator: string, value: string } }> | null>(null);
 
@@ -56,6 +58,65 @@ export const AnalysisModule: React.FC = () => {
   useEffect(() => {
     runSystemHealthCheck().then(res => setHealthStatus(res.status));
   }, []);
+
+  const dynamicInsights = React.useMemo(() => {
+    const list: Array<{ title: string, content: string, type: 'info' | 'positive' | 'warning' }> = [];
+    
+    // Outliers Insight
+    let totalOutliers = anomalies?.length || 0;
+    if (outlierMap && outlierMap.size > 0) {
+      totalOutliers = Array.from(outlierMap.values()).reduce((sum, r) => sum + r.outlierCount, 0);
+    }
+    list.push({
+      title: 'Anomaly Detection',
+      content: `Found ${totalOutliers} outliers across all columns using the IQR method.`,
+      type: totalOutliers > 0 ? 'warning' : 'positive'
+    });
+    
+    // Data Quality Insight
+    const score = healthScore?.score ?? 100;
+    list.push({
+      title: 'Data Integrity',
+      content: `Data quality: ${score}% - ${score > 80 ? 'Excellent ready for analysis.' : 'Needs cleaning.'}`,
+      type: score > 80 ? 'positive' : 'warning'
+    });
+    
+    // Correlation Insight
+    if (correlationMatrix && correlationMatrix.columns.length >= 2) {
+      let maxR = -1;
+      let pair = ['', ''];
+      for (let i = 0; i < correlationMatrix.columns.length; i++) {
+        for (let j = i + 1; j < correlationMatrix.columns.length; j++) {
+          const r = Math.abs(correlationMatrix.matrix[i][j]);
+          if (r > maxR) {
+            maxR = r;
+            pair = [correlationMatrix.columns[i], correlationMatrix.columns[j]];
+          }
+        }
+      }
+      if (maxR > 0.5) {
+        list.push({
+          title: 'Strong Relationship',
+          content: `Strongest correlation between ${pair[0]} and ${pair[1]} (r ≈ ${maxR.toFixed(2)}).`,
+          type: 'info'
+        });
+      }
+    } else {
+      // Fallback if no correlation matrix
+      const numCol = metadata.find(m => m.type === 'numeric')?.name;
+      if (numCol && data.length > 0) {
+        let maxVal = -Infinity;
+        data.forEach(r => { const v = Number(r[numCol]); if (v > maxVal) maxVal = v; });
+        list.push({
+          title: 'Key Metric',
+          content: `Highest value recorded in ${numCol} is ${maxVal}.`,
+          type: 'info'
+        });
+      }
+    }
+    
+    return list;
+  }, [anomalies, healthScore, outlierMap, correlationMatrix, metadata, data]);
 
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -177,10 +238,14 @@ export const AnalysisModule: React.FC = () => {
             
             <ErrorBoundary moduleName="AI Storyteller">
               <InsightSummary
-                insights={(insights ?? []).map(ins => ({
+                insights={insights && insights.length > 0 ? insights.map(ins => ({
                   title: ins.title,
                   description: ins.content,
                   type: 'info' as const,
+                })) : dynamicInsights.map(ins => ({
+                  title: ins.title,
+                  description: ins.content,
+                  type: ins.type,
                 }))}
                 isLoading={isGeneratingInsights}
               />
