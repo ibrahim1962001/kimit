@@ -214,7 +214,7 @@ function App() {
 
         <div className="flex-1 animate-fade-in">
           {tab === 'home' && <HomePage lang={lang} onFile={handleFile} />}
-          {tab === 'dashboard' && dataset && <DashboardPage info={dataset} lang={lang} />}
+          {tab === 'dashboard' && dataset && <DashboardPage lang={lang} />}
           {tab === 'cleaning' && dataset && <CleaningPage info={dataset} lang={lang} onClean={handleClean} onUpdate={setDataset} />}
           {tab === 'chat' && <OpenRouterChat dataset={dataset} onFileUpload={handleChatFile} onUpdate={setDataset} />}
           {tab === 'export' && dataset && <ExportPage info={dataset} lang={lang} />}

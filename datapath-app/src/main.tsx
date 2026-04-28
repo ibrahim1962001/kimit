@@ -26,6 +26,7 @@ class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean,
 import infoContent from '../info.md?raw';
 import { migrateMarkdownToFirestore } from './lib/markdownParser';
 import { UserProvider } from './contexts/UserContext';
+import { DataProvider } from './contexts/DataContext';
 
 // Auto-Migration logic on startup
 if (!localStorage.getItem('markdown_migrated_v1')) {
@@ -38,7 +39,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
       <UserProvider>
-        <App />
+        <DataProvider>
+          <App />
+        </DataProvider>
       </UserProvider>
     </ErrorBoundary>
   </StrictMode>,

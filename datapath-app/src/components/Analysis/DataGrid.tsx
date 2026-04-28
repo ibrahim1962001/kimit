@@ -10,6 +10,7 @@ import {
   type SortingState,
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { SmartProfiler } from './SmartProfiler';
 import type { DataRow } from '../../types/index';
 
 interface DataGridProps {
@@ -31,15 +32,19 @@ export const DataGrid: React.FC<DataGridProps> = ({ data, columns, externalFilte
   const tableColumns = useMemo<ColumnDef<DataRow>[]>(() => 
     columns.map((col) => ({
       accessorKey: col,
-      header: () => <span style={{ fontWeight: 'bold' }}>{col}</span>,
-      size: 150, // Default width for all columns
+      header: () => (
+        <div style={{ textAlign: 'left', width: '100%' }}>
+          <div style={{ fontWeight: 'bold', color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{col}</div>
+          <SmartProfiler columnName={col} data={data} />
+        </div>
+      ),
+      size: 180, // Optimized width for profiler visibility
       cell: info => {
         const val = info.getValue();
         return typeof val === 'number' ? Number(val.toFixed(4)) : String(val ?? '');
       }
     })),
-  [columns]);
-
+  [columns, data]);
 
   const table = useReactTable({
     data,
@@ -58,36 +63,42 @@ export const DataGrid: React.FC<DataGridProps> = ({ data, columns, externalFilte
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => 40,
+    estimateSize: () => 52, // Slightly taller for better readability
     overscan: 10,
   });
 
   if (!data || data.length === 0) {
-    return <div style={{ padding: '20px', textAlign: 'center', color: '#888' }}>No data available</div>;
+    return (
+      <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+        No data available for display.
+      </div>
+    );
   }
 
   return (
-    <div className="grid-module" style={{ display: 'flex', flexDirection: 'column', height: '100%', border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
-      <div className="grid-toolbar" style={{ padding: '10px', background: 'var(--card-bg)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
+    <div className="grid-module" style={{ display: 'flex', flexDirection: 'column', height: '100%', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden', background: '#020617' }}>
+      <div className="grid-toolbar" style={{ padding: '12px 16px', background: 'rgba(15, 23, 42, 0.8)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <input 
           type="text" 
           value={globalFilter ?? ''} 
           onChange={e => setGlobalFilter(e.target.value)} 
           placeholder="Search all columns..."
-          style={{ padding: '8px 12px', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg-color)', color: '#fff', width: '300px' }}
+          style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: '#0f172a', color: '#f1f5f9', width: '280px', fontSize: '13px' }}
         />
-        <span style={{ color: '#888', fontSize: '13px', display: 'flex', alignItems: 'center' }}>
-          {rows.length} records found
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 500 }}>
+            <b style={{ color: 'var(--primary)' }}>{rows.length}</b> records found
+          </span>
+        </div>
       </div>
       
       <div 
         ref={tableContainerRef} 
-        style={{ overflow: 'auto', flex: 1, position: 'relative', background: 'rgba(2, 6, 23, 0.5)' }}
+        style={{ overflow: 'auto', flex: 1, position: 'relative' }}
       >
         <div style={{ width: 'fit-content', minWidth: '100%' }}>
           {/* Header */}
-          <div style={{ position: 'sticky', top: 0, zIndex: 2, background: 'var(--card-bg)', borderBottom: '2px solid var(--border)', display: 'flex' }}>
+          <div style={{ position: 'sticky', top: 0, zIndex: 10, background: '#0f172a', borderBottom: '2px solid #1e293b', display: 'flex' }}>
             {table.getHeaderGroups().map(headerGroup => (
               <React.Fragment key={headerGroup.id}>
                 {headerGroup.headers.map(header => (
@@ -102,14 +113,14 @@ export const DataGrid: React.FC<DataGridProps> = ({ data, columns, externalFilte
                       fontSize: '13px', 
                       color: '#94a3b8', 
                       whiteSpace: 'nowrap',
-                      fontWeight: 'bold',
                       display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
+                      flexDirection: 'column'
                     }}
                   >
-                    {flexRender(header.column.columnDef.header, header.getContext())}
-                    {{ asc: ' 🔼', desc: ' 🔽' }[header.column.getIsSorted() as string] ?? null}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                      {{ asc: ' 🔼', desc: ' 🔽' }[header.column.getIsSorted() as string] ?? null}
+                    </div>
                   </div>
                 ))}
               </React.Fragment>
@@ -131,10 +142,13 @@ export const DataGrid: React.FC<DataGridProps> = ({ data, columns, externalFilte
                     width: '100%', 
                     height: `${virtualRow.size}px`, 
                     transform: `translateY(${virtualRow.start}px)`,
-                    borderBottom: '1px solid var(--border)',
-                    background: virtualRow.index % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)',
-                    display: 'flex'
+                    borderBottom: '1px solid #1e293b',
+                    background: virtualRow.index % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)',
+                    display: 'flex',
+                    transition: 'background 0.2s ease'
                   }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.05)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = virtualRow.index % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)'}
                 >
                   {row.getVisibleCells().map(cell => (
                     <div 

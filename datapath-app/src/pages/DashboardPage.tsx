@@ -1,216 +1,60 @@
-import React, { useRef, useState, useEffect } from 'react';
-
-import { analyzeDataset } from '../lib/dataUtils';
+import React, { useState } from 'react';
+import { useKimitData } from '../contexts/DataContext';
+import { useKimitEngine } from '../hooks/useKimitEngine';
 import { DataChart } from '../components/DataChart';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
-import { Download, Filter, Plus, Trash2, Maximize2, FileText, Loader2 } from 'lucide-react';
-import { generateExecutiveSummary } from '../lib/aiService';
-import type { DatasetInfo, Lang, ChartInfo, SummaryReport } from '../types';
+import { Plus, Trash2, FileText, Loader2, Sparkles, Database, ShieldCheck, Activity } from 'lucide-react';
+import type { Lang, ChartInfo } from '../types';
 import { motion } from 'framer-motion';
-import confetti from 'canvas-confetti';
-import { AdSpace } from '../components/AdSpace';
-import { AD_PROVIDERS } from '../config/adConfig';
 import { DataGrid } from '../components/Analysis/DataGrid';
-import { DataWranglerUI } from '../components/DataWranglerUI';
+import { TransformationTimeline } from '../components/Analysis/TransformationTimeline';
 import { CreatorFooter } from '../components/CreatorFooter';
+import { exportBrandedPDF, exportToExcel } from '../lib/exportUtils';
+import { generateAInarrative } from '../lib/narrativeEngine';
 import { useMediaQuery } from 'react-responsive';
-import { Copy, AlertTriangle, AlertCircle, Lightbulb, TrendingUp, CheckCircle, Brain } from 'lucide-react';
 
-interface Props { info: DatasetInfo; lang: Lang; }
+interface Props { lang: Lang; }
 
 const T = {
   ar: {
-    title: 'التحليل والرسوم البيانية',
-    rows: 'سجلات', cols: 'متغير', missing: 'قيم مفقودة', dups: 'تكرار',
-    anomalies: '⚠️ قيم شاذة', correlations: '🔗 علاقات قوية',
-    insights: '🧠 ملخص سريع', high: 'عالي', medium: 'متوسط',
-    chartsTitle: 'الرسوم البيانية',
-    filters: 'فلاتر البيانات (Slicers)',
-    noFilters: 'لا توجد أعمدة نصية للفلترة',
-    builderTitle: 'صانع المخططات المخصص',
-    xAxis: 'المحور الأفقي (X)',
-    yAxis: 'المحور الرأسي (Y)',
-    chartType: 'نوع الرسم',
-    addChart: 'إضافة للوحة التحكم',
-    clearFilters: 'مسح الفلاتر',
+    title: 'منصة التحليل المتقدمة',
+    healthTitle: 'مؤشر صحة البيانات',
+    insights: 'رؤى الذكاء الاصطناعي',
+    export: 'تصدير التقارير',
+    undo: 'مركز التراجع',
+    builder: 'صانع المخططات',
+    records: 'سجل',
+    columns: 'عمود',
   },
   en: {
-    title: 'Analytics & Charts',
-    rows: 'Records', cols: 'Columns', missing: 'Missing', dups: 'Duplicates',
-    anomalies: '⚠️ Anomalies', correlations: '🔗 Correlations',
-    insights: '🧠 Quick Insights', high: 'High', medium: 'Medium',
-    chartsTitle: 'Charts',
-    filters: 'Data Slicers',
-    noFilters: 'No text columns to filter',
-    builderTitle: 'Custom Chart Builder',
-    xAxis: 'X Axis (Categorical)',
-    yAxis: 'Y Axis (Numeric)',
-    chartType: 'Chart Type',
-    addChart: 'Add to Dashboard',
-    clearFilters: 'Clear Filters',
+    title: 'Advanced Analyst Suite',
+    healthTitle: 'Data Health Score',
+    insights: 'AI Narrative Insights',
+    export: 'Executive Export',
+    undo: 'Transformation Center',
+    builder: 'Custom Chart Builder',
+    records: 'Records',
+    columns: 'Columns',
   }
 };
 
-export const DashboardPage: React.FC<Props> = ({ info: initialInfo, lang }) => {
+export const DashboardPage: React.FC<Props> = ({ lang }) => {
   const isMobile = useMediaQuery({ maxWidth: 768 });
-  const dashRef = useRef<HTMLDivElement>(null);
-  const chartsRef = useRef<HTMLDivElement>(null);
+  const { info } = useKimitData();
+  const { removeDuplicates, fillMissingValues, getHealthStats } = useKimitEngine();
+  
   const [exporting, setExporting] = useState(false);
-  
-  // Filtering Logic
-  const [filters, setFilters] = useState<Record<string, string>>({});
-  const [info, setInfo] = useState<DatasetInfo>(initialInfo);
-  
-  // Custom Builder Logic
   const [customCharts, setCustomCharts] = useState<ChartInfo[]>([]);
   const [builder, setBuilder] = useState<{ x: string; y: string; type: ChartInfo['type'] }>({ x: '', y: '', type: 'bar' });
-
-  // Advanced Features
   const [activeChartFilter, setActiveChartFilter] = useState<string>('');
-  const [presentationMode, setPresentationMode] = useState(false);
-  const [theme, setTheme] = useState('emerald');
-  const [summary, setSummary] = useState<SummaryReport | null>(null);
-  const [loadingSummary, setLoadingSummary] = useState(false);
-
+  
+  const health = getHealthStats();
   const t = T[lang];
+  const insights = info ? generateAInarrative(info) : [];
 
-  // providers منفصلة لكل بانر
-  const topAdProvider = AD_PROVIDERS.filter(p => p.id === 'native_banner');
-  const sidebarAdProvider = AD_PROVIDERS.filter(p => p.id === 'social_banner');
-
-  const handleChartClick = (_col: string, val: string) => {
-    setActiveChartFilter(val);
-  };
-
-  const handleFetchSummary = async () => {
-    const apiKey = localStorage.getItem('groq_key') || undefined;
-    setLoadingSummary(true);
-    try {
-      const res = await generateExecutiveSummary(info, apiKey, lang);
-      setSummary(res);
-      if (!res.isLocal) {
-        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#10b981', '#6366f1'] });
-      }
-    } catch (e: unknown) {
-      console.error(e);
-      // Fallback is already handled inside generateExecutiveSummary, this catch is just for safety
-    } finally {
-      setLoadingSummary(false);
-    }
-  };
-
-  const handleCopyReport = () => {
-    if (!summary) return;
-    const reportText = `
-Executive Summary:
-${summary.executiveSummary}
-
-Top Insights:
-${summary.insights.map(i => '- ' + i).join('\n')}
-
-Warnings & Anomalies:
-${summary.warnings.map(i => '- ' + i).join('\n')}
-
-Data Quality Issues:
-${summary.qualityIssues.map(i => '- ' + i).join('\n')}
-
-Actionable Recommendations:
-${summary.recommendations.map(i => '- ' + i).join('\n')}
-
-Suggested Opportunities:
-${summary.opportunities.map(i => '- ' + i).join('\n')}
-    `.trim();
-    navigator.clipboard.writeText(reportText);
-    alert(lang === 'ar' ? 'تم نسخ التقرير' : 'Report copied to clipboard');
-  };
-
-  const handleSummaryPDF = async () => {
-    if (!summary) return;
-    setLoadingSummary(true);
-    try {
-      const tempDiv = document.createElement('div');
-      tempDiv.style.padding = '30px';
-      tempDiv.style.background = '#0f172a';
-      tempDiv.style.color = '#f8fafc';
-      tempDiv.style.width = '800px';
-      tempDiv.style.fontFamily = '"Plus Jakarta Sans", "Noto Sans Arabic", sans-serif';
-      
-      let html = `
-        <div style="display: flex; align-items: center; gap: 15px; border-bottom: 2px solid #334155; padding-bottom: 10px; margin-bottom: 20px;">
-          <img src="/logo.png" alt="Kimit Logo" style="height: 40px; mix-blend-mode: screen;" />
-          <h2 style="color: #10b981; margin: 0;">Kimit AI - Smart Analytics Report</h2>
-        </div>
-      `;
-      if (summary.isLocal) html += `<p style="color: #f59e0b; font-weight: bold;">[Local Analysis Mode]</p>`;
-      
-      html += `
-        <div dir="${lang === 'ar' ? 'rtl' : 'ltr'}">
-          <h3 style="color: #38bdf8;">Executive Summary</h3>
-          <p style="font-size: 14px;">${summary.executiveSummary}</p>
-          
-          <h3 style="color: #a855f7; margin-top: 20px;">Top Insights</h3>
-          <ul style="font-size: 14px;">${summary.insights.map(i => `<li style="margin-bottom: 8px;">${i}</li>`).join('')}</ul>
-          
-          <h3 style="color: #f59e0b; margin-top: 20px;">Warnings & Anomalies</h3>
-          <ul style="font-size: 14px;">${summary.warnings.map(i => `<li style="margin-bottom: 8px;">${i}</li>`).join('')}</ul>
-          
-          <h3 style="color: #ef4444; margin-top: 20px;">Data Quality</h3>
-          <ul style="font-size: 14px;">${summary.qualityIssues.map(i => `<li style="margin-bottom: 8px;">${i}</li>`).join('')}</ul>
-          
-          <h3 style="color: #10b981; margin-top: 20px;">Recommendations</h3>
-          <ul style="font-size: 14px;">${summary.recommendations.map(i => `<li style="margin-bottom: 8px;">${i}</li>`).join('')}</ul>
-        </div>
-      `;
-      
-      tempDiv.innerHTML = html;
-      document.body.appendChild(tempDiv);
-      const canvas = await html2canvas(tempDiv, { scale: 2, useCORS: true, backgroundColor: '#0f172a' });
-      document.body.removeChild(tempDiv);
-      
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`${info.filename.replace(/\.[^/.]+$/, "")}_Smart_Report.pdf`);
-    } catch (pdfErr) {
-      console.error('PDF Generation Error:', pdfErr);
-    } finally {
-      setLoadingSummary(false);
-    }
-  };
-  const numCols = info.columns.filter(c => c.type === 'numeric').length;
-  const txtCols = info.columns.filter(c => c.type === 'text').length;
-
-  const totalCells = Math.max(1, info.rows * info.columns.length);
-  const healthPercent = Math.max(0, Math.round(100 - ((info.totalNulls / totalCells) * 100) - ((info.duplicates / info.rows) * 100) - (info.anomalies.length * 0.5)));
-
-  // Re-calculate DataInfo when filters change
-  useEffect(() => {
-    const active = Object.values(filters).some(v => v);
-    if (!active) {
-      setInfo(initialInfo);
-      return;
-    }
-    const filteredWorkData = initialInfo.workData.filter(row => {
-      return Object.entries(filters).every(([col, val]) => !val || String(row[col]) === val);
-    });
-    setInfo(analyzeDataset(new File([], initialInfo.filename), filteredWorkData));
-  }, [filters, initialInfo]);
-
-  // Phase 2.1: Proactive Insights — REMOVED auto-trigger
-  // Summary is now only generated when the user clicks the button
-
-  const getUniqueValues = (col: string) => {
-    const vals = Array.from(new Set(initialInfo.workData.map(r => String(r[col]))));
-    return vals.slice(0, 50).sort(); // Limit to 50 unique values for UI safety
-  };
+  if (!info) return <div className="p-20 text-center">No Data found. Please upload a file.</div>;
 
   const handleAddCustomChart = () => {
     if (!builder.x || !builder.y) return;
-    
-    // Aggregation logic
     const agg: Record<string, number> = {};
     info.workData.forEach(r => {
       const key = String(r[builder.x]);
@@ -226,375 +70,191 @@ ${summary.opportunities.map(i => '- ' + i).join('\n')}
     setCustomCharts([newChart, ...customCharts]);
   };
 
-  const handleExportPDF = async () => {
-    const target = chartsRef.current || dashRef.current;
-    if (!target) return;
+  const handleFullPDF = async () => {
     setExporting(true);
-    try {
-      // Use higher scale for PDF quality
-      const canvas = await html2canvas(target, { scale: 2, backgroundColor: '#020617', logging: false, useCORS: true });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Kimit_Charts_${info.filename}.pdf`);
-    } catch (e) {
-      console.error(e);
-    }
+    await exportBrandedPDF('dashboard-main-content', `Kimit_Report_${info.filename}.pdf`);
     setExporting(false);
   };
 
-  const handleExportImage = async () => {
-    const target = chartsRef.current || dashRef.current;
-    if (!target) return;
-    setExporting(true);
-    try {
-      // Direct PNG capture - much faster
-      const canvas = await html2canvas(target, { scale: 1.5, backgroundColor: '#020617', useCORS: true });
-      const link = document.createElement('a');
-      link.download = `Kimit_Charts_${info.filename}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-    } catch (e) {
-      console.error(e);
-    }
-    setExporting(false);
+  const handleExcel = () => {
+    exportToExcel(info.workData, `Kimit_Data_${info.filename}.xlsx`);
   };
 
   return (
-    <div className="page" ref={dashRef}>
-      <div className={`dashboard-header ${presentationMode ? 'presentation-mode' : ''}`}>
+    <div className="page" id="dashboard-main-content" style={{ background: '#020617', minHeight: '100vh', padding: '20px' }}>
+      
+      {/* 1. Header & Undo Engine */}
+      <div className="dashboard-header" style={{ marginBottom: '20px' }}>
         <div className="title-group">
-          <h2 className="page-title">{t.title}</h2>
-          <p className="page-sub">Kimit Analytics · {info.filename}</p>
-        </div>
-        <div className="actions-group">
-          <div className="theme-picker">
-            <span className="theme-picker-label">Theme</span>
-            {['emerald', 'indigo', 'amber', 'rose'].map(th => (
-              <button
-                key={th}
-                className={`theme-dot ${theme === th ? 'active' : ''}`}
-                onClick={() => { setTheme(th); document.body.className = `theme-${th}`; }}
-                style={{ background: th === 'emerald' ? '#10b981' : th === 'indigo' ? '#6366f1' : th === 'amber' ? '#f59e0b' : '#f43f5e' }}
-              />
-            ))}
-          </div>
-          <button className="btn-primary" style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)' }} onClick={() => setPresentationMode(!presentationMode)}>
-            <Maximize2 size={16} />
-          </button>
-          <button className="btn-primary" style={{ background: '#10b981', border: 'none', boxShadow: '0 0 15px rgba(16,185,129,0.2)' }} onClick={handleExportImage} disabled={exporting}>
-            <Download size={16} /> {exporting ? '...' : (lang === 'ar' ? 'تحميل صورة' : 'IMAGE')}
-          </button>
-          <button className="btn-primary" style={{ background: '#10b981', border: 'none', opacity: 0.8 }} onClick={handleExportPDF} disabled={exporting}>
-            <FileText size={16} /> {exporting ? '...' : 'PDF'}
-          </button>
-        </div>
-      </div>
-
-      <div className="dash-content-wrapper">
-        {/* Top Banner Ad */}
-        <div className="dashboard-ad-top">
-          <AdSpace
-            type="responsive"
-            providers={topAdProvider}
-            minHeight={90}
-          />
+          <motion.h2 
+            initial={{ opacity: 0, x: -20 }} 
+            animate={{ opacity: 1, x: 0 }}
+            className="page-title" 
+            style={{ display: 'flex', alignItems: 'center', gap: 12 }}
+          >
+            <Sparkles className="text-primary" /> {t.title}
+          </motion.h2>
+          <p className="page-sub">{info.filename} • {info.rows.toLocaleString()} {t.records}</p>
         </div>
         
-        {/* Quick Preview Section */}
-        <div className="dashboard-preview-section" style={{ padding: '0 20px', marginBottom: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-             <h4 style={{ color: '#10b981', margin: 0 }}>{t.chartsTitle} & Interactive Data Grid (Virtual Table)</h4>
-             {activeChartFilter && (
-               <button onClick={() => setActiveChartFilter('')} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer' }}>
-                 {t.clearFilters} ({activeChartFilter})
-               </button>
-             )}
-          </div>
-          <div style={{ height: '400px', width: '100%', background: 'var(--card-bg)', borderRadius: '12px' }}>
-             <DataGrid data={info.workData} columns={info.columns.map(c => c.name)} externalFilter={activeChartFilter} />
-          </div>
+        <div className="actions-group" style={{ display: 'flex', gap: 12 }}>
+          <button className="premium-button secondary" onClick={handleExcel}>
+             <Database size={16} /> Excel
+          </button>
+          <button className="premium-button" onClick={handleFullPDF} disabled={exporting}>
+             {exporting ? <Loader2 className="spin" size={16} /> : <FileText size={16} />} 
+             {lang === 'ar' ? 'تصدير PDF' : 'Branded PDF'}
+          </button>
         </div>
-
-        {/* Live Slicers Bar */}
-      <div className="slicers-bar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#10b981', fontWeight: 600, fontSize: 13 }}>
-          <Filter size={16} /> {t.filters}
-        </div>
-        {info.columns.filter(c => c.type === 'text').slice(0, 3).map(col => (
-          <div key={col.name} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label>{col.name}</label>
-            <select
-              value={filters[col.name] || ''}
-              onChange={e => setFilters({ ...filters, [col.name]: e.target.value })}
-            >
-              <option value="">All</option>
-              {getUniqueValues(col.name).map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
-          </div>
-        ))}
-        {Object.keys(filters).length > 0 && (
-          <button className="filter-reset" onClick={() => setFilters({})}>{t.clearFilters}</button>
-        )}
       </div>
 
-      {/* Stats KPI Grid */}
-      <div className="kpi-grid">
-        {[
-          { label: t.rows, value: info.rows.toLocaleString(), color: 'green' },
-          { label: t.cols, value: info.columns.length.toLocaleString(), color: 'blue' },
-          { label: t.missing, value: info.totalNulls.toLocaleString(), color: info.totalNulls > 0 ? 'yellow' : 'green' },
-          { label: t.dups, value: info.duplicates.toLocaleString(), color: info.duplicates > 0 ? 'red' : 'green' },
-        ].map(s => (
-          <div key={s.label} className={`stat-box ${s.color}`}>
-            <div
-              className="stat-val"
-              style={{
-                fontSize: s.value.length > 7 ? '16px' : s.value.length > 5 ? '20px' : s.value.length > 3 ? '26px' : '32px',
-                lineHeight: 1.1,
-              }}
-            >
-              {s.value}
+      <TransformationTimeline />
+
+      <div className="dash-content-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap: '20px' }}>
+        
+        {/* Left Column: Data & Charts */}
+        <div className="main-analytics-flow" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          
+          {/* KPI Mini Row */}
+          <div className="kpi-mini-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px' }}>
+            <div className="glass-card p-4" style={{ textAlign: 'center' }}>
+               <div style={{ color: 'var(--primary)', fontWeight: 800, fontSize: '24px' }}>{info.rows}</div>
+               <div style={{ fontSize: '11px', opacity: 0.6, textTransform: 'uppercase' }}>{t.records}</div>
             </div>
-            <div className="stat-label">{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Middle Banner Ad between KPIs and Charts */}
-      <div className="dashboard-ad-top" style={{ marginTop: 15, marginBottom: 5 }}>
-        <AdSpace
-          type="responsive"
-          providers={AD_PROVIDERS.filter(p => p.id === 'adsterra_main')}
-          minHeight={90}
-          lazyLoad
-        />
-      </div>
-
-      <div className="dash-layout" style={isMobile ? { display: 'flex', flexDirection: 'column', gap: 0 } : {}}>
-        {/* Charts grid */}
-        <div className="charts-section">
-          {/* Custom Builder */}
-          <div className="builder-panel">
-            <div className="builder-row">
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 15 }}>
-                  <Plus size={18} color="#10b981" />
-                  <span style={{ fontWeight: 700, fontSize: 14 }}>{t.builderTitle}</span>
-                </div>
-                <label>{t.xAxis}</label>
-                <select value={builder.x} onChange={e => setBuilder({ ...builder, x: e.target.value })}>
-                  <option value="">Select...</option>
-                  {info.columns.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label>{t.yAxis}</label>
-                <select value={builder.y} onChange={e => setBuilder({ ...builder, y: e.target.value })}>
-                  <option value="">Select...</option>
-                  {info.columns.filter(c => c.type === 'numeric').map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label>{t.chartType}</label>
-                <select value={builder.type} onChange={e => setBuilder({ ...builder, type: e.target.value as ChartInfo['type'] })}>
-                  <option value="bar">Bar</option>
-                  <option value="line">Line</option>
-                  <option value="pie">Pie</option>
-                  <option value="area">Area</option>
-                </select>
-              </div>
-              <div className="builder-action">
-                <button className="btn-primary" onClick={handleAddCustomChart}>{t.addChart}</button>
-              </div>
+            <div className="glass-card p-4" style={{ textAlign: 'center' }}>
+               <div style={{ color: '#38bdf8', fontWeight: 800, fontSize: '24px' }}>{info.columns.length}</div>
+               <div style={{ fontSize: '11px', opacity: 0.6, textTransform: 'uppercase' }}>{t.columns}</div>
+            </div>
+            <div className="glass-card p-4" style={{ textAlign: 'center' }}>
+               <div style={{ color: health.color, fontWeight: 800, fontSize: '24px' }}>{health.score}%</div>
+               <div style={{ fontSize: '11px', opacity: 0.6, textTransform: 'uppercase' }}>{health.label}</div>
             </div>
           </div>
 
-          <div ref={chartsRef} style={{ background: '#020617', padding: '10px', borderRadius: '16px' }}>
-            <div className="section-title">{t.chartsTitle}</div>
-            <div
-              className="charts-grid"
-            style={isMobile ? {
-              display: 'grid',
-              gridTemplateColumns: '1fr',
-              gap: '14px',
-            } : {}}
-          >
-            {customCharts.map((ch, i) => (
-              <div key={`custom-${i}`} style={{ position: 'relative' }}>
-                 <DataChart chart={ch} onFilterClick={handleChartClick} />
-                 <button onClick={() => setCustomCharts(customCharts.filter((_, idx) => idx !== i))} style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(239, 68, 68, 0.2)', border: 'none', color: '#ef4444', padding: 4, borderRadius: 4, cursor: 'pointer' }}>
-                    <Trash2 size={14} />
+          {/* Data Grid Section */}
+          <div className="glass-panel" style={{ height: '500px', padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <DataGrid data={info.workData} columns={info.columns.map(c => c.name)} externalFilter={activeChartFilter} />
+          </div>
+
+          {/* Chart Section */}
+          <div className="glass-panel p-6">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+               <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>{t.builder}</h3>
+               {activeChartFilter && (
+                 <button onClick={() => setActiveChartFilter('')} style={{ fontSize: '11px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '4px 8px', borderRadius: '4px' }}>
+                   Clear Filters
                  </button>
-              </div>
-            ))}
-            {/* On mobile show all charts — grid is 1 col so it's clean */}
-            {info.charts.map((ch, i) => <DataChart key={i} chart={ch} onFilterClick={handleChartClick} />)}
+               )}
+            </div>
+            
+            <div className="builder-controls" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 20 }}>
+               <select className="kimit-select" value={builder.x} onChange={e => setBuilder({...builder, x: e.target.value})}>
+                 <option value="">X-Axis</option>
+                 {info.columns.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+               </select>
+               <select className="kimit-select" value={builder.y} onChange={e => setBuilder({...builder, y: e.target.value})}>
+                 <option value="">Y-Axis</option>
+                 {info.columns.filter(c => c.type === 'numeric').map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+               </select>
+               <select className="kimit-select" value={builder.type} onChange={e => setBuilder({...builder, type: e.target.value as any})}>
+                 <option value="bar">Bar Chart</option>
+                 <option value="line">Line Chart</option>
+                 <option value="pie">Pie Chart</option>
+               </select>
+               <button className="premium-button" onClick={handleAddCustomChart}><Plus size={16} /> Add</button>
+            </div>
+
+            <div className="charts-display-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 15 }}>
+               {customCharts.map((ch, i) => (
+                 <div key={i} className="relative group">
+                   <DataChart chart={ch} onFilterClick={(_, v) => setActiveChartFilter(v)} />
+                   <button onClick={() => setCustomCharts(customCharts.filter((_, idx) => idx !== i))} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-red-500/20 p-1 rounded text-red-500"><Trash2 size={14} /></button>
+                 </div>
+               ))}
+               {info.charts.slice(0, 4).map((ch, i) => <DataChart key={i} chart={ch} onFilterClick={(_, v) => setActiveChartFilter(v)} />)}
+            </div>
           </div>
         </div>
-        </div>
 
-         {/* Insights sidebar */}
-         <div className="insights-section">
-           <div className="section-title">صحة البيانات (Data Health)</div>
-            <div className="insight-box data-health-box">
-              <div style={{
-                fontSize: 36,
-                fontWeight: 900,
-                color: healthPercent > 80 ? '#10b981' : healthPercent > 50 ? '#f59e0b' : '#ef4444'
-              }}>
-                {healthPercent}%
-              </div>
-              <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 5 }}>مؤشر جودة ونظافة البيانات</p>
-            </div>
+        {/* Right Column: AI Insights & Tools */}
+        <div className="sidebar-analytics" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          
+          {/* Health Gauge */}
+          <div className="glass-panel p-6 text-center" style={{ background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.05), transparent)' }}>
+             <h4 style={{ fontSize: '14px', opacity: 0.7, marginBottom: 15 }}>{t.healthTitle}</h4>
+             <div style={{ position: 'relative', width: '120px', height: '120px', margin: '0 auto' }}>
+                <svg viewBox="0 0 36 36" className="w-full h-full">
+                  <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="3" />
+                  <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke={health.color} strokeWidth="3" strokeDasharray={`${health.score}, 100`} />
+                </svg>
+                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontWeight: 800, fontSize: '24px', color: health.color }}>
+                  {health.score}%
+                </div>
+             </div>
+             <p style={{ marginTop: 15, fontSize: '12px', color: '#94a3b8' }}>Overall Data Integrity: <b>{health.label}</b></p>
+          </div>
 
-            <div style={{ marginTop: '20px', marginBottom: '20px' }}>
-              <DataWranglerUI data={info.workData} columns={info.columns.map(c => c.name)} onDataTransformed={(newData) => setInfo({ ...info, workData: newData })} />
-            </div>
+          {/* AI Narrative */}
+          <div className="glass-panel p-6">
+             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 15 }}>
+                <ShieldCheck className="text-primary" size={20} />
+                <h4 style={{ margin: 0, fontSize: '15px' }}>{t.insights}</h4>
+             </div>
+             <div className="insights-list" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {insights.map((ins, i) => (
+                  <motion.div 
+                    initial={{ opacity: 0, x: 20 }} 
+                    animate={{ opacity: 1, x: 0 }} 
+                    transition={{ delay: i * 0.1 }}
+                    key={i} 
+                    className={`insight-card ${ins.type}`}
+                    style={{ 
+                      padding: '12px', 
+                      borderRadius: '8px', 
+                      background: ins.type === 'positive' ? 'rgba(16, 185, 129, 0.05)' : ins.type === 'warning' ? 'rgba(239, 68, 68, 0.05)' : 'rgba(56, 189, 248, 0.05)',
+                      borderLeft: `3px solid ${ins.type === 'positive' ? '#10b981' : ins.type === 'warning' ? '#ef4444' : '#38bdf8'}`
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: 4 }}>{ins.title}</div>
+                    <div style={{ fontSize: '12px', opacity: 0.8, lineHeight: 1.4 }}>{ins.description}</div>
+                  </motion.div>
+                ))}
+             </div>
+          </div>
 
-            {/* Side Square Ad */}
-            <div className="dashboard-ad-square">
-              <AdSpace
-                type="responsive"
-                providers={sidebarAdProvider}
-                minHeight={250}
-              />
-            </div>
-
-            <div className="section-title" style={{ marginTop: 20 }}>{t.insights}</div>
-          <div className="insight-box summary" style={{ position: 'relative', padding: summary ? '0' : '20px', background: summary ? 'transparent' : 'var(--card-bg)', border: summary ? 'none' : '1px solid var(--border)' }}>
-            {!summary ? (
-              <>
-                <button 
-                  onClick={handleFetchSummary} 
-                  disabled={loadingSummary}
-                  style={{ width: '100%', padding: '15px', background: 'rgba(16,185,129,0.1)', border: '1px dashed var(--primary)', borderRadius: '10px', color: 'var(--primary)', cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-                >
-                  {loadingSummary ? (<><Loader2 size={18} className="spin" style={{ animation: 'spin 1s linear infinite' }} /> {lang === 'ar' ? 'جاري التوليد...' : 'Generating...'}</>) : (lang === 'ar' ? 'توليد تقرير ذكي شامل ✨' : 'Generate Smart Report ✨')}
+          {/* Quick Transformation Tools */}
+          <div className="glass-panel p-6">
+             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 15 }}>
+                <Activity className="text-blue-400" size={20} />
+                <h4 style={{ margin: 0, fontSize: '15px' }}>Smart Transformations</h4>
+             </div>
+             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <button onClick={removeDuplicates} className="action-row-btn">
+                   <span>Remove Duplicates</span>
+                   <Trash2 size={14} />
                 </button>
-                <p style={{ marginTop: 10, fontSize: 11, opacity: 0.6, textAlign: 'center' }}>
-                  {lang === 'ar'
-                    ? `${info.rows.toLocaleString()} سجل · ${numCols} عمود رقمي · ${txtCols} عمود نصي`
-                    : `${info.rows.toLocaleString()} rows · ${numCols} numeric cols · ${txtCols} text cols`
-                  }
-                </p>
-              </>
-            ) : (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="structured-report">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {summary.isLocal ? (
-                      <span style={{ fontSize: 11, background: '#f59e0b', color: '#000', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold' }}>Local Analysis — No AI</span>
-                    ) : (
-                      <span style={{ fontSize: 11, background: 'var(--primary)', color: '#000', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold' }}>AI Generated ✨</span>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <button onClick={handleCopyReport} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: 12 }}>
-                      <Copy size={14} /> {lang === 'ar' ? 'نسخ' : 'Copy'}
-                    </button>
-                    <button onClick={handleSummaryPDF} disabled={loadingSummary} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(16,185,129,0.2)', border: 'none', color: 'var(--primary)', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: 12 }}>
-                      {loadingSummary ? <Loader2 size={14} className="spin" /> : <FileText size={14} />} PDF
-                    </button>
-                  </div>
-                </div>
-
-                <div className="report-card" style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '15px' }}>
-                  <h4 style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#38bdf8', marginBottom: 10, fontSize: 15 }}><Brain size={18} /> Executive Summary</h4>
-                  <p style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.9 }}>{summary.executiveSummary}</p>
-                </div>
-
-                <div className="report-card" style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', marginBottom: '15px' }}>
-                  <h4 style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#a855f7', marginBottom: 10, fontSize: 15 }}><TrendingUp size={18} /> Top Insights</h4>
-                  <ol style={{ paddingInlineStart: 20, margin: 0, fontSize: 13, lineHeight: 1.6, opacity: 0.9 }}>
-                    {summary.insights.map((item, idx) => (
-                      <li key={idx} style={{ marginBottom: 6 }}><strong>{item.split(':')[0]}</strong>{item.includes(':') ? ':' + item.split(':').slice(1).join(':') : ''}</li>
-                    ))}
-                  </ol>
-                </div>
-
-                <div className="report-card" style={{ background: 'rgba(245, 158, 11, 0.05)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: '12px', padding: '20px', marginBottom: '15px' }}>
-                  <h4 style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#f59e0b', marginBottom: 10, fontSize: 15 }}><AlertTriangle size={18} /> Warnings & Anomalies</h4>
-                  <ul style={{ paddingInlineStart: 20, margin: 0, fontSize: 13, lineHeight: 1.6, color: '#fcd34d' }}>
-                    {summary.warnings.map((item, idx) => <li key={idx} style={{ marginBottom: 6 }}>{item}</li>)}
-                  </ul>
-                </div>
-
-                <div className="report-card" style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '12px', padding: '20px', marginBottom: '15px' }}>
-                  <h4 style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#ef4444', marginBottom: 10, fontSize: 15 }}><AlertCircle size={18} /> Data Quality Issues</h4>
-                  <ul style={{ paddingInlineStart: 20, margin: 0, fontSize: 13, lineHeight: 1.6, color: '#fca5a5' }}>
-                    {summary.qualityIssues.map((item, idx) => <li key={idx} style={{ marginBottom: 6 }}>{item}</li>)}
-                  </ul>
-                </div>
-
-                <div className="report-card" style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '12px', padding: '20px', marginBottom: '15px' }}>
-                  <h4 style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#10b981', marginBottom: 10, fontSize: 15 }}><CheckCircle size={18} /> Recommendations</h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {summary.recommendations.map((item, idx) => (
-                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, background: 'rgba(16, 185, 129, 0.1)', padding: '10px 15px', borderRadius: '8px' }}>
-                        <span style={{ fontSize: 13, lineHeight: 1.6, color: '#d1fae5' }}>{item}</span>
-                        <button style={{ minWidth: '80px', background: '#10b981', border: 'none', color: '#000', fontSize: 11, fontWeight: 'bold', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer' }}>{lang === 'ar' ? 'تنفيذ' : 'Execute'}</button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="report-card" style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px' }}>
-                  <h4 style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#60a5fa', marginBottom: 10, fontSize: 15 }}><Lightbulb size={18} /> Opportunities</h4>
-                  <ul style={{ paddingInlineStart: 20, margin: 0, fontSize: 13, lineHeight: 1.6, opacity: 0.9 }}>
-                    {summary.opportunities.map((item, idx) => <li key={idx} style={{ marginBottom: 6 }}>{item}</li>)}
-                  </ul>
-                </div>
-
-              </motion.div>
-            )}
+                <button onClick={fillMissingValues} className="action-row-btn">
+                   <span>Auto-Fill Missing</span>
+                   <Plus size={14} />
+                </button>
+             </div>
           </div>
 
-          {info.anomalies.length > 0 && (
-            <div className="insight-block">
-              <div className="insight-block-title danger">{t.anomalies}</div>
-              {info.anomalies.map((a, i) => (
-                <div key={i} className="insight-item">
-                  <div className="insight-item-top">
-                    <span className="insight-col">{a.column}</span>
-                    <span className={`sev-badge ${a.severity}`}>{a.severity === 'high' ? t.high : t.medium}</span>
-                  </div>
-                  <div className="insight-item-desc">{a.description}</div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {info.correlations.length > 0 && (
-            <div className="insight-block">
-              <div className="insight-block-title purple">{t.correlations}</div>
-              {info.correlations.map((c, i) => (
-                <div key={i} className="insight-item corr">
-                  <div className="insight-item-top">
-                    <span className="insight-col">{c.col1} ↔ {c.col2}</span>
-                    <span className="corr-val">{c.value.toFixed(2)}</span>
-                  </div>
-                  <div className="insight-item-desc">{c.strength}</div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Bottom Ad space in the Insights sidebar to fill empty vertical space */}
-          <div className="dashboard-ad-vertical" style={{ marginTop: 20 }}>
-            <AdSpace
-              type="vertical"
-              providers={AD_PROVIDERS.filter(p => p.id === 'native_banner')}
-              minHeight={400}
-              lazyLoad
-            />
-          </div>
         </div>
       </div>
-      </div>
+
       <CreatorFooter lang={lang} />
+
+      <style>{`
+        .glass-panel { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; backdrop-filter: blur(10px); }
+        .glass-card { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; }
+        .premium-button { display: flex; align-items: center; gap: 8; background: var(--primary); color: #000; border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-weight: 700; transition: all 0.2s; }
+        .premium-button:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3); }
+        .premium-button.secondary { background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.1); }
+        .kimit-select { background: #0f172a; border: 1px solid rgba(255,255,255,0.1); color: #f1f5f9; padding: 8px 12px; border-radius: 8px; font-size: 13px; outline: none; }
+        .action-row-btn { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 12px 15px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; color: #cbd5e1; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .action-row-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+      `}</style>
     </div>
   );
 };
