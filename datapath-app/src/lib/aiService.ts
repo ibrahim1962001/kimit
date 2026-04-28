@@ -1,7 +1,7 @@
 import type { DatasetInfo, Lang } from '../types';
 
 // Set this via environment or UI rather than hardcoding a real key.
-const LLAMA_API_KEY = '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';
+const LLAMA_API_KEY = import.meta.env.VITE_OPENROUTER_KEY || '';
 
 export interface ChatParams {
   question: string;
