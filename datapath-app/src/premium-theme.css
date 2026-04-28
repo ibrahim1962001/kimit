@@ -360,13 +360,29 @@ body::after {
 
 /* ── 8. CARDS ──────────────────────────────── */
 .chart-card, .feature-card, .export-card, .insight-box,
-.stat-box, .col-card, .clean-banner {
-  background: rgba(255,255,255,0.028) !important;
-  backdrop-filter: blur(24px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
-  border: 1px solid rgba(255,255,255,0.06) !important;
+.stat-box, .col-card, .clean-banner, .premium-card {
+  background: rgba(15, 23, 42, 0.4) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 24px !important;
   position: relative !important;
   overflow: hidden !important;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+
+.premium-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+}
+
+.premium-card:hover {
+  transform: translateY(-5px) scale(1.01) !important;
+  border-color: rgba(0, 229, 255, 0.3) !important;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4), 0 0 20px rgba(0, 229, 255, 0.1) !important;
 }
 
 /* fadeInUp staggered */

@@ -113,22 +113,24 @@ export const HomePage: React.FC<Props> = ({ lang, onFile }) => {
         {/* Feature Cards */}
         <div className="features-grid">
           {t.features.map((f, i) => (
-            <div key={i} className="feature-card">
-              <f.icon size={26} className="feature-icon" />
-              <div className="feature-title">{f.title}</div>
-              <div className="feature-desc">{f.desc}</div>
+            <div key={i} className="premium-card p-6 flex flex-col items-center text-center group">
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-5 border border-primary/20 group-hover:scale-110 transition-transform">
+                <f.icon size={24} className="text-primary" />
+              </div>
+              <div className="text-lg font-black text-white mb-2">{f.title}</div>
+              <div className="text-xs text-text-dim leading-relaxed">{f.desc}</div>
             </div>
           ))}
         </div>
 
         {/* How to use */}
-        <div className="how-to-section">
-          <h2>{t.howTo.title}</h2>
-          <ul className="how-to-list">
+        <div className="how-to-section premium-card p-10 md:p-16">
+          <h2 className="text-3xl md:text-4xl font-black mb-12 text-center text-white">{t.howTo.title}</h2>
+          <ul className="grid md:grid-cols-2 gap-8">
             {t.howTo.steps.map((step, i) => (
-              <li key={i} className="how-to-step">
-                <span className="how-to-step-number">{i + 1}</span>
-                <span className="how-to-step-text">{step}</span>
+              <li key={i} className="flex gap-5 items-start group">
+                <span className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 text-primary font-black group-hover:bg-primary group-hover:text-bg transition-all">{i + 1}</span>
+                <span className="text-text-dim text-sm md:text-base leading-relaxed pt-1">{step}</span>
               </li>
             ))}
           </ul>

@@ -8,56 +8,39 @@ export const PrivacyPage: React.FC<Props> = ({ lang }) => {
   const isAr = lang === 'ar';
   
   return (
-    <div className="page p-6 md:p-12 max-w-4xl mx-auto">
-      <div className="flex items-center gap-4 mb-8">
-        <ShieldAlert size={48} className="text-primary" />
-        <h1 className="text-3xl md:text-4xl font-bold">
+    <div className="page p-6 md:p-12 max-w-6xl mx-auto" dir={isAr ? 'rtl' : 'ltr'}>
+      <div className="text-center mb-24 animate-fade-in">
+        <div className="w-24 h-24 bg-gradient-to-br from-primary/20 to-secondary/20 rounded-[2rem] border border-primary/20 flex items-center justify-center mx-auto mb-10 shadow-[0_0_50px_rgba(0,229,255,0.2)]">
+          <ShieldAlert size={48} className="text-primary" />
+        </div>
+        <h1 className="text-5xl md:text-7xl font-black bg-gradient-to-r from-white via-primary to-white/40 bg-clip-text text-transparent mb-6 leading-tight">
           {isAr ? 'سياسة الخصوصية' : 'Privacy Policy'}
         </h1>
+        <p className="text-xl text-text-dim max-w-2xl mx-auto leading-relaxed">
+          {isAr 
+            ? 'نحن نؤمن بأن بياناتك هي ملكك وحدك. Kimit مصمم تقنياً لضمان عدم مغادرة أي معلومة لجهازك الشخصي.' 
+            : 'We believe your data belongs to you alone. Kimit is technically architected to ensure no information ever leaves your local device.'}
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        <section className="premium-card p-8 rounded-[2rem] border border-white/5 bg-white/[0.02] backdrop-blur-xl flex flex-col items-center text-center">
-          <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-6 border border-red-500/20">
-            <ServerOff className="text-red-400" size={28} />
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-4" style={{ fontFamily: "'Cairo', sans-serif" }}>
-            {isAr ? 'طرفي' : 'Edge'}
-          </h2>
-          <p className="text-white/60 text-sm leading-relaxed">
-            {isAr 
-              ? 'معالجة بياناتك محلياً بالكامل دون مغادرة جهازك عبر تقنيات Edge.'
-              : 'End-to-end local data processing powered by pure Edge computing technology.'}
-          </p>
-        </section>
-
-        <section className="premium-card p-8 rounded-[2rem] border border-white/5 bg-white/[0.02] backdrop-blur-xl flex flex-col items-center text-center">
-          <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mb-6 border border-emerald-500/20">
-            <Database className="text-emerald-400" size={28} />
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-4" style={{ fontFamily: "'Cairo', sans-serif" }}>
-            {isAr ? 'حصين' : 'Vault'}
-          </h2>
-          <p className="text-white/60 text-sm leading-relaxed">
-            {isAr
-              ? 'تشفير سيادي وتخزين محلي للمفاتيح داخل خزنة Vault مشفرة تماماً.'
-              : 'Sovereign encryption with local key storage inside a fully isolated Vault.'}
-          </p>
-        </section>
-
-        <section className="premium-card p-8 rounded-[2rem] border border-white/5 bg-white/[0.02] backdrop-blur-xl flex flex-col items-center text-center">
-          <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center mb-6 border border-blue-500/20">
-            <ShieldCheck className="text-blue-400" size={28} />
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-4" style={{ fontFamily: "'Cairo', sans-serif" }}>
-            {isAr ? 'سيادة' : 'Sovereignty'}
-          </h2>
-          <p className="text-white/60 text-sm leading-relaxed">
-            {isAr
-              ? 'امتثال مطلق لمعايير خصوصية أبريل 2026 مع سيادة بيانات محلية.'
-              : 'Full compliance with April 2026 protocols ensuring absolute data sovereignty.'}
-          </p>
-        </section>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-24">
+        {[
+          { icon: ServerOff, color: '#f87171', title: isAr ? 'طرفي' : 'Edge Computing', desc: isAr ? 'معالجة بياناتك محلياً بالكامل دون مغادرة جهازك عبر تقنيات Edge الحديثة لضمان الأمان.' : 'End-to-end local data processing powered by pure Edge computing technology for maximum security.' },
+          { icon: Database, color: '#34d399', title: isAr ? 'حصين' : 'Isolated Vault', desc: isAr ? 'تشفير سيادي وتخزين محلي للمفاتيح داخل خزنة Vault مشفرة تماماً لا يمكن الوصول إليها خارجياً.' : 'Sovereign encryption with local key storage inside a fully isolated Vault that cannot be accessed externally.' },
+          { icon: ShieldCheck, color: '#60a5fa', title: isAr ? 'سيادة' : 'Data Sovereignty', desc: isAr ? 'امتثال مطلق لمعايير خصوصية أبريل 2026 العالمية مع سيادة بيانات محلية كاملة للمستخدم.' : 'Full compliance with April 2026 global privacy standards ensuring absolute local data sovereignty.' }
+        ].map((item, i) => (
+          <section key={i} className="premium-card p-10 flex flex-col items-center text-center group">
+            <div className="w-20 h-20 rounded-3xl flex items-center justify-center mb-8 transition-transform group-hover:scale-110" style={{ background: `${item.color}10`, border: `1px solid ${item.color}30` }}>
+              <item.icon style={{ color: item.color }} size={36} />
+            </div>
+            <h2 className="text-2xl font-black text-white mb-5">
+              {item.title}
+            </h2>
+            <p className="text-text-dim text-base leading-relaxed">
+              {item.desc}
+            </p>
+          </section>
+        ))}
       </div>
 
       <div className="text-center pt-8">
