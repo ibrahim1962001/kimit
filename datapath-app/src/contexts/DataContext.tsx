@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useState, useCallback } from 'react';
 import type { DatasetInfo } from '../types';
 
 interface DataState {
@@ -15,7 +15,7 @@ interface DataContextType extends DataState {
   resetData: () => void;
 }
 
-const DataContext = createContext<DataContextType | undefined>(undefined);
+export const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<DataState>({
@@ -75,8 +75,4 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-export const useKimitData = () => {
-  const context = useContext(DataContext);
-  if (!context) throw new Error('useKimitData must be used within DataProvider');
-  return context;
-};
+

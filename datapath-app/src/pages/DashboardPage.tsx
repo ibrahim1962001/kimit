@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useKimitData } from '../contexts/DataContext';
+import { useKimitData } from '../hooks/useKimitData';
 import { useKimitEngine } from '../hooks/useKimitEngine';
 import { DataChart } from '../components/DataChart';
 import { Plus, Trash2, FileText, Loader2, Sparkles, Database, ShieldCheck, Activity } from 'lucide-react';

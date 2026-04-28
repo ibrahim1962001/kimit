@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useKimitData } from '../contexts/DataContext';
+import { useKimitData } from './useKimitData';
 
 export const useKimitEngine = () => {
   const { info, setDataset } = useKimitData();

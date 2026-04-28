@@ -21,7 +21,7 @@ import { get, set, del } from 'idb-keyval';
 import { LoginPopup } from './components/LoginPopup';
 import './App.css';
 import './premium-theme.css';
-import { useKimitData } from './contexts/DataContext';
+import { useKimitData } from './hooks/useKimitData';
 
 
 type Tab = 'home' | 'dashboard' | 'cleaning' | 'chat' | 'export' | 'about' | 'privacy' | 'faq' | 'guide' | 'compare';
@@ -60,7 +60,7 @@ function App() {
     });
     
     return () => unsub();
-  }, []);
+  }, [setDataset]);
 
   useEffect(() => {
     if (dataset) {
@@ -103,7 +103,7 @@ function App() {
       setLoading(false); 
       setProgress(0);
     }
-  }, [lang]);
+  }, [lang, setDataset]);
 
   const handleChatFile = useCallback(async (file: File) => {
     setLoading(true);
@@ -130,14 +130,14 @@ function App() {
       setLoading(false); 
       setProgress(0);
     }
-  }, [lang]);
+  }, [lang, setDataset]);
 
   const handleClean = useCallback(() => {
     if (!dataset) return;
     const cleaned = cleanDataset(dataset);
     setDataset(cleaned);
     showToast(lang === 'ar' ? '✅ تمت التنقية بنجاح!' : '✅ Data cleaned successfully!');
-  }, [dataset, lang]);
+  }, [dataset, lang, setDataset]);
 
   const handleClose = () => { 
     setDataset(null); 

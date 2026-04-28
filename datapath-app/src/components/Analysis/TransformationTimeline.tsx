@@ -1,5 +1,5 @@
 import React from 'react';
-import { useKimitData } from '../../contexts/DataContext';
+import { useKimitData } from '../../hooks/useKimitData';
 import { RotateCcw, History } from 'lucide-react';
 
 export const TransformationTimeline: React.FC = () => {
