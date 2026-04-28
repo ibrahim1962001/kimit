@@ -43,12 +43,21 @@ body {
   --text-dim: #7a9ab8;
   --muted:    #3d5570;
   --brand:    #00e5ff;
-  --sidebar-w: 220px;
+  --sidebar-w: 240px;
+  --sidebar-percent: 18%;
   --shadow-sm: 0 2px 8px rgba(0,0,0,0.25);
   --shadow-md: 0 8px 24px rgba(0,0,0,0.35);
   --shadow-lg: 0 20px 60px rgba(0,0,0,0.50);
   --glass-bg:     rgba(255,255,255,0.032);
   --glass-border: rgba(255,255,255,0.07);
+}
+
+@media (max-width: 1400px) {
+  :root { --sidebar-percent: 22%; }
+}
+
+@media (max-width: 1100px) {
+  :root { --sidebar-percent: 25%; }
 }
 
 /* Themes */
@@ -102,15 +111,20 @@ html, body, #root {
 
 .main {
   flex: 1;
-  width: calc(100% - var(--sidebar-w) - 2%);
-  margin-right: calc(var(--sidebar-w) + 1.5%);
+  width: calc(100% - var(--sidebar-percent));
+  margin-right: var(--sidebar-percent);
   min-height: 100vh;
   position: relative;
   z-index: 1;
   animation: fadeInMain 0.8s ease-out forwards;
   box-sizing: border-box;
+  padding: 1.5% 2%;
 }
-.ltr .main { margin-right: 0; margin-left: calc(var(--sidebar-w) + 1.5%); }
+.ltr .main { margin-right: 0; margin-left: var(--sidebar-percent); }
+
+@media (max-width: 900px) {
+  .main { width: 100%; margin: 0 !important; padding: 20px 15px; }
+}
 
 @keyframes fadeInMain {
   from { opacity: 0; transform: translateY(20px); }
@@ -142,7 +156,7 @@ html, body, #root {
 
 @media (min-width: 900px) {
   .sidebar {
-    width: var(--sidebar-w);
+    width: var(--sidebar-percent);
     background: rgba(10, 15, 30, 0.65);
     border: 1px solid rgba(255, 255, 255, 0.08);
     position: fixed; top: 16px; right: 16px; bottom: 16px;
@@ -365,7 +379,7 @@ html, body, #root {
 /* =========================================
    PAGE BASE
 ========================================= */
-.page { padding: 2.5% 3%; width: 100%; box-sizing: border-box; }
+.page { padding: 1% 2%; width: 100%; box-sizing: border-box; }
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; }
 .page-title { font-size: 26px; font-weight: 800; background: linear-gradient(135deg, #fff, #94a3b8); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
 .page-sub { color: var(--muted); font-size: 14px; margin-top: 5px; }

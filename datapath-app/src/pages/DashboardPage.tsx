@@ -110,7 +110,7 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
 
       <TransformationTimeline />
 
-      <div className="dash-content-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap: '20px' }}>
+      <div className="dash-content-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 74%) 24%', gap: '2%' }}>
         
         {/* Left Column: Data & Charts */}
         <div className="main-analytics-flow" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -132,7 +132,7 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
           </div>
 
           {/* Data Grid Section */}
-          <div className="glass-panel" style={{ height: '500px', padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="glass-panel" style={{ height: '65vh', minHeight: '400px', padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
             <DataGrid data={info.workData} columns={info.columns.map(c => c.name)} externalFilter={activeChartFilter} />
           </div>
 
