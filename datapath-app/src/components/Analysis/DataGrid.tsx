@@ -32,6 +32,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ data, columns, externalFilte
     columns.map((col) => ({
       accessorKey: col,
       header: () => <span style={{ fontWeight: 'bold' }}>{col}</span>,
+      size: 150, // Default width for all columns
       cell: info => {
         const val = info.getValue();
         return typeof val === 'number' ? Number(val.toFixed(4)) : String(val ?? '');
@@ -82,30 +83,46 @@ export const DataGrid: React.FC<DataGridProps> = ({ data, columns, externalFilte
       
       <div 
         ref={tableContainerRef} 
-        style={{ overflow: 'auto', flex: 1, position: 'relative' }}
+        style={{ overflow: 'auto', flex: 1, position: 'relative', background: 'rgba(2, 6, 23, 0.5)' }}
       >
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead style={{ position: 'sticky', top: 0, zIndex: 1, background: 'var(--card-bg)' }}>
+        <div style={{ width: 'fit-content', minWidth: '100%' }}>
+          {/* Header */}
+          <div style={{ position: 'sticky', top: 0, zIndex: 2, background: 'var(--card-bg)', borderBottom: '2px solid var(--border)', display: 'flex' }}>
             {table.getHeaderGroups().map(headerGroup => (
-              <tr key={headerGroup.id}>
+              <React.Fragment key={headerGroup.id}>
                 {headerGroup.headers.map(header => (
-                  <th 
+                  <div 
                     key={header.id} 
                     onClick={header.column.getToggleSortingHandler()}
-                    style={{ padding: '12px 16px', borderBottom: '2px solid var(--border)', cursor: header.column.getCanSort() ? 'pointer' : 'default', fontSize: '13px', color: '#94a3b8', whiteSpace: 'nowrap' }}
+                    style={{ 
+                      width: header.column.getSize(), 
+                      minWidth: header.column.getSize(),
+                      padding: '12px 16px', 
+                      cursor: header.column.getCanSort() ? 'pointer' : 'default', 
+                      fontSize: '13px', 
+                      color: '#94a3b8', 
+                      whiteSpace: 'nowrap',
+                      fontWeight: 'bold',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
                   >
                     {flexRender(header.column.columnDef.header, header.getContext())}
                     {{ asc: ' 🔼', desc: ' 🔽' }[header.column.getIsSorted() as string] ?? null}
-                  </th>
+                  </div>
                 ))}
-              </tr>
+              </React.Fragment>
             ))}
-          </thead>
-          <tbody style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+          </div>
+
+          {/* Body */}
+          <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative', width: '100%' }}>
             {rowVirtualizer.getVirtualItems().map(virtualRow => {
               const row = rows[virtualRow.index];
+              if (!row) return null;
               return (
-                <tr 
+                <div 
                   key={row.id} 
                   style={{ 
                     position: 'absolute', 
@@ -115,21 +132,34 @@ export const DataGrid: React.FC<DataGridProps> = ({ data, columns, externalFilte
                     height: `${virtualRow.size}px`, 
                     transform: `translateY(${virtualRow.start}px)`,
                     borderBottom: '1px solid var(--border)',
-                    background: virtualRow.index % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)'
+                    background: virtualRow.index % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)',
+                    display: 'flex'
                   }}
                 >
                   {row.getVisibleCells().map(cell => (
-                    <td key={cell.id} style={{ padding: '0 16px', fontSize: '13px', color: '#cbd5e1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', height: '100%' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </div>
-                    </td>
+                    <div 
+                      key={cell.id} 
+                      style={{ 
+                        width: cell.column.getSize(), 
+                        minWidth: cell.column.getSize(),
+                        padding: '0 16px', 
+                        fontSize: '13px', 
+                        color: '#cbd5e1', 
+                        whiteSpace: 'nowrap', 
+                        overflow: 'hidden', 
+                        textOverflow: 'ellipsis', 
+                        display: 'flex', 
+                        alignItems: 'center' 
+                      }}
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </div>
                   ))}
-                </tr>
+                </div>
               );
             })}
-          </tbody>
-        </table>
+          </div>
+        </div>
       </div>
     </div>
   );
