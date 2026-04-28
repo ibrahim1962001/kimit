@@ -1,4 +1,4 @@
-"use no memo";
+"use client";
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import {
   useReactTable,
@@ -19,6 +19,11 @@ interface DataGridProps {
   externalFilter?: string;
 }
 
+// Static model generators to satisfy React Compiler stability requirements
+const coreRowModel = getCoreRowModel();
+const sortedRowModel = getSortedRowModel();
+const filteredRowModel = getFilteredRowModel();
+
 export const DataGrid: React.FC<DataGridProps> = ({ data, columns, externalFilter }) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
@@ -31,7 +36,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ data, columns, externalFilte
     return () => window.removeEventListener('resize', checkSize);
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (externalFilter !== undefined) {
       setGlobalFilter(externalFilter);
     }
@@ -54,15 +59,16 @@ export const DataGrid: React.FC<DataGridProps> = ({ data, columns, externalFilte
     })),
   [columns, data, isMobile]);
 
+  // TanStack Table setup with optimized stability for React Compiler
   const table = useReactTable({
     data,
     columns: tableColumns,
     state: { sorting, globalFilter },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
+    getCoreRowModel: coreRowModel,
+    getSortedRowModel: sortedRowModel,
+    getFilteredRowModel: filteredRowModel,
   });
 
   const { rows } = table.getRowModel();
