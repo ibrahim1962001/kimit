@@ -8,10 +8,11 @@ interface DataState {
 }
 
 interface DataContextType extends DataState {
-  setDataset: (newInfo: DatasetInfo) => void;
+  setDataset: (newInfo: DatasetInfo | null) => void;
   rollback: () => void;
   setFilter: (col: string, val: string) => void;
   clearFilters: () => void;
+  resetData: () => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -23,14 +24,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     activeFilters: {}
   });
 
-  const setDataset = useCallback((newInfo: DatasetInfo) => {
-    setState(prev => ({
-      ...prev,
-      // Save current state to history before updating (Undo Engine)
-      // Limit history to 10 steps for performance
-      history: prev.info ? [...prev.history, prev.info].slice(-10) : prev.history,
-      info: JSON.parse(JSON.stringify(newInfo)) // Deep copy to ensure history remains immutable
-    }));
+  const setDataset = useCallback((newInfo: DatasetInfo | null) => {
+    setState(prev => {
+      if (!newInfo) {
+        return { ...prev, info: null };
+      }
+      return {
+        ...prev,
+        history: prev.info ? [...prev.history, prev.info].slice(-10) : prev.history,
+        info: JSON.parse(JSON.stringify(newInfo))
+      };
+    });
+  }, []);
+
+  const resetData = useCallback(() => {
+    setState({
+      info: null,
+      history: [],
+      activeFilters: {}
+    });
   }, []);
 
   const rollback = useCallback(() => {
@@ -57,7 +69,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <DataContext.Provider value={{ ...state, setDataset, rollback, setFilter, clearFilters }}>
+    <DataContext.Provider value={{ ...state, setDataset, rollback, setFilter, clearFilters, resetData }}>
       {children}
     </DataContext.Provider>
   );

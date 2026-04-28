@@ -13,7 +13,7 @@ import { FAQPage } from './pages/FAQPage';
 import { GuidePage } from './pages/GuidePage';
 import { ComparisonPage } from './pages/ComparisonPage';
 import { parseFile, analyzeDataset, cleanDataset } from './lib/dataUtils';
-import type { DatasetInfo, Lang } from './types';
+import type { Lang } from './types';
 import { auth } from './lib/firebase';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { get, set, del } from 'idb-keyval';
@@ -21,6 +21,7 @@ import { get, set, del } from 'idb-keyval';
 import { LoginPopup } from './components/LoginPopup';
 import './App.css';
 import './premium-theme.css';
+import { useKimitData } from './contexts/DataContext';
 
 
 type Tab = 'home' | 'dashboard' | 'cleaning' | 'chat' | 'export' | 'about' | 'privacy' | 'faq' | 'guide' | 'compare';
@@ -28,7 +29,7 @@ type Tab = 'home' | 'dashboard' | 'cleaning' | 'chat' | 'export' | 'about' | 'pr
 function App() {
   const [lang, setLang] = useState<Lang>('en');
   const [tab, setTab] = useState<Tab>('home');
-  const [dataset, setDataset] = useState<DatasetInfo | null>(null);
+  const { info: dataset, setDataset } = useKimitData();
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(false);
