@@ -12,11 +12,18 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { SmartProfiler } from './SmartProfiler';
 import type { DataRow } from '../../types/index';
+import type { IQRResult } from '../../hooks/useKimitEngine';
 
 interface DataGridProps {
   data: DataRow[];
   columns: string[];
   externalFilter?: string;
+  /** Set of row indices that are outliers in at least one column */
+  outlierRowIndices?: Set<number>;
+  /** Map of column → IQRResult for cell-level highlighting */
+  outlierMap?: Map<string, IQRResult>;
+  /** Whether outlier highlighting is currently active */
+  showOutliers?: boolean;
 }
 
 // Static model generators to satisfy React Compiler stability requirements
@@ -24,7 +31,14 @@ const coreRowModel = getCoreRowModel();
 const sortedRowModel = getSortedRowModel();
 const filteredRowModel = getFilteredRowModel();
 
-export const DataGrid: React.FC<DataGridProps> = ({ data, columns, externalFilter }) => {
+export const DataGrid: React.FC<DataGridProps> = ({
+  data,
+  columns,
+  externalFilter,
+  outlierRowIndices,
+  outlierMap,
+  showOutliers = false,
+}) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
   const [isMobile, setIsMobile] = useState(false);
@@ -37,17 +51,33 @@ export const DataGrid: React.FC<DataGridProps> = ({ data, columns, externalFilte
   }, []);
 
   useEffect(() => {
-    if (externalFilter !== undefined) {
-      setGlobalFilter(externalFilter);
-    }
+    if (externalFilter !== undefined) setGlobalFilter(externalFilter);
   }, [externalFilter]);
 
-  const tableColumns = useMemo<ColumnDef<DataRow>[]>(() => 
+  const tableColumns = useMemo<ColumnDef<DataRow>[]>(() =>
     columns.map((col, index) => ({
       accessorKey: col,
       header: () => (
         <div style={{ textAlign: 'left', width: '100%' }}>
-          <div style={{ fontWeight: 'bold', color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{col}</div>
+          <div style={{
+            fontWeight: 'bold',
+            color: showOutliers && outlierMap?.has(col) ? '#d4af37' : '#f1f5f9',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+          }}>
+            {col}
+            {showOutliers && outlierMap?.has(col) && (
+              <span title={`${outlierMap.get(col)!.outlierCount} outliers`}
+                style={{ fontSize: 9, background: 'rgba(239,68,68,0.15)', color: '#ef4444',
+                  border: '1px solid rgba(239,68,68,0.3)', borderRadius: 4, padding: '1px 4px' }}>
+                {outlierMap.get(col)!.outlierCount} ⚠
+              </span>
+            )}
+          </div>
           <SmartProfiler columnName={col} data={data} />
         </div>
       ),
@@ -55,11 +85,10 @@ export const DataGrid: React.FC<DataGridProps> = ({ data, columns, externalFilte
       cell: info => {
         const val = info.getValue();
         return typeof val === 'number' ? Number(val.toFixed(4)) : String(val ?? '');
-      }
+      },
     })),
-  [columns, data, isMobile]);
+  [columns, data, isMobile, showOutliers, outlierMap]);
 
-  // TanStack Table setup with optimized stability for React Compiler
   const table = useReactTable({
     data,
     columns: tableColumns,
@@ -92,10 +121,10 @@ export const DataGrid: React.FC<DataGridProps> = ({ data, columns, externalFilte
   return (
     <div className="grid-module" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div className="grid-toolbar" style={{ padding: isMobile ? '10px' : '15px 20px', gap: isMobile ? '10px' : '20px' }}>
-        <input 
-          type="text" 
-          value={globalFilter ?? ''} 
-          onChange={e => setGlobalFilter(e.target.value)} 
+        <input
+          type="text"
+          value={globalFilter ?? ''}
+          onChange={e => setGlobalFilter(e.target.value)}
           placeholder="Search columns..."
           className="grid-search"
           style={{ flex: 1, minWidth: 0 }}
@@ -104,17 +133,21 @@ export const DataGrid: React.FC<DataGridProps> = ({ data, columns, externalFilte
           <span style={{ color: '#94a3b8', fontSize: isMobile ? '10px' : '12px', fontWeight: 500 }}>
             <b style={{ color: 'var(--primary)' }}>{rows.length}</b> records
           </span>
+          {/* Outlier badge summary */}
+          {showOutliers && outlierRowIndices && outlierRowIndices.size > 0 && (
+            <span style={{
+              fontSize: 10, background: 'rgba(239,68,68,0.12)', color: '#ef4444',
+              border: '1px solid rgba(239,68,68,0.25)', borderRadius: 6, padding: '2px 7px',
+            }}>
+              ⚠ {outlierRowIndices.size} outlier rows
+            </span>
+          )}
         </div>
       </div>
-      
-      <div 
-        ref={tableContainerRef} 
-        style={{ 
-          overflow: 'auto', 
-          flex: 1, 
-          position: 'relative',
-          WebkitOverflowScrolling: 'touch'
-        }}
+
+      <div
+        ref={tableContainerRef}
+        style={{ overflow: 'auto', flex: 1, position: 'relative', WebkitOverflowScrolling: 'touch' }}
       >
         <div style={{ width: 'fit-content', minWidth: '100%' }}>
           {/* Header */}
@@ -122,14 +155,14 @@ export const DataGrid: React.FC<DataGridProps> = ({ data, columns, externalFilte
             {table.getHeaderGroups().map(headerGroup => (
               <React.Fragment key={headerGroup.id}>
                 {headerGroup.headers.map((header, idx) => (
-                  <div 
-                    key={header.id} 
+                  <div
+                    key={header.id}
                     onClick={header.column.getToggleSortingHandler()}
                     className="grid-header-cell"
-                    style={{ 
-                      width: header.column.getSize(), 
+                    style={{
+                      width: header.column.getSize(),
                       minWidth: header.column.getSize(),
-                      cursor: header.column.getCanSort() ? 'pointer' : 'default', 
+                      cursor: header.column.getCanSort() ? 'pointer' : 'default',
                       whiteSpace: 'nowrap',
                       display: 'flex',
                       flexDirection: 'column',
@@ -137,7 +170,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ data, columns, externalFilte
                       left: idx === 0 ? 0 : 'auto',
                       zIndex: idx === 0 ? 30 : 1,
                       background: '#0a0f1d',
-                      boxShadow: idx === 0 ? '4px 0 8px rgba(0,0,0,0.3)' : 'none'
+                      boxShadow: idx === 0 ? '4px 0 8px rgba(0,0,0,0.3)' : 'none',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -155,45 +188,71 @@ export const DataGrid: React.FC<DataGridProps> = ({ data, columns, externalFilte
             {rowVirtualizer.getVirtualItems().map(virtualRow => {
               const row = rows[virtualRow.index];
               if (!row) return null;
+
+              // Map filtered row back to original data index for outlier lookup
+              const originalIdx = data.indexOf(row.original);
+              const isOutlierRow = showOutliers && outlierRowIndices?.has(originalIdx);
+
               return (
-                <div 
-                  key={row.id} 
-                  style={{ 
-                    position: 'absolute', 
-                    top: 0, 
-                    left: 0, 
-                    width: '100%', 
-                    height: `${virtualRow.size}px`, 
+                <div
+                  key={row.id}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: `${virtualRow.size}px`,
                     transform: `translateY(${virtualRow.start}px)`,
                     borderBottom: '1px solid #1e293b',
-                    background: virtualRow.index % 2 === 0 ? '#050810' : '#0a0f1d',
+                    borderLeft: isOutlierRow ? '3px solid rgba(239,68,68,0.7)' : '3px solid transparent',
+                    background: isOutlierRow
+                      ? 'rgba(239,68,68,0.06)'
+                      : (virtualRow.index % 2 === 0 ? '#050810' : '#0a0f1d'),
                     display: 'flex',
-                    transition: 'background 0.2s ease'
+                    transition: 'background 0.2s ease',
                   }}
                   className="grid-row-container"
                 >
-                  {row.getVisibleCells().map((cell, idx) => (
-                    <div 
-                      key={cell.id} 
-                      className="grid-cell"
-                      style={{ 
-                        width: cell.column.getSize(), 
-                        minWidth: cell.column.getSize(),
-                        whiteSpace: 'nowrap', 
-                        overflow: 'hidden', 
-                        textOverflow: 'ellipsis', 
-                        display: 'flex', 
-                        alignItems: 'center',
-                        position: idx === 0 ? 'sticky' : 'relative',
-                        left: idx === 0 ? 0 : 'auto',
-                        zIndex: idx === 0 ? 15 : 1,
-                        background: 'inherit',
-                        boxShadow: idx === 0 ? '4px 0 8px rgba(0,0,0,0.3)' : 'none'
-                      }}
-                    >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </div>
-                  ))}
+                  {row.getVisibleCells().map((cell, idx) => {
+                    // Highlight individual cell if it's an outlier in that specific column
+                    const colName = cell.column.id;
+                    const cellVal = Number(row.original[colName]);
+                    const iqr = outlierMap?.get(colName);
+                    const isCellOutlier = showOutliers && iqr && !isNaN(cellVal) &&
+                      (cellVal < iqr.lowerBound || cellVal > iqr.upperBound);
+
+                    return (
+                      <div
+                        key={cell.id}
+                        className="grid-cell"
+                        style={{
+                          width: cell.column.getSize(),
+                          minWidth: cell.column.getSize(),
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          display: 'flex',
+                          alignItems: 'center',
+                          position: idx === 0 ? 'sticky' : 'relative',
+                          left: idx === 0 ? 0 : 'auto',
+                          zIndex: idx === 0 ? 15 : 1,
+                          background: isOutlierRow ? 'rgba(239,68,68,0.06)' : 'inherit',
+                          boxShadow: idx === 0 ? '4px 0 8px rgba(0,0,0,0.3)' : 'none',
+                          // Cell-level outlier styling
+                          color: isCellOutlier ? '#d4af37' : undefined,
+                          fontWeight: isCellOutlier ? 700 : undefined,
+                        }}
+                        title={isCellOutlier
+                          ? `Outlier: ${cellVal.toFixed(2)} (bounds: [${iqr!.lowerBound.toFixed(2)}, ${iqr!.upperBound.toFixed(2)}])`
+                          : undefined}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        {isCellOutlier && (
+                          <span style={{ marginLeft: 4, fontSize: 9, color: '#ef4444' }}>⚠</span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}
