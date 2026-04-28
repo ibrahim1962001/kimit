@@ -932,6 +932,9 @@ html, body, #root {
   border: 1px solid var(--border); border-radius: 20px; overflow: visible;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: var(--shadow-md);
+
+  display: flex;
+  flex-direction: column;
 }
 .chart-card:hover { transform: translateY(-6px); border-color: var(--border-hover); box-shadow: var(--shadow-lg); }
 .chart-card-header {
@@ -1024,7 +1027,11 @@ html, body, #root {
   border: 1px solid var(--border); margin-bottom: 5px;
 }
 .chart-hint-trigger:hover .chart-hint-popover { opacity: 1; }
-.chart-body { padding: 12px 6px 12px; }
+.chart-body {
+  padding: 12px 6px 18px;
+  overflow: visible;
+  min-height: 0;
+}
 
 /* INSIGHT BOX */
 .insight-box.summary {
@@ -2680,3 +2687,6 @@ html, body, #root {
   /* Sidebar narrower on very small screens */
   .sidebar { width: 260px !important; }
 }
+
+select option { background-color: #0f172a !important; color: #fff !important; }
+

@@ -48,6 +48,7 @@ export const DataChart: React.FC<Props> = ({ chart }) => {
     
     // ECharts Configuration (Power BI Style interaction)
     const baseOption = {
+      legend: undefined as Record<string, unknown> | undefined,
       backgroundColor: 'transparent',
       tooltip: {
         trigger: isPie ? 'item' : 'axis',
@@ -88,15 +89,25 @@ export const DataChart: React.FC<Props> = ({ chart }) => {
     };
 
     if (isPie) {
+      baseOption.legend = {
+        type: 'scroll',
+        orient: 'vertical',
+        right: '5%',
+        top: 'middle',
+        textStyle: { color: '#cbd5e1', fontSize: 12 },
+        pageIconColor: '#38bdf8',
+        pageTextStyle: { color: '#fff' }
+      };
+
       baseOption.series.push({
         name: chart.title,
         type: 'pie',
-        // Responsive radius - fits within container
-        radius: ['38%', '65%'],
-        center: ['50%', '52%'],
+        // Responsive full circle
+        radius: '70%',
+        center: ['40%', '50%'],
         itemStyle: { borderRadius: 5, borderColor: '#0f172a', borderWidth: 2 },
-        label: { show: false },
-        emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold', color: '#fff', formatter: '{c}' } },
+        label: { show: false }, // Use Tooltip instead of inside labels for cleaner look
+        emphasis: { label: { show: false } },
         data: chart.data.map((d, i) => ({
           name: String(d.x).slice(0, 20),
           value: Number(d.y),
@@ -178,20 +189,12 @@ export const DataChart: React.FC<Props> = ({ chart }) => {
       </div>
       <div
         className="chart-body"
-        style={isMobile ? {
-          // Mobile: explicit height — no aspect-ratio (Safari issues)
+        style={{
           width: '100%',
-          height: chart.type === 'pie' ? '350px' : '220px',
-          padding: '0 4px',
-          overflow: 'visible',
-        } : {
-          // Desktop: aspect-ratio based
-          width: '100%',
-          aspectRatio: chart.type === 'pie' ? '1 / 1' : '16 / 9',
-          maxHeight: chart.type === 'pie' ? '450px' : '300px',
-          minHeight: chart.type === 'pie' ? '320px' : undefined,
+          height: chart.type === 'pie' ? '300px' : (isMobile ? '220px' : '300px'),
           padding: '0 5px',
           overflow: 'visible',
+          position: 'relative'
         }}
       >
         <ReactECharts

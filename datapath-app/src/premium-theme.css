@@ -348,6 +348,11 @@ input:focus, select:focus, textarea:focus {
   background: rgba(255,255,255,0.04) !important;
   border: 1px solid rgba(255,255,255,0.08) !important;
   border-radius: 10px !important;
+  color: #fff !important;
+}
+.slicers-bar select option, .builder-panel select option {
+  background-color: #0f172a !important;
+  color: #fff !important;
 }
 
 /* ── 20. INSIGHT BOXES ─────────────────────── */

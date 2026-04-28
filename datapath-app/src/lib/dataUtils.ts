@@ -192,7 +192,7 @@ export function analyzeDataset(file: File, data: DataRow[]): DatasetInfo {
     });
   });
 
-  txtCols.slice(0, 8).forEach((col, i) => {
+  txtCols.slice(0, 8).forEach((col) => {
     const freq: Record<string, number> = {};
     for (const r of chartSample) { 
       const v = String(r[col] ?? '').slice(0, 15); 
@@ -200,8 +200,13 @@ export function analyzeDataset(file: File, data: DataRow[]): DatasetInfo {
     }
     const top = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 8);
     if (top.length > 1) {
+      // CHART SELECTION RULES:
+      // Never use Pie for names, IDs, or >6 unique values
+      const isNameOrId = /name|id|customer|client|product|person|user|email/i.test(col);
+      const isPieSuitable = !isNameOrId && top.length <= 6;
+      
       charts.push({
-        type: i % 2 === 0 ? 'bar' : 'pie',
+        type: isPieSuitable ? 'pie' : 'bar',
         title: `Top ${col} Summary`,
         data: top.map(([x, y]) => ({ x, y }))
       });

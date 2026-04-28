@@ -12,6 +12,8 @@
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
     "@fontsource/plus-jakarta-sans": "^5.2.8",
+    "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-virtual": "^3.13.24",
     "@types/papaparse": "^5.5.2",
     "ag-grid-community": "^31.2.0",
     "ag-grid-react": "^31.2.0",

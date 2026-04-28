@@ -115,7 +115,7 @@ def robust_read_file(file_content: bytes, filename: str) -> pd.DataFrame:
                     encoding_errors='replace',
                     on_bad_lines='skip',
                     low_memory=False,
-                    dtype_backend='pyarrow'  # Faster
+                    dtype_backend='pyarrow'
                 )
                 if not df.empty and len(df.columns) > 0:
                     return df
@@ -128,7 +128,7 @@ def robust_read_file(file_content: bytes, filename: str) -> pd.DataFrame:
                 io.BytesIO(file_content),
                 encoding='utf-8-sig',
                 on_bad_lines='skip',
-                sep=None,  # Auto-detect
+                sep=None,
                 engine='python'
             )
             if not df.empty:
@@ -181,7 +181,6 @@ def get_summary_for_ai(df: pd.DataFrame) -> str:
         unique_count = df[col].nunique()
         summary += f"- {col}: {dtype} (unique values: {unique_count})\n"
     
-    # Missing values
     null_counts = df.isnull().sum()
     missing_cols = null_counts[null_counts > 0]
     if len(missing_cols) > 0:
@@ -191,11 +190,10 @@ def get_summary_for_ai(df: pd.DataFrame) -> str:
     else:
         summary += "\nNo missing values found.\n"
     
-    # Statistical summary for numeric columns
     numeric_cols = df.select_dtypes(include=[np.number]).columns
     if len(numeric_cols) > 0:
         summary += "\nStatistical Summary (Numeric Columns):\n"
-        for col in numeric_cols[:5]:  # Limit to first 5 numeric columns
+        for col in numeric_cols[:5]:
             if df[col].notna().sum() > 0:
                 stats = df[col].describe()
                 summary += f"- {col}:\n"
@@ -203,11 +201,10 @@ def get_summary_for_ai(df: pd.DataFrame) -> str:
                 summary += f"  Min: {stats['min']:.2f}, Max: {stats['max']:.2f}\n"
                 summary += f"  Std Dev: {stats['std']:.2f}\n"
     
-    # Categorical summary
     categorical_cols = df.select_dtypes(include=['object', 'category']).columns
     if len(categorical_cols) > 0:
         summary += "\nCategorical Columns (Top 5 values each):\n"
-        for col in categorical_cols[:5]:  # Limit to first 5 categorical columns
+        for col in categorical_cols[:5]:
             if df[col].notna().sum() > 0:
                 top_values = df[col].value_counts().head(5)
                 summary += f"- {col}:\n"
@@ -218,45 +215,77 @@ def get_summary_for_ai(df: pd.DataFrame) -> str:
 
 
 def generate_chart_config(df: pd.DataFrame) -> List[Dict]:
-    """Generate chart configurations based on data types."""
+    """Generate chart configurations with smart Pie vs Bar selection."""
     charts = []
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-    
+
     chart_id = 0
-    
-    # 1. Line chart for timeline/numeric trends
+
+    # Columns that should NEVER use Pie (names, IDs, identifiers)
+    name_keywords = [
+        'name', 'customer', 'client', 'employee', 'user', 'person',
+        'id', 'code', 'email', 'phone', 'address', 'product', 'item',
+        'اسم', 'عميل', 'موظف', 'كود', 'رقم'
+    ]
+
+    def is_name_column(col_name: str) -> bool:
+        col_lower = col_name.lower()
+        return any(kw in col_lower for kw in name_keywords)
+
+    def is_pie_suitable(col_name: str, unique_count: int) -> bool:
+        """Pie only if: ≤6 unique values AND not a name/ID column."""
+        if is_name_column(col_name):
+            return False
+        if unique_count > 6:
+            return False
+        return True
+
+    # 1. Line chart for numeric trends
     for col in numeric_cols[:2]:
+        if len(charts) >= 4:
+            break
         if len(df) > 0 and df[col].notna().sum() > 0:
             charts.append({
                 "id": chart_id,
                 "type": "line",
                 "title": f"{col} Trend",
                 "data": [
-                    {"name": str(i), "value": float(v) if pd.notna(v) else 0} 
+                    {"name": str(i), "value": float(v) if pd.notna(v) else 0}
                     for i, v in enumerate(df[col].head(30).tolist())
                 ]
             })
             chart_id += 1
-            if len(charts) >= 4:
-                break
-    
-    # 2. Bar chart for categorical data
-    for col in categorical_cols[:2]:
+
+    # 2. Smart categorical charts: Pie or Bar based on rules
+    for col in categorical_cols:
         if len(charts) >= 4:
             break
         unique_count = df[col].nunique()
-        if unique_count <= 15 and unique_count > 0:
-            value_counts = df[col].value_counts().head(8)
+        if unique_count == 0:
+            continue
+
+        if is_pie_suitable(col, unique_count):
+            # PIE: few categories, not a name/ID column
+            value_counts = df[col].value_counts().head(6)
+            charts.append({
+                "id": chart_id,
+                "type": "pie",
+                "title": f"Top {col} Summary",
+                "data": [{"name": str(k)[:15], "value": int(v)} for k, v in value_counts.items()]
+            })
+        else:
+            # BAR: names, IDs, or too many unique values
+            value_counts = df[col].value_counts().head(10)
             charts.append({
                 "id": chart_id,
                 "type": "bar",
-                "title": f"{col} Distribution",
+                "title": f"Top {col} Summary",
                 "data": [{"name": str(k)[:20], "value": int(v)} for k, v in value_counts.items()]
             })
-            chart_id += 1
-    
-    # 3. Area chart for more numeric data
+        chart_id += 1
+
+    # 3. Area chart for extra numeric columns
     for col in numeric_cols[2:4]:
         if len(charts) >= 4:
             break
@@ -266,28 +295,12 @@ def generate_chart_config(df: pd.DataFrame) -> List[Dict]:
                 "type": "area",
                 "title": f"{col} Values",
                 "data": [
-                    {"index": i, "value": float(v) if pd.notna(v) else 0} 
+                    {"index": i, "value": float(v) if pd.notna(v) else 0}
                     for i, v in enumerate(df[col].head(40).tolist())
                 ]
             })
             chart_id += 1
-    
-    # 4. Pie chart for distribution
-    if len(charts) < 4:
-        for col in categorical_cols[2:4]:
-            if len(charts) >= 4:
-                break
-            unique_count = df[col].nunique()
-            if unique_count <= 10 and unique_count > 0:
-                value_counts = df[col].value_counts().head(8)
-                charts.append({
-                    "id": chart_id,
-                    "type": "pie",
-                    "title": f"{col} Breakdown",
-                    "data": [{"name": str(k)[:15], "value": int(v)} for k, v in value_counts.items()]
-                })
-                chart_id += 1
-    
+
     return charts[:4]
 
 
@@ -318,7 +331,6 @@ async def upload_file(file: UploadFile = File(...)):
         if not contents:
             raise HTTPException(status_code=400, detail="The uploaded file is empty.")
         
-        # Read the file robustly
         try:
             df = robust_read_file(contents, file.filename)
         except HTTPException as he:
@@ -332,17 +344,11 @@ async def upload_file(file: UploadFile = File(...)):
         if df.empty:
             raise HTTPException(status_code=400, detail="The uploaded file is empty.")
         
-        # Clean column names (remove extra spaces, etc.)
         df.columns = df.columns.str.strip()
-        
-        # Replace infinite values with NaN
         df = df.replace([np.inf, -np.inf], np.nan)
         
         file_id = f"file_{len(DATA_STORE) + 1}"
-        
         preview = df.head(10).to_dict(orient='records')
-        
-        # Calculate duplicates
         duplicates = int(df.duplicated().sum())
         
         DATA_STORE[file_id] = {
@@ -355,7 +361,6 @@ async def upload_file(file: UploadFile = File(...)):
             "duplicates": duplicates
         }
         
-        # Super features: Anomalies & Correlations
         anomalies = detect_anomalies(df)
         correlations = get_correlations(df)
         
@@ -392,7 +397,6 @@ async def clean_data(request: dict):
     original_nulls = int(df.isnull().sum().sum())
     original_duplicates = int(df.duplicated().sum())
     
-    # Fill numeric nulls with median
     numeric_cols = df.select_dtypes(include=[np.number]).columns
     for col in numeric_cols:
         if df[col].isnull().any():
@@ -400,7 +404,6 @@ async def clean_data(request: dict):
             if pd.notna(median_val):
                 df[col].fillna(median_val, inplace=True)
     
-    # Fill categorical nulls with mode
     categorical_cols = df.select_dtypes(include=['object', 'category']).columns
     for col in categorical_cols:
         if df[col].isnull().any():
@@ -410,10 +413,8 @@ async def clean_data(request: dict):
             else:
                 df[col].fillna("Unknown", inplace=True)
     
-    # Remove duplicates
     df.drop_duplicates(inplace=True)
     
-    # Update store
     DATA_STORE[file_id]["df"] = df
     DATA_STORE[file_id]["shape"] = list(df.shape)
     DATA_STORE[file_id]["null_counts"] = df.isnull().sum().to_dict()
@@ -439,7 +440,6 @@ async def get_ai_summary(request: dict):
         raise HTTPException(status_code=404, detail="File not found. Please upload a file first.")
     
     if not groq_client:
-        # Fallback without AI
         df = DATA_STORE[file_id]["df"]
         return {
             "summary": f"The dataset contains {len(df)} rows and {len(df.columns)} columns ready for analysis." if language == "en" else f"تحتوي مجموعة البيانات على {len(df)} صف و {len(df.columns)} عمود جاهزة للتحليل.",
@@ -454,7 +454,6 @@ async def get_ai_summary(request: dict):
     
     df = DATA_STORE[file_id]["df"]
     data_summary = get_summary_for_ai(df)
-    
     lang_instruction = "Respond in Arabic language." if language == "ar" else "Respond in English language."
     
     prompt = f"""You are an expert data analyst assistant. Analyze the dataset and provide insights.
@@ -486,7 +485,6 @@ Make sure suggestions are practical and related to the actual data columns."""
         
         content = response.choices[0].message.content.strip()
         
-        # Try to parse JSON
         if content.startswith("```json"):
             content = content[7:]
         if content.startswith("```"):
@@ -498,7 +496,6 @@ Make sure suggestions are practical and related to the actual data columns."""
         return result
         
     except json.JSONDecodeError:
-        # Fallback if JSON parsing fails
         return {
             "summary": f"The dataset contains {len(df)} rows and {len(df.columns)} columns with various data types ready for analysis." if language == "en" else f"تحتوي مجموعة البيانات على {len(df)} صف و {len(df.columns)} عمود جاهزة للتحليل.",
             "suggestions": [
@@ -533,7 +530,6 @@ async def chat_with_ai(request: dict):
     
     df = DATA_STORE[file_id]["df"]
     data_context = get_summary_for_ai(df)
-    
     lang_instruction = "Respond in Arabic language." if language == "ar" else "Respond in English language."
     
     prompt = f"""You are a helpful data analyst assistant. Answer the user's question about their dataset.
