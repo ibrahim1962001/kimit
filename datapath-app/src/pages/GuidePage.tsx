@@ -10,91 +10,78 @@ export const GuidePage: React.FC<Props> = ({ lang }) => {
   const steps = [
     {
       icon: Search,
-      title: isAr ? 'ميزة Z-Score (كشف القيم الشاذة)' : 'Z-Score Anomaly Detection',
-      desc: isAr 
-        ? 'تستخدم المنصة خوارزمية Z-Score إحصائياً لتحديد القيم التي تبعد بشكل غير طبيعي عن متوسط البيانات.' 
-        : 'The platform uses the Z-Score statistical algorithm to identify values that are abnormally far from the data mean.',
-      formula: 'Z = (x - μ) / σ'
+      title: isAr ? 'استكشاف البيانات' : 'Explore Data',
+      desc: isAr ? 'ارفع ملفك وسيقوم Kimit بتحليل الهيكل والأنواع والارتباطات تلقائياً.' : 'Upload your file and Kimit will automatically analyze structure, types, and correlations.'
     },
     {
       icon: Brain,
-      title: isAr ? 'كيف يعمل "مستشار AI"؟' : 'AI Advisor Intelligence',
-      desc: isAr 
-        ? 'يقوم المستشار الذكي بقراءة ملخص إحصائي لبياناتك ويربطه بمعارفه الواسعة ليقدم لك تحليلات دقيقة.' 
-        : 'The AI Advisor reads a statistical summary of your data and links it with its knowledge to provide insights.'
+      title: isAr ? 'الذكاء الاصطناعي' : 'AI Intelligence',
+      desc: isAr ? 'اسأل المستشار الذكي عن أي شيء في بياناتك واحصل على إجابات دقيقة.' : 'Ask the smart consultant anything about your data and get accurate answers.'
     },
     {
       icon: BarChart2,
-      title: isAr ? 'الرسوم التفاعلية' : 'Interactive Visuals',
-      desc: isAr 
-        ? 'رسوم بيانية ذكية تتيح لك التفاعل المباشر مع البيانات وفهم التوزيعات والأنماط.' 
-        : 'Smart charts that allow direct interaction with data to understand distributions and patterns.'
+      title: isAr ? 'رسوم بيانية' : 'Visualizations',
+      desc: isAr ? 'حول الأرقام إلى قصص بصرية مذهلة بضغطة زر واحدة.' : 'Turn numbers into stunning visual stories with a single click.'
     },
     {
       icon: FileText,
-      title: isAr ? 'تصدير ذكي' : 'Smart Export',
-      desc: isAr 
-        ? 'احصل على بياناتك المنقحة بصيغ CSV/JSON أو حمل تقريراً كاملاً بصيغة PDF.' 
-        : 'Get your cleaned data in CSV/JSON or download a full PDF report for your team.'
+      title: isAr ? 'تصدير التقارير' : 'Export Reports',
+      desc: isAr ? 'استخرج نتائجك في ملفات Excel أو PDF أو صور عالية الجودة.' : 'Extract your results in Excel, PDF, or high-quality images.'
     }
   ];
 
   return (
-    <div className="min-h-screen py-12 px-8 md:px-12" style={{ backgroundColor: 'var(--bg-primary)' }}>
-      <div className="max-w-[900px] mx-auto" dir={isAr ? 'rtl' : 'ltr'}>
-        <header className="mb-16">
-          <div className="flex items-center gap-4 mb-6">
-            <BookOpen size={32} className="text-[#10b981]" />
-            <h1 className="text-[clamp(24px,4vw,36px)] font-bold text-[#f8fafc]">
-              {isAr ? 'دليل الاستخدام السريع' : 'Quick Usage Guide'}
-            </h1>
-          </div>
-          <p className="text-[15px] text-[#94a3b8] leading-relaxed max-w-2xl">
-            {isAr 
-              ? 'رحلتك من البيانات الخام إلى الرؤى الذكية تبدأ من هنا. اكتشف كيف تستخدم Kimit بأفضل طريقة.' 
-              : 'Your journey from raw data to smart insights starts here. Discover how to use Kimit effectively.'}
-          </p>
-        </header>
+    <div className="p-section" dir={isAr ? 'rtl' : 'ltr'}>
+      <header className="p-header">
+        <div className="p-flex-center" style={{ marginBottom: '16px' }}>
+          <BookOpen size={32} className="p-icon-box" style={{ marginBottom: 0 }} />
+          <h1 className="p-title" style={{ marginBottom: 0 }}>
+            {isAr ? 'دليل الاستخدام' : 'User Guide'}
+          </h1>
+        </div>
+        <p className="p-subtitle">
+          {isAr ? 'تعلم كيف تستخدم Kimit AI Studio لتحويل بياناتك الخام إلى رؤى قيمة في دقائق.' : 'Learn how to use Kimit AI Studio to transform your raw data into valuable insights in minutes.'}
+        </p>
+      </header>
 
-        <div className="relative space-y-12">
-          {/* Vertical Line on Desktop */}
-          <div className={`hidden md:block absolute ${isAr ? 'right-[15px]' : 'left-[15px]'} top-4 bottom-4 w-[2px] bg-[#334155] -z-0`} />
-          
+      <div style={{ position: 'relative' }}>
+        {/* Connecting Line */}
+        <div className="p-step-line" style={{ left: isAr ? 'auto' : '15px', right: isAr ? '15px' : 'auto' }} />
+
+        <div style={{ display: 'grid', gap: '48px' }}>
           {steps.map((step, i) => (
-            <div key={i} className="relative z-10 flex flex-col md:flex-row gap-6 md:gap-8 items-start">
-              {/* Badge */}
-              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#10b981] text-white font-bold text-[14px] shrink-0 shadow-lg">
-                {i + 1}
-              </div>
+            <div key={i} className="p-flex-row" style={{ position: 'relative', zIndex: 1 }}>
+              <div className="p-badge">{i + 1}</div>
               
-              {/* Content Card */}
-              <div className="flex-1 bg-[#1e293b] border border-[#334155] rounded-[12px] p-6 transition-all hover:border-[#10b981] group w-full">
-                <div className="flex items-center gap-4 mb-4">
-                  <step.icon size={24} className="text-[#10b981]" />
-                  <h3 className="text-[17px] font-semibold text-[#f8fafc]">{step.title}</h3>
+              <div className="p-card" style={{ flex: 1 }}>
+                <div className="p-flex-center" style={{ marginBottom: '16px' }}>
+                  <div className="p-icon-box" style={{ marginBottom: 0 }}>
+                    <step.icon size={24} />
+                  </div>
+                  <h3 className="p-title" style={{ fontSize: '18px', marginBottom: 0 }}>
+                    {step.title}
+                  </h3>
                 </div>
-                <p className="text-[14px] text-[#94a3b8] leading-relaxed mb-4">
+                <p className="p-subtitle">
                   {step.desc}
                 </p>
-                {step.formula && (
-                  <div className="bg-[#0f172a] p-3 rounded-lg border border-[#334155] inline-block">
-                    <code className="text-[#10b981] font-mono text-[13px]">{step.formula}</code>
-                  </div>
-                )}
               </div>
             </div>
           ))}
         </div>
-
-        <div className="mt-16 text-center">
-          <button 
-            onClick={() => window.location.hash = '#/'}
-            className="px-8 py-4 bg-[#10b981] hover:bg-[#059669] text-white font-bold rounded-[12px] transition-all shadow-lg active:scale-95"
-          >
-            {isAr ? 'ابدأ رحلتك الآن' : 'Start Your Journey'}
-          </button>
-        </div>
       </div>
+
+      <footer className="p-card" style={{ marginTop: '64px', background: 'linear-gradient(135deg, var(--bg-secondary), rgba(16, 185, 129, 0.05))', textAlign: 'center' }}>
+        <h2 className="p-title" style={{ fontSize: '20px' }}>
+          {isAr ? 'جاهز للبدء؟' : 'Ready to start?'}
+        </h2>
+        <p className="p-subtitle" style={{ marginBottom: '24px' }}>
+          {isAr ? 'انتقل إلى الصفحة الرئيسية وارفع أول ملف بيانات لك الآن.' : 'Go to the home page and upload your first data file now.'}
+        </p>
+        <button className="p-pill" style={{ border: 'none', cursor: 'pointer' }} onClick={() => window.location.href = '/'}>
+          {isAr ? 'ابدأ الآن' : 'Start Now'}
+        </button>
+      </footer>
     </div>
   );
 };

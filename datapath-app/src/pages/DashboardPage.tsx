@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useKimitData } from '../hooks/useKimitData';
 import { useKimitEngine } from '../hooks/useKimitEngine';
 import { DataChart } from '../components/DataChart';
 import {
   Plus, Trash2, FileText, Loader2, Sparkles, Database,
   Activity, AlertTriangle, TrendingUp, TrendingDown,
-  Minus, GitBranch, Wand2,
+  Minus, GitBranch, Wand2, BookOpen, Plug, X, Filter,
 } from 'lucide-react';
 import type { Lang, ChartInfo } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,10 +13,14 @@ import { DataGrid } from '../components/Analysis/DataGrid';
 import { TransformationTimeline } from '../components/Analysis/TransformationTimeline';
 import { CorrelationHeatmap } from '../components/Analysis/CorrelationHeatmap';
 import { InsightSummary } from '../components/Analysis/InsightSummary';
+import { ExportActions } from '../components/Analysis/ExportActions';
 import { PowerBIPanel } from '../components/Analysis/PowerBIPanel';
+import { PredictiveSuite } from '../components/Analysis/PredictiveSuite';
+import { SourceManager } from '../components/SourceManager';
 import { CreatorFooter } from '../components/CreatorFooter';
 import { exportBrandedPDF, exportToExcel } from '../lib/exportUtils';
 import { generateAInarrative } from '../lib/narrativeEngine';
+import { generateExecutiveReport } from '../lib/report-gen';
 
 interface Props { lang: Lang; }
 
@@ -70,60 +74,155 @@ const GrowthBadge: React.FC<{ pct: number; trend: 'up' | 'down' | 'flat' }> = ({
 };
 
 export const DashboardPage: React.FC<Props> = ({ lang }) => {
-  const { info, rollback } = useKimitData();
   const {
-    removeDuplicates, fillMissingValues, getHealthStats,
+    info, rollback,
+    crossFilters, crossFilteredData, isCrossFiltered,
+    setCrossFilter, clearCrossFilters,
+  } = useKimitData();
+  const {
+    removeDuplicates, fillMissingValues, magicClean, getHealthStats,
     outlierMap, allOutlierRowIndices, correlationMatrix, growthIndicators,
   } = useKimitEngine();
 
   const [exporting, setExporting] = useState(false);
+  const [reportGenerating, setReportGenerating] = useState(false);
   const [cleaning, setCleaning] = useState(false);
   const [customCharts, setCustomCharts] = useState<ChartInfo[]>([]);
   const [builder, setBuilder] = useState<{ x: string; y: string; type: ChartInfo['type'] }>({ x: '', y: '', type: 'bar' });
   const [activeChartFilter, setActiveChartFilter] = useState('');
   const [showOutliers, setShowOutliers] = useState(false);
   const [activeTab, setActiveTab] = useState<'grid' | 'correlation'>('grid');
+  const [showSourceManager, setShowSourceManager] = useState(false);
 
   const health = getHealthStats();
   const t = T[lang];
-  const insights = info ? generateAInarrative(info) : [];
 
-  // Magic Clean: remove duplicates + fill nulls in one click
+  // ── insights must be memoized so it doesn't change every render ──────────
+  const insights = useMemo(
+    () => (info ? generateAInarrative(info) : []),
+    [info]
+  );
+
+  // ── All hooks MUST be declared before any early return ───────────────────
+
+  // Magic Clean: Atomic dedup + mean fill
   const handleMagicClean = async () => {
     setCleaning(true);
-    await new Promise(r => setTimeout(r, 300)); // brief animation delay
-    removeDuplicates();
-    fillMissingValues();
+    await new Promise(r => setTimeout(r, 600));
+    magicClean();
     setCleaning(false);
   };
 
-  if (!info) return <div className="p-20 text-center">No Data found. Please upload a file.</div>;
-
-  const handleAddCustomChart = () => {
-    if (!builder.x || !builder.y) return;
+  const handleAddCustomChart = useCallback(() => {
+    if (!info || !builder.x || !builder.y) return;
     const agg: Record<string, number> = {};
     info.workData.forEach(r => {
       const key = String(r[builder.x]);
       agg[key] = (agg[key] || 0) + (Number(r[builder.y]) || 0);
     });
-    setCustomCharts([{
+    setCustomCharts(prev => [{
       title: `${builder.y} vs ${builder.x}`,
       type: builder.type,
       data: Object.entries(agg).map(([x, y]) => ({ x, y })),
-    }, ...customCharts]);
-  };
+    }, ...prev]);
+  }, [info, builder]);
 
-  const handleFullPDF = async () => {
+  const handleFullPDF = useCallback(async () => {
+    if (!info) return;
     setExporting(true);
     await exportBrandedPDF('dashboard-main-content', `Kimit_Report_${info.filename}.pdf`);
     setExporting(false);
-  };
+  }, [info]);
+
+  // ── AI Executive Report (Task 1) ──────────────────────────────────────────
+  const handleExecutiveReport = useCallback(async () => {
+    if (!info) return;
+    setReportGenerating(true);
+    const chartIds = [
+      ...customCharts.map((_, i) => `custom-chart-${i}`),
+      ...info.charts.slice(0, 4).map((_, i) => `kimit-chart-${i}`),
+    ];
+    await generateExecutiveReport(info, health, {
+      title: `${info.filename} — Executive Report`,
+      subtitle: 'Kimit AI Studio — Advanced Analytics',
+      author: 'Kimit AI System',
+      chartElementIds: chartIds,
+      insights: insights.map(ins => ({ title: ins.title, description: ins.description, type: ins.type })),
+    });
+    setReportGenerating(false);
+  }, [info, health, customCharts, insights]);
+
+  // ── Cross-Filter handlers (Task 4) ────────────────────────────────────────
+  const handleChartSegmentClick = useCallback((column: string, value: string) => {
+    setCrossFilter(column, value);
+    setActiveChartFilter(value);
+  }, [setCrossFilter]);
+
+  const handleClearAllFilters = useCallback(() => {
+    clearCrossFilters();
+    setActiveChartFilter('');
+  }, [clearCrossFilters]);
+
+  // ── Early return guard — AFTER all hooks ──────────────────────────────────
+  if (!info) return <div className="p-20 text-center">No Data found. Please upload a file.</div>;
 
   // Growth: pick first 3 numeric columns for KPI display
   const kpiGrowth = growthIndicators.slice(0, 3);
 
   return (
     <div className="dash-layout-container">
+
+      {/* ── Source Manager Modal (Task 3) ── */}
+      <AnimatePresence>
+        {showSourceManager && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 9999,
+              background: 'rgba(5,8,16,0.85)', backdropFilter: 'blur(10px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '20px',
+            }}
+            onClick={() => setShowSourceManager(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              onClick={e => e.stopPropagation()}
+              style={{
+                width: '100%', maxWidth: 540,
+                background: '#0a0f1d',
+                border: '1px solid rgba(212,175,55,0.25)',
+                borderRadius: 20, padding: '24px',
+                maxHeight: '90vh', overflowY: 'auto',
+                boxShadow: '0 40px 80px rgba(0,0,0,0.7)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(212,175,55,0.1)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Plug size={18} color="#d4af37" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: '#e2e8f0' }}>Source Manager</div>
+                    <div style={{ fontSize: 11, color: '#475569' }}>Connect to a data source</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowSourceManager(false)}
+                  style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 4 }}>
+                  <X size={18} />
+                </button>
+              </div>
+              <SourceManager onFileUploadMode={() => setShowSourceManager(false)} />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Header ── */}
       <div className="dash-header-wrap">
@@ -135,6 +234,14 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
           <p className="page-sub">{info.filename} • {info.rows.toLocaleString()} {t.records}</p>
         </div>
         <div className="actions-group" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          {/* Source Manager */}
+          <button
+            className="premium-button secondary"
+            onClick={() => setShowSourceManager(true)}
+            style={{ fontSize: '12px' }}
+          >
+            <Plug size={14} /> Sources
+          </button>
           {/* ✨ Magic Clean */}
           <motion.button
             className="premium-button"
@@ -153,13 +260,32 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
             {exporting ? <Loader2 className="spin" size={16} /> : <FileText size={16} />}
             {lang === 'ar' ? 'تصدير PDF' : 'Branded PDF'}
           </button>
+          {/* AI Executive Report (Task 1) */}
+          <button
+            className="premium-button"
+            onClick={handleExecutiveReport}
+            disabled={reportGenerating}
+            style={{ background: 'linear-gradient(135deg, #1e3a5f, #0f2040)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.3)' }}
+          >
+            {reportGenerating ? <Loader2 className="spin" size={16} /> : <BookOpen size={16} />}
+            AI Report
+          </button>
         </div>
       </div>
 
       <TransformationTimeline />
 
-      {/* ── KPI Row with Growth Indicators ── */}
-      <div className="kpi-mini-row">
+      <div style={{ marginBottom: 20 }}>
+        <ExportActions 
+          data={info.workData} 
+          columns={info.columns.map(c => c.name)} 
+          elementIdToCapture="dashboard-main-area" 
+        />
+      </div>
+
+      <div id="dashboard-main-area" className="dash-main-grid-container">
+        {/* ── KPI Row with Growth Indicators ── */}
+        <div className="kpi-mini-row">
         {/* Records */}
         <motion.div className="glass-card kpi-card" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0 }}>
           <div className="kpi-label">{t.records}</div>
@@ -228,12 +354,59 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
               ))}
             </div>
 
+            {/* Cross-filter active banner (Task 4) */}
+            <AnimatePresence>
+              {isCrossFiltered && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  style={{ overflow: 'hidden' }}
+                >
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '8px 16px', background: 'rgba(212,175,55,0.06)',
+                    borderBottom: '1px solid rgba(212,175,55,0.15)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flex: 1 }}>
+                      <Filter size={11} color="#d4af37" />
+                      <span style={{ fontSize: 10, color: '#d4af37', fontWeight: 700 }}>CROSS-FILTER ACTIVE</span>
+                      {crossFilters.map(cf => (
+                        <span key={cf.column} style={{
+                          fontSize: 9, padding: '2px 8px', borderRadius: 20,
+                          background: 'rgba(212,175,55,0.15)', color: '#d4af37',
+                          border: '1px solid rgba(212,175,55,0.3)',
+                          display: 'flex', alignItems: 'center', gap: 4,
+                        }}>
+                          {cf.column}: <b>{cf.value}</b>
+                          <button
+                            onClick={() => setCrossFilter(cf.column, cf.value)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d4af37', padding: 0, lineHeight: 1 }}>
+                            <X size={9} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <button
+                      onClick={handleClearAllFilters}
+                      style={{ fontSize: 10, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                      Clear All
+                    </button>
+                  </div>
+                  <div style={{ padding: '6px 16px', fontSize: 10, color: '#64748b', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    Showing <b style={{ color: '#e2e8f0' }}>{crossFilteredData.length}</b> of{' '}
+                    <b style={{ color: '#e2e8f0' }}>{info.workData.length}</b> records
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             <AnimatePresence mode="wait">
               {activeTab === 'grid' ? (
                 <motion.div key="grid" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                   style={{ height: '45vh', minHeight: 280 }}>
                   <DataGrid
-                    data={info.workData}
+                    data={isCrossFiltered ? crossFilteredData : info.workData}
                     columns={info.columns.map(c => c.name)}
                     externalFilter={activeChartFilter}
                     outlierRowIndices={allOutlierRowIndices}
@@ -282,8 +455,11 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
             </div>
             <div className="charts-display-grid">
               {customCharts.map((ch, i) => (
-                <div key={i} style={{ position: 'relative' }}>
-                  <DataChart chart={ch} onFilterClick={(_col: string, v: string) => setActiveChartFilter(v)} />
+                <div key={i} id={`custom-chart-${i}`} style={{ position: 'relative' }}>
+                  <DataChart
+                    chart={ch}
+                    onFilterClick={(col: string, v: string) => handleChartSegmentClick(col, v)}
+                  />
                   <button onClick={() => setCustomCharts(customCharts.filter((_ch, idx) => idx !== i))}
                     style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(239,68,68,0.15)',
                       color: '#ef4444', border: 'none', borderRadius: 6, padding: '4px 6px', cursor: 'pointer' }}>
@@ -292,7 +468,12 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
                 </div>
               ))}
               {info.charts.slice(0, 4).map((ch, i) => (
-                <DataChart key={i} chart={ch} onFilterClick={(_col: string, v: string) => setActiveChartFilter(v)} />
+                <div key={i} id={`kimit-chart-${i}`}>
+                  <DataChart
+                    chart={ch}
+                    onFilterClick={(col: string, v: string) => handleChartSegmentClick(col, v)}
+                  />
+                </div>
               ))}
             </div>
           </div>
@@ -342,6 +523,9 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
 
           {/* AI Insight Summary */}
           <InsightSummary insights={insights} />
+
+          {/* ── Scenario Analysis / What-If Sliders (Task 2) ── */}
+          <PredictiveSuite />
 
           {/* Power BI Bridge */}
           <PowerBIPanel />
@@ -395,6 +579,7 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
           .builder-controls { grid-template-columns: 1fr !important; }
         }
       `}</style>
+      </div>
     </div>
   );
 };

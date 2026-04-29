@@ -27,51 +27,49 @@ export const generateAInarrative = (info: DatasetInfo): Insight[] => {
   const insights: Insight[] = [];
   const numericCols = topNumericCols(info);
 
-  // 1. Data Quality
+  // 1. Data Quality Story
   if (info.totalNulls > 0) {
-    const pct = ((info.totalNulls / (info.rows * info.columns.length)) * 100).toFixed(1);
     insights.push({
-      title: 'Data Gaps Detected',
-      description: `${info.totalNulls} missing values found (${pct}% of cells). Use "Magic Clean" to auto-fill and restore statistical accuracy.`,
+      title: 'The Narrative Gap',
+      description: `Your data story has missing chapters. With ${info.totalNulls} empty cells, your analysis is operating on partial visibility. Filling these gaps will reveal the complete business trajectory.`,
       type: 'warning',
     });
   } else {
     insights.push({
-      title: '✓ Clean Dataset',
-      description: 'Zero missing values detected. Your dataset is primed for high-accuracy modelling and BI integration.',
+      title: 'A Flawless Foundation',
+      description: 'Your dataset is perfectly contiguous. This integrity ensures that every trend we discover is backed by solid, uninterrupted evidence.',
       type: 'positive',
     });
   }
 
-  // 2. Trend / Statistical — most interesting numeric col
+  // 2. Efficiency / Duplicates
+  if (info.duplicates > 0) {
+    insights.push({
+      title: 'Resource Optimization',
+      description: `We've identified ${info.duplicates} redundant entries that are inflating your metrics. Pruning this noise will sharpen your focus on unique customer behaviors.`,
+      type: 'warning',
+    });
+  }
+
+  // 3. Performance Story
   if (numericCols.length > 0) {
     const col = numericCols[0];
-    const spread = (col.max !== undefined && col.min !== undefined)
-      ? ` Range spans from ${fmt(col.min)} to ${fmt(col.max)}.` : '';
     insights.push({
-      title: `Trend: ${col.name}`,
-      description: `Average ${col.name} = ${fmt(col.mean)}.${spread} Stable distribution detected — suitable for forecasting.`,
+      title: 'Revenue/Value Velocity',
+      description: `The pulse of your data, "${col.name}", is beating at an average of ${fmt(col.mean)}. We've observed peaks up to ${fmt(col.max)}, suggesting high-growth potential if we can replicate those specific conditions.`,
       type: 'info',
       daxSnippet: `Avg_${col.name} = AVERAGE('KimitData'[${col.name}])`,
     });
   }
 
-  // 3. Duplicates / Efficiency
-  if (info.duplicates > 0) {
-    const saving = ((info.duplicates / info.rows) * 100).toFixed(1);
-    insights.push({
-      title: 'Redundancy Alert',
-      description: `${info.duplicates} duplicate rows detected. Removing them reduces dataset size by ${saving}% and eliminates bias in aggregations.`,
-      type: 'warning',
-    });
-  } else if (numericCols.length >= 2) {
-    // 3b. Correlation hint
+  // 4. Strategic Insight
+  if (numericCols.length >= 2) {
     const [a, b] = numericCols;
     insights.push({
-      title: `Correlation Opportunity`,
-      description: `Run the Correlation Heatmap on "${a.name}" × "${b.name}" to uncover hidden business relationships that inform pricing or demand models.`,
+      title: 'Interconnected Growth',
+      description: `There is a subtle dance between "${a.name}" and "${b.name}". Uncovering the strength of this relationship could be the key to your next cross-selling or optimization strategy.`,
       type: 'info',
-      daxSnippet: `Correlation_${a.name}_${b.name} =\n  DIVIDE(\n    SUMX(KimitData, (KimitData[${a.name}] - [Avg_${a.name}]) * (KimitData[${b.name}] - [Avg_${b.name}])),\n    SQRT(SUMX(KimitData, (KimitData[${a.name}] - [Avg_${a.name}])^2) * SUMX(KimitData, (KimitData[${b.name}] - [Avg_${b.name}])^2))\n  )`,
+      daxSnippet: `Correlation_${a.name}_${b.name} = DIVIDE(SUMX(KimitData, (KimitData[${a.name}] - [Avg_${a.name}]) * (KimitData[${b.name}] - [Avg_${b.name}])), SQRT(SUMX(KimitData, (KimitData[${a.name}] - [Avg_${a.name}])^2) * SUMX(KimitData, (KimitData[${b.name}] - [Avg_${b.name}])^2)))`,
     });
   }
 

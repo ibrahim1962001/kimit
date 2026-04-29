@@ -29,75 +29,61 @@ export const FAQPage: React.FC<Props> = ({ lang }) => {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <div className="min-h-screen py-12 px-8 md:px-12" style={{ backgroundColor: 'var(--bg-primary)' }}>
-      <div className="max-w-[900px] mx-auto" dir={isAr ? 'rtl' : 'ltr'}>
-        <header className="mb-12">
-          <div className="flex items-center gap-4 mb-6">
-            <HelpCircle size={32} className="text-[#10b981]" />
-            <h1 className="text-[clamp(24px,4vw,36px)] font-bold text-[#f8fafc]">
-              {isAr ? 'الأسئلة الشائعة' : 'Frequently Asked Questions'}
-            </h1>
-          </div>
-          <p className="text-[15px] text-[#94a3b8] leading-relaxed">
-            {isAr ? 'كل ما تحتاج معرفته عن منصة Kimit وكيفية التعامل مع بياناتك بذكاء.' : 'Everything you need to know about Kimit and how to handle your data smartly.'}
-          </p>
-        </header>
+    <div className="p-section" dir={isAr ? 'rtl' : 'ltr'}>
+      <header className="p-header">
+        <div className="p-flex-center" style={{ marginBottom: '16px' }}>
+          <HelpCircle size={32} className="p-icon-box" style={{ marginBottom: 0 }} />
+          <h1 className="p-title" style={{ marginBottom: 0 }}>
+            {isAr ? 'الأسئلة الشائعة' : 'Frequently Asked Questions'}
+          </h1>
+        </div>
+        <p className="p-subtitle">
+          {isAr ? 'كل ما تحتاج معرفته عن منصة Kimit وكيفية التعامل مع بياناتك بذكاء.' : 'Everything you need to know about Kimit and how to handle your data smartly.'}
+        </p>
+      </header>
 
-        <div className="space-y-4">
-          {faqs.map((faq, i) => (
-            <div 
-              key={i} 
-              className={`bg-[#1e293b] border rounded-[12px] overflow-hidden transition-all duration-300 ${
-                openIndex === i ? 'border-[#10b981]' : 'border-[#334155]'
-              }`}
+      <div>
+        {faqs.map((faq, i) => (
+          <div key={i} className="p-accordion-item" style={{ borderColor: openIndex === i ? 'var(--accent)' : 'var(--border)' }}>
+            <button 
+              onClick={() => setOpenIndex(openIndex === i ? null : i)}
+              className="p-accordion-btn"
             >
-              <button 
-                onClick={() => setOpenIndex(openIndex === i ? null : i)}
-                className="w-full px-6 py-5 flex justify-between items-center text-start focus:outline-none group"
-              >
-                <span className={`text-[17px] font-semibold transition-colors ${
-                  openIndex === i ? 'text-[#10b981]' : 'text-[#f8fafc]'
-                }`}>
-                  {faq.q}
-                </span>
-                <ChevronDown 
-                  size={20} 
-                  className={`text-[#94a3b8] transition-transform duration-300 ${
-                    openIndex === i ? 'rotate-180 text-[#10b981]' : ''
-                  }`} 
-                />
-              </button>
-              
-              <div 
-                className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                  openIndex === i ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
-                }`}
-              >
-                <div className="px-6 pb-6 pt-2 border-t border-[#334155]/50">
-                  <p className="text-[14px] text-[#94a3b8] leading-relaxed">
-                    {faq.a}
-                  </p>
+              <span style={{ color: openIndex === i ? 'var(--accent)' : 'var(--text-primary)' }}>
+                {faq.q}
+              </span>
+              <ChevronDown 
+                size={20} 
+                style={{ 
+                  color: openIndex === i ? 'var(--accent)' : 'var(--text-secondary)',
+                  transform: openIndex === i ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.3s'
+                }} 
+              />
+            </button>
+            
+            {openIndex === i && (
+              <div className="p-accordion-content" style={{ borderTop: '1px solid rgba(51, 65, 85, 0.5)' }}>
+                <div style={{ paddingTop: '16px' }}>
+                  {faq.a}
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-
-        <section className="mt-16 bg-[#1e293b] border border-[#334155] rounded-[12px] p-8 text-center">
-          <h3 className="text-[18px] font-bold text-[#f8fafc] mb-4">
-            {isAr ? 'لديك سؤال آخر؟' : 'Still have questions?'}
-          </h3>
-          <p className="text-[14px] text-[#94a3b8] mb-8">
-            {isAr ? 'نحن هنا للمساعدة! تواصل معنا مباشرة عبر البريد الإلكتروني.' : "We're here to help! Contact us directly via email."}
-          </p>
-          <a 
-            href="mailto:ebrahimsabrey2001@gmail.com" 
-            className="inline-flex items-center gap-2 px-6 py-3 bg-[#334155] rounded-full text-[13px] font-medium text-[#f8fafc] hover:bg-[#475569] transition-colors"
-          >
-            {isAr ? 'تواصل مع الدعم' : 'Contact Support'}
-          </a>
-        </section>
+            )}
+          </div>
+        ))}
       </div>
+
+      <section className="p-card" style={{ marginTop: '64px', textAlign: 'center' }}>
+        <h3 className="p-title" style={{ fontSize: '18px' }}>
+          {isAr ? 'لديك سؤال آخر؟' : 'Still have questions?'}
+        </h3>
+        <p className="p-subtitle" style={{ marginBottom: '32px' }}>
+          {isAr ? 'نحن هنا للمساعدة! تواصل معنا مباشرة عبر البريد الإلكتروني.' : "We're here to help! Contact us directly via email."}
+        </p>
+        <a href="mailto:ebrahimsabrey2001@gmail.com" className="p-pill">
+          {isAr ? 'تواصل مع الدعم' : 'Contact Support'}
+        </a>
+      </section>
     </div>
   );
 };

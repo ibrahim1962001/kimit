@@ -27,69 +27,65 @@ export const AboutUsPage: React.FC<Props> = ({ lang }) => {
   ];
 
   return (
-    <div className="min-h-screen py-12 px-8 md:px-12" style={{ backgroundColor: 'var(--bg-primary)' }}>
-      <div className="max-w-[900px] mx-auto" dir={isAr ? 'rtl' : 'ltr'}>
-        <header className="mb-12">
-          <h1 className="text-[clamp(24px,4vw,36px)] font-bold text-[#f8fafc] mb-4">
-            {isAr ? 'عن Kimit AI' : 'About Us'}
-          </h1>
-          <p className="text-[15px] text-[#94a3b8] leading-relaxed">
-            {isAr 
-              ? 'Kimit هو مشروع طموح يهدف لتبسيط تحليل البيانات باستخدام الذكاء الاصطناعي، لنجعل البيانات تتحدث بلغة يفهمها الجميع.' 
-              : 'Kimit is an ambitious project aimed at simplifying data analysis using AI, making data speak a language everyone understands.'}
-          </p>
-        </header>
+    <div className="p-section" dir={isAr ? 'rtl' : 'ltr'}>
+      <header className="p-header">
+        <h1 className="p-title">
+          {isAr ? 'عن Kimit AI' : 'About Us'}
+        </h1>
+        <p className="p-subtitle">
+          {isAr 
+            ? 'Kimit هو مشروع طموح يهدف لتبسيط تحليل البيانات باستخدام الذكاء الاصطناعي، لنجعل البيانات تتحدث بلغة يفهمها الجميع.' 
+            : 'Kimit is an ambitious project aimed at simplifying data analysis using AI, making data speak a language everyone understands.'}
+        </p>
+      </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          {features.map((f, i) => (
-            <div key={i} className="bg-[#1e293b] border border-[#334155] rounded-[12px] p-6 transition-all hover:border-[#10b981] group">
-              <div className="mb-4">
-                <f.icon size={24} className="text-[#10b981]" />
-              </div>
-              <h3 className="text-[17px] font-semibold text-[#f8fafc] mb-2">{f.title}</h3>
-              <p className="text-[14px] text-[#94a3b8] leading-relaxed">{f.desc}</p>
+      <div className="p-grid-3" style={{ marginBottom: '48px' }}>
+        {features.map((f, i) => (
+          <div key={i} className="p-card">
+            <div className="p-icon-box">
+              <f.icon size={24} />
             </div>
-          ))}
-        </div>
+            <h3 className="p-title" style={{ fontSize: '17px', marginBottom: '8px' }}>{f.title}</h3>
+            <p className="p-subtitle" style={{ fontSize: '14px' }}>{f.desc}</p>
+          </div>
+        ))}
+      </div>
 
-        <section className="bg-[#1e293b] border border-[#334155] rounded-[12px] p-8">
-          <h2 className="text-[20px] font-bold text-[#f8fafc] mb-8">
-            {isAr ? 'تواصل مع المطور' : 'Contact the Developer'}
-          </h2>
+      <section className="p-card">
+        <h2 className="p-title" style={{ fontSize: '20px', marginBottom: '32px' }}>
+          {isAr ? 'تواصل مع المطور' : 'Contact the Developer'}
+        </h2>
+        
+        <div className="p-flex-row" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div className="p-avatar">IS</div>
           
-          <div className="flex flex-col md:flex-row gap-8 items-center md:items-start">
-            <div className="w-16 h-16 rounded-full bg-[#10b981] flex items-center justify-center shrink-0 shadow-lg">
-              <span className="text-[18px] font-bold text-white">IS</span>
-            </div>
+          <div style={{ flex: 1, minWidth: '250px' }}>
+            <h3 className="p-title" style={{ fontSize: '18px', marginBottom: '8px' }}>
+              {isAr ? 'إبراهيم صبري' : 'Ibrahim Sabrey'}
+            </h3>
+            <p className="p-subtitle" style={{ marginBottom: '24px' }}>
+              {isAr 
+                ? 'مطور برمجيات شغوف ببناء أدوات ذكية تحل مشاكل حقيقية وتجعل حياة المستخدمين أسهل.' 
+                : 'A software developer passionate about building smart tools that solve real problems and make users\' lives easier.'}
+            </p>
             
-            <div className="flex-1 text-center md:text-start">
-              <h3 className="text-[18px] font-bold text-[#f8fafc] mb-2">
-                {isAr ? 'إبراهيم صبري' : 'Ibrahim Sabrey'}
-              </h3>
-              <p className="text-[14px] text-[#94a3b8] leading-relaxed mb-6">
-                {isAr 
-                  ? 'مطور برمجيات شغوف ببناء أدوات ذكية تحل مشاكل حقيقية وتجعل حياة المستخدمين أسهل.' 
-                  : 'A software developer passionate about building smart tools that solve real problems and make users\' lives easier.'}
-              </p>
-              
-              <div className="flex flex-wrap gap-4 justify-center md:justify-start">
-                <a href="mailto:ebrahimsabrey2001@gmail.com" className="flex items-center gap-2 px-4 py-2 bg-[#334155] rounded-full text-[13px] font-medium text-[#f8fafc] hover:bg-[#475569] transition-colors">
-                  <Mail size={16} className="text-[#10b981]" />
-                  {isAr ? 'البريد الإلكتروني' : 'Email'}
-                </a>
-                <a href="https://linkedin.com/in/ibrahimsabrey" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-[#334155] rounded-full text-[13px] font-medium text-[#f8fafc] hover:bg-[#475569] transition-colors">
-                  <Link size={16} className="text-[#10b981]" />
-                  LinkedIn
-                </a>
-              </div>
+            <div className="p-flex-center" style={{ flexWrap: 'wrap' }}>
+              <a href="mailto:ebrahimsabrey2001@gmail.com" className="p-pill">
+                <Mail size={16} />
+                {isAr ? 'البريد الإلكتروني' : 'Email'}
+              </a>
+              <a href="https://linkedin.com/in/ibrahimsabrey" target="_blank" rel="noopener noreferrer" className="p-pill">
+                <Link size={16} />
+                LinkedIn
+              </a>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <footer className="mt-12">
-          <CreatorFooter lang={lang} />
-        </footer>
-      </div>
+      <footer style={{ marginTop: '48px' }}>
+        <CreatorFooter lang={lang} />
+      </footer>
     </div>
   );
 };

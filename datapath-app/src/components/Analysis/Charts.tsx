@@ -4,7 +4,8 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, Camera } from 'lucide-react';
+import html2canvas from 'html2canvas';
 import { ErrorBoundary } from './ErrorBoundary';
 import type { DataRow, ChartConfig } from '../../types/index';
 
@@ -283,9 +284,31 @@ const ChartRenderer: React.FC<AnalysisChartProps> = ({ data, config, onFilter })
   const chartHeight = isMobile ? 250 : 350;
   const chartAspect = isMobile ? 1.2 : 2;
 
+  const handleCapture = async () => {
+    const el = document.getElementById(`chart-container-${config.xAxisKey}-${config.yAxisKey}`);
+    if (!el) return;
+    try {
+      const canvas = await html2canvas(el, {
+        scale: 3,
+        backgroundColor: '#0a0f1d',
+        useCORS: true,
+      });
+      const url = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `${config.title || 'Kimit_Chart'}.png`;
+      link.href = url;
+      link.click();
+    } catch (err) {
+      console.error("Capture failed", err);
+    }
+  };
+
   return (
-    <div style={{ width: '100%', minHeight: chartHeight }}>
-      {/* Title + Regression toggle */}
+    <div 
+      id={`chart-container-${config.xAxisKey}-${config.yAxisKey}`}
+      style={{ width: '100%', minHeight: chartHeight, background: '#0a0f1d', padding: '16px', borderRadius: '14px' }}
+    >
+      {/* Title + Toggles */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         {config.title && (
           <h3 style={{
@@ -295,22 +318,40 @@ const ChartRenderer: React.FC<AnalysisChartProps> = ({ data, config, onFilter })
             {config.title}
           </h3>
         )}
-        {canShowRegression && (
+        <div style={{ display: 'flex', gap: 6 }}>
+          {canShowRegression && (
+            <button
+              onClick={() => setShowRegression(v => !v)}
+              title={showRegression ? 'Hide Trend' : 'Show Regression Trend'}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700,
+                cursor: 'pointer', transition: 'all 0.2s',
+                background: showRegression ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${showRegression ? 'rgba(212,175,55,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                color: showRegression ? '#d4af37' : '#64748b',
+              }}
+            >
+              <TrendingUp size={11} /> Trend
+            </button>
+          )}
           <button
-            onClick={() => setShowRegression(v => !v)}
-            title={showRegression ? 'Hide OLS Trend' : 'Show OLS Regression Line'}
+            onClick={handleCapture}
+            title="Capture high-res PNG"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
-              padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700,
+              padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700,
               cursor: 'pointer', transition: 'all 0.2s',
-              background: showRegression ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.04)',
-              border: `1px solid ${showRegression ? 'rgba(212,175,55,0.4)' : 'rgba(255,255,255,0.08)'}`,
-              color: showRegression ? '#d4af37' : '#64748b',
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              color: '#64748b',
             }}
+            onMouseOver={e => e.currentTarget.style.color = '#10b981'}
+            onMouseOut={e => e.currentTarget.style.color = '#64748b'}
           >
-            <TrendingUp size={11} /> Trend
+            <Camera size={11} /> Capture
           </button>
-        )}
+        </div>
       </div>
 
       <div style={{ width: '100%', height: chartHeight }}>

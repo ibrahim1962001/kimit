@@ -10,62 +10,57 @@ export const PrivacyPage: React.FC<Props> = ({ lang }) => {
   const sections = [
     {
       icon: Shield,
-      title: isAr ? 'طرفي' : 'Edge Computing',
+      title: isAr ? 'معالجة محلية' : 'Local Processing',
       desc: isAr 
-        ? 'معالجة بياناتك محلياً بالكامل دون مغادرة جهازك عبر تقنيات Edge الحديثة.' 
-        : 'End-to-end local data processing powered by pure Edge computing technology.'
+        ? 'تتم جميع عمليات تحليل البيانات داخل متصفحك مباشرة. بياناتك لا تغادر جهازك أبداً.' 
+        : 'All data analysis happens directly in your browser. Your data never leaves your device.'
     },
     {
       icon: Database,
-      title: isAr ? 'حصين' : 'Vault Storage',
+      title: isAr ? 'تخزين مؤقت' : 'Temporary Storage',
       desc: isAr 
-        ? 'تشفير سيادي وتخزين محلي للمفاتيح داخل خزنة Vault مشفرة تماماً.' 
-        : 'Sovereign encryption with local key storage inside a fully isolated Vault.'
+        ? 'نستخدم ذاكرة المتصفح المؤقتة فقط. لا يتم تخزين سجلاتك على أي خوادم سحابية.' 
+        : 'We use temporary browser memory only. Your records are never stored on cloud servers.'
     },
     {
       icon: Lock,
-      title: isAr ? 'سيادة' : 'Data Sovereignty',
+      title: isAr ? 'أمان تام' : 'Full Security',
       desc: isAr 
-        ? 'امتثال مطلق لمعايير الخصوصية العالمية مع سيادة بيانات محلية كاملة.' 
-        : 'Full compliance with global privacy protocols ensuring absolute data sovereignty.'
+        ? 'التزام تام بمعايير حماية البيانات العالمية لضمان سيادة بياناتك.' 
+        : 'Full commitment to global data protection standards to ensure your data sovereignty.'
     }
   ];
 
   return (
-    <div className="min-h-screen py-12 px-8 md:px-12" style={{ backgroundColor: 'var(--bg-primary)' }}>
-      <div className="max-w-[900px] mx-auto" dir={isAr ? 'rtl' : 'ltr'}>
-        <header className="mb-12 flex items-center gap-4">
-          <ShieldAlert size={36} className="text-[#10b981]" />
-          <h1 className="text-[clamp(24px,4vw,36px)] font-bold text-[#f8fafc]">
-            {isAr ? 'سياسة الخصوصية' : 'Privacy Policy'}
-          </h1>
-        </header>
+    <div className="p-section" dir={isAr ? 'rtl' : 'ltr'}>
+      <header className="p-header p-flex-center">
+        <ShieldAlert size={36} className="p-icon-box" style={{ marginBottom: 0 }} />
+        <h1 className="p-title" style={{ marginBottom: 0 }}>
+          {isAr ? 'سياسة الخصوصية' : 'Privacy Policy'}
+        </h1>
+      </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {sections.map((item, i) => (
-            <div 
-              key={i} 
-              className="bg-[#1e293b] border border-[#334155] rounded-[12px] p-6 transition-all hover:border-[#10b981] group"
-            >
-              <div className="mb-4">
-                <item.icon size={24} className="text-[#10b981]" />
-              </div>
-              <h3 className="text-[17px] font-semibold text-[#f8fafc] mb-2">
-                {item.title}
-              </h3>
-              <p className="text-[14px] text-[#94a3b8] leading-relaxed">
-                {item.desc}
-              </p>
+      <div className="p-grid-2">
+        {sections.map((item, i) => (
+          <div key={i} className="p-card">
+            <div className="p-icon-box">
+              <item.icon size={24} />
             </div>
-          ))}
-        </div>
-
-        <footer className="mt-12 pt-8 border-t border-[#334155] text-center">
-          <p className="text-[14px] text-[#94a3b8]">
-            {isAr ? 'تحديث: أبريل 2026' : 'Updated: April 2026'}
-          </p>
-        </footer>
+            <h3 className="p-title" style={{ fontSize: '18px' }}>
+              {item.title}
+            </h3>
+            <p className="p-subtitle">
+              {item.desc}
+            </p>
+          </div>
+        ))}
       </div>
+
+      <footer style={{ marginTop: '48px', paddingTop: '32px', borderTop: '1px solid var(--border)', textAlign: 'center' }}>
+        <p className="p-subtitle">
+          {isAr ? 'آخر تحديث: أبريل 2026' : 'Last Updated: April 2026'}
+        </p>
+      </footer>
     </div>
   );
 };

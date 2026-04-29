@@ -5,10 +5,11 @@ import {
   calcCorrelationMatrix,
   calcGrowthIndicators,
   detectDateColumn,
+  calcPredictions,
 } from '../lib/stats';
-import type { IQRResult, CorrelationMatrix, GrowthIndicator } from '../lib/stats';
+import type { IQRResult, CorrelationMatrix, GrowthIndicator, PredictionResult } from '../lib/stats';
 
-export type { IQRResult, CorrelationMatrix, GrowthIndicator };
+export type { IQRResult, CorrelationMatrix, GrowthIndicator, PredictionResult };
 
 export const useKimitEngine = () => {
   const { info, setDataset } = useKimitData();
@@ -148,6 +149,20 @@ export const useKimitEngine = () => {
     return calcGrowthIndicators(info.workData, numericCols, dateCol);
   }, [info, numericCols, dateCol]);
 
+  // ── 8. Predictive Analytics (memoized) ──────────────────
+  /**
+   * Generates next 3 data points using simple linear regression.
+   */
+  const predictions = useMemo<Map<string, PredictionResult>>(() => {
+    const map = new Map<string, PredictionResult>();
+    if (!info) return map;
+    for (const col of numericCols) {
+      const res = calcPredictions(info.workData, col);
+      if (res) map.set(col, res);
+    }
+    return map;
+  }, [info, numericCols]);
+
   return {
     // Existing
     removeDuplicates,
@@ -160,6 +175,7 @@ export const useKimitEngine = () => {
     allOutlierRowIndices,
     correlationMatrix,
     growthIndicators,
+    predictions,
     numericCols,
     dateCol,
   };

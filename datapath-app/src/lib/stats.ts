@@ -216,3 +216,54 @@ export function detectDateColumn(data: DataRow[], columns: string[]): string | u
   }
   return undefined;
 }
+
+// ─────────────────────────────────────────────
+//  4. Simple Linear Regression (Predictive)
+// ─────────────────────────────────────────────
+
+export interface PredictionResult {
+  column: string;
+  points: { label: string; value: number }[];
+  slope: number;
+  intercept: number;
+}
+
+/**
+ * Simple Linear Regression: y = mx + b
+ * Calculates next 3 trend points based on existing data.
+ */
+export function calcPredictions(
+  data: DataRow[],
+  col: string,
+): PredictionResult | null {
+  const vals = getNumericValues(data, col);
+  if (vals.length < 5) return null;
+
+  // X is just the index (0 to n-1)
+  const n = vals.length;
+  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+  for (let i = 0; i < n; i++) {
+    sumX += i;
+    sumY += vals[i];
+    sumXY += i * vals[i];
+    sumX2 += i * i;
+  }
+
+  const denominator = (n * sumX2 - sumX * sumX);
+  if (denominator === 0) return null;
+
+  const slope = (n * sumXY - sumX * sumY) / denominator;
+  const intercept = (sumY - slope * sumX) / n;
+
+  // Predict next 3 points
+  const points = [];
+  for (let i = 1; i <= 3; i++) {
+    const nextX = n + i - 1;
+    points.push({
+      label: `T+${i}`,
+      value: Number((slope * nextX + intercept).toFixed(2)),
+    });
+  }
+
+  return { column: col, points, slope, intercept };
+}
