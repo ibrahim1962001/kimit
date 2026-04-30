@@ -94,7 +94,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       await signInWithEmailAndPassword(auth, email, password);
       return;
     } catch (err: unknown) {
-      const code = (err as any).code;
+      const code = (err as { code?: string }).code;
       // 2. If it's a wrong password or user not found, try to register
       if (code === 'auth/invalid-credential' || code === 'auth/user-not-found' || code === 'auth/wrong-password') {
         try {
@@ -112,7 +112,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
             notifications: true
           });
         } catch (regErr: unknown) {
-          const regCode = (regErr as any).code;
+          const regCode = (regErr as { code?: string }).code;
           if (regCode === 'auth/email-already-in-use') {
             // If email exists, then the original sign-in failure was actually a wrong password!
             throw new Error('wrong-password');

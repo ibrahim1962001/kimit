@@ -340,24 +340,6 @@ export const SourceManager: React.FC<SourceManagerProps> = ({
   };
 
   const handleConnect = async () => {
-    if (!onConnect) {
-      // Demo mode — simulate connection
-      setConnectionStatus('connecting');
-      setStatusMessage('Establishing connection…');
-      await new Promise(r => setTimeout(r, 1800));
-      // Randomly succeed or show credential error for demo
-      const success = selected === 'api'
-        ? apiConfig.url.startsWith('http')
-        : sqlConfig.host.length > 0;
-      if (success) {
-        setConnectionStatus('connected');
-        setStatusMessage(`Connected to ${selected === 'sql' ? sqlConfig.host : apiConfig.url}`);
-      } else {
-        setConnectionStatus('error');
-        setStatusMessage('Connection failed — check your credentials and try again');
-      }
-      return;
-    }
     setConnectionStatus('connecting');
     setStatusMessage('Establishing connection…');
     try {
@@ -365,10 +347,20 @@ export const SourceManager: React.FC<SourceManagerProps> = ({
         const { datasetsApi } = await import('../api/datasets.api');
         const result = await datasetsApi.importSheets(sheetsUrl);
         if (onSuccess) onSuccess(result);
-        // If onConnect exists, we might still want to call it or just use the result
         if (onConnect) await onConnect(selected, null);
       } else {
-        await onConnect(selected, selected === 'sql' ? sqlConfig : apiConfig);
+        if (!onConnect) {
+          // Demo mode — simulate connection for SQL/API
+          await new Promise(r => setTimeout(r, 1800));
+          const success = selected === 'api'
+            ? apiConfig.url.startsWith('http')
+            : sqlConfig.host.length > 0;
+          if (!success) {
+            throw new Error('Connection failed — check your credentials and try again');
+          }
+        } else {
+          await onConnect(selected, selected === 'sql' ? sqlConfig : apiConfig);
+        }
       }
       setConnectionStatus('connected');
       setStatusMessage('Successfully connected!');
