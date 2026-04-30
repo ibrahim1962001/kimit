@@ -19,13 +19,12 @@ class SheetsService:
             raise HTTPException(status_code=400, detail="Invalid Google Sheets URL.")
         
         spreadsheet_id = match.group(1)
-        export_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv"
         
-        # Optionally extract gid (sheet ID) if present
-        gid_match = re.search(r"gid=([0-9]+)", url)
-        if gid_match:
-            export_url += f"&gid={gid_match.group(1)}"
-            
+        gid_match = re.search(r"[#&]gid=([0-9]+)", url)
+        gid_param = f"&gid={gid_match.group(1)}" if gid_match else ""
+        
+        export_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv{gid_param}"
+        
         return export_url
 
     async def import_sheet(self, url: str, user_id: int, db: AsyncSession):

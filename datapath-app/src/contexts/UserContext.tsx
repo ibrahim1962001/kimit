@@ -8,6 +8,7 @@ import {
 } from 'firebase/auth';
 import type { User } from 'firebase/auth';
 import { collection, query, where, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
+import { authApi } from '../api/auth.api';
 
 interface UserData {
   profile?: Record<string, unknown>;
@@ -71,7 +72,12 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser && currentUser.email) {
-        await fetchUserData(currentUser.uid, currentUser.email);
+        try {
+          await authApi.sync(); // Sync user to backend!
+          await fetchUserData(currentUser.uid, currentUser.email);
+        } catch (err) {
+          console.error("Failed to sync user or fetch data:", err);
+        }
       } else {
         setUserData(null);
       }
@@ -84,44 +90,38 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   // القاعدة الذهبية: التحقق الذكي عند التسجيل (Check-then-Login)
   const smartRegisterOrLogin = async (email: string, password: string) => {
     try {
-      // 1. البحث عن Gmail في كولكشن users_profile
-      const q = query(collection(db, 'users_profile'), where('email', '==', email));
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        // الإيميل موجود -> تسجيل دخول ناجح (استخدام تسجيل الدخول بدلاً من إنشاء حساب)
-        await signInWithEmailAndPassword(auth, email, password);
-        // البيانات سيتم جلبها تلقائياً عبر onAuthStateChanged
-        return;
-      }
-
-      // 2. في حالة عدم وجوده مسبقاً، محاولة إنشاء حساب جديد
-      try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const newUser = userCredential.user;
-        
-        // إنشاء ملفات مبدئية في الكولكشنات
-        await setDoc(doc(db, 'users_profile', newUser.uid), {
-          email: newUser.email,
-          createdAt: new Date().toISOString()
-        });
-        
-        await setDoc(doc(db, 'users_settings', newUser.uid), {
-          theme: 'dark',
-          notifications: true
-        });
-
-      } catch (err: unknown) {
-        // إذا كان الإيميل مسجلاً في Auth ولكن غير موجود في Firestore Profile
-        if (err instanceof Error && (err as Error & { code?: string }).code === 'auth/email-already-in-use') {
-          await signInWithEmailAndPassword(auth, email, password);
-        } else {
-          throw err;
+      // 1. Try to sign in first
+      await signInWithEmailAndPassword(auth, email, password);
+      return;
+    } catch (err: unknown) {
+      const code = (err as any).code;
+      // 2. If it's a wrong password or user not found, try to register
+      if (code === 'auth/invalid-credential' || code === 'auth/user-not-found' || code === 'auth/wrong-password') {
+        try {
+          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+          const newUser = userCredential.user;
+          
+          // إنشاء ملفات مبدئية في الكولكشنات
+          await setDoc(doc(db, 'users_profile', newUser.uid), {
+            email: newUser.email,
+            createdAt: new Date().toISOString()
+          });
+          
+          await setDoc(doc(db, 'users_settings', newUser.uid), {
+            theme: 'dark',
+            notifications: true
+          });
+        } catch (regErr: unknown) {
+          const regCode = (regErr as any).code;
+          if (regCode === 'auth/email-already-in-use') {
+            // If email exists, then the original sign-in failure was actually a wrong password!
+            throw new Error('wrong-password');
+          }
+          throw regErr;
         }
+      } else {
+        throw err;
       }
-    } catch (error) {
-      console.error("Smart Auth Error:", error);
-      throw error;
     }
   };
 

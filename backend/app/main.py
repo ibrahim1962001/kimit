@@ -347,11 +347,11 @@ async def upload_file(file: UploadFile = File(...)):
         df.columns = df.columns.str.strip()
         df = df.replace([np.inf, -np.inf], np.nan)
         
-        file_id = f"file_{len(DATA_STORE) + 1}"
+        dataset_id = len(DATA_STORE) + 1
         preview = df.head(10).to_dict(orient='records')
         duplicates = int(df.duplicated().sum())
         
-        DATA_STORE[file_id] = {
+        DATA_STORE[dataset_id] = {
             "df": df,
             "filename": file.filename,
             "columns": df.columns.tolist(),
@@ -365,7 +365,7 @@ async def upload_file(file: UploadFile = File(...)):
         correlations = get_correlations(df)
         
         return {
-            "fileId": file_id,
+            "datasetId": dataset_id,
             "filename": file.filename,
             "columns": df.columns.tolist(),
             "dtypes": df.dtypes.astype(str).to_dict(),
@@ -384,15 +384,76 @@ async def upload_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
 
 
+@app.post("/api/datasets/import-sheets")
+async def import_sheets(request: dict):
+    url = request.get("url")
+    if not url:
+        raise HTTPException(status_code=400, detail="Google Sheet URL is required.")
+        
+    import re
+    match = re.search(r"/spreadsheets/d/([a-zA-Z0-9-_]+)", url)
+    if not match:
+        raise HTTPException(status_code=400, detail="Invalid Google Sheets URL.")
+    
+    spreadsheet_id = match.group(1)
+    gid_match = re.search(r"[#&]gid=([0-9]+)", url)
+    gid_param = f"&gid={gid_match.group(1)}" if gid_match else ""
+    
+    export_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv{gid_param}"
+    
+    try:
+        df = pd.read_csv(export_url)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read Google Sheet: {str(e)}")
+        
+    if df.empty:
+        raise HTTPException(status_code=400, detail="The Google Sheet is empty.")
+        
+    df.columns = df.columns.str.strip()
+    df = df.replace([np.inf, -np.inf], np.nan)
+    
+    dataset_id = len(DATA_STORE) + 1
+    preview = df.head(10).to_dict(orient='records')
+    duplicates = int(df.duplicated().sum())
+    
+    DATA_STORE[dataset_id] = {
+        "df": df,
+        "filename": "Google Sheet Import",
+        "columns": df.columns.tolist(),
+        "dtypes": df.dtypes.astype(str).to_dict(),
+        "shape": list(df.shape),
+        "null_counts": df.isnull().sum().to_dict(),
+        "duplicates": duplicates
+    }
+    
+    anomalies = detect_anomalies(df)
+    correlations = get_correlations(df)
+    
+    return {
+        "datasetId": dataset_id,
+        "filename": "Google Sheet Import",
+        "columns": df.columns.tolist(),
+        "dtypes": df.dtypes.astype(str).to_dict(),
+        "shape": list(df.shape),
+        "nullCounts": df.isnull().sum().to_dict(),
+        "duplicates": duplicates,
+        "preview": preview,
+        "fullData": df.to_dict(orient='records'),
+        "charts": generate_chart_config(df),
+        "anomalies": anomalies,
+        "correlations": correlations
+    }
+
+
 @app.post("/api/clean")
 async def clean_data(request: dict):
     """Auto-clean data: fill nulls and remove duplicates."""
-    file_id = request.get("fileId", "")
+    dataset_id = int(request.get("datasetId", 0))
     
-    if file_id not in DATA_STORE:
-        raise HTTPException(status_code=404, detail="File not found. Please upload a file first.")
+    if dataset_id not in DATA_STORE:
+        raise HTTPException(status_code=404, detail="Dataset not found. Please upload a file first.")
     
-    df = DATA_STORE[file_id]["df"].copy()
+    df = DATA_STORE[dataset_id]["df"].copy()
     
     original_nulls = int(df.isnull().sum().sum())
     original_duplicates = int(df.duplicated().sum())
@@ -415,10 +476,10 @@ async def clean_data(request: dict):
     
     df.drop_duplicates(inplace=True)
     
-    DATA_STORE[file_id]["df"] = df
-    DATA_STORE[file_id]["shape"] = list(df.shape)
-    DATA_STORE[file_id]["null_counts"] = df.isnull().sum().to_dict()
-    DATA_STORE[file_id]["duplicates"] = int(df.duplicated().sum())
+    DATA_STORE[dataset_id]["df"] = df
+    DATA_STORE[dataset_id]["shape"] = list(df.shape)
+    DATA_STORE[dataset_id]["null_counts"] = df.isnull().sum().to_dict()
+    DATA_STORE[dataset_id]["duplicates"] = int(df.duplicated().sum())
     
     return {
         "cleaned": True,
@@ -433,14 +494,14 @@ async def clean_data(request: dict):
 @app.post("/api/ai/summary")
 async def get_ai_summary(request: dict):
     """Get AI-generated executive summary and suggestions."""
-    file_id = request.get("fileId", "")
+    dataset_id = int(request.get("datasetId", 0))
     language = request.get("language", "en")
     
-    if file_id not in DATA_STORE:
-        raise HTTPException(status_code=404, detail="File not found. Please upload a file first.")
+    if dataset_id not in DATA_STORE:
+        raise HTTPException(status_code=404, detail="Dataset not found. Please upload a file first.")
     
     if not groq_client:
-        df = DATA_STORE[file_id]["df"]
+        df = DATA_STORE[dataset_id]["df"]
         return {
             "summary": f"The dataset contains {len(df)} rows and {len(df.columns)} columns ready for analysis." if language == "en" else f"تحتوي مجموعة البيانات على {len(df)} صف و {len(df.columns)} عمود جاهزة للتحليل.",
             "suggestions": [
@@ -452,7 +513,7 @@ async def get_ai_summary(request: dict):
             ]
         }
     
-    df = DATA_STORE[file_id]["df"]
+    df = DATA_STORE[dataset_id]["df"]
     data_summary = get_summary_for_ai(df)
     lang_instruction = "Respond in Arabic language." if language == "ar" else "Respond in English language."
     
@@ -514,21 +575,21 @@ Make sure suggestions are practical and related to the actual data columns."""
 async def chat_with_ai(request: dict):
     """Chat with AI about the data."""
     question = request.get("question", "")
-    file_id = request.get("fileId", "")
+    dataset_id = int(request.get("datasetId", 0))
     language = request.get("language", "en")
     
     if not question:
         raise HTTPException(status_code=400, detail="Question is required.")
     
-    if file_id not in DATA_STORE:
-        raise HTTPException(status_code=404, detail="File not found. Please upload a file first.")
+    if dataset_id not in DATA_STORE:
+        raise HTTPException(status_code=404, detail="Dataset not found. Please upload a file first.")
     
     if not groq_client:
         return {
             "answer": "AI is not configured. Please set GROQ_API_KEY in .env file." if language == "en" else "لم يتم تكوين الذكاء الاصطناعي. يرجى تعيين GROQ_API_KEY في ملف .env"
         }
     
-    df = DATA_STORE[file_id]["df"]
+    df = DATA_STORE[dataset_id]["df"]
     data_context = get_summary_for_ai(df)
     lang_instruction = "Respond in Arabic language." if language == "ar" else "Respond in English language."
     
@@ -563,14 +624,14 @@ Keep your response concise but informative (2-3 paragraphs max)."""
 @app.post("/api/export")
 async def export_data(request: dict):
     """Export data as CSV or JSON."""
-    file_id = request.get("fileId", "")
+    dataset_id = int(request.get("datasetId", 0))
     format_type = request.get("format", "csv")
     
-    if file_id not in DATA_STORE:
-        raise HTTPException(status_code=404, detail="File not found. Please upload a file first.")
+    if dataset_id not in DATA_STORE:
+        raise HTTPException(status_code=404, detail="Dataset not found. Please upload a file first.")
     
-    df = DATA_STORE[file_id]["df"]
-    filename = DATA_STORE[file_id]["filename"].rsplit('.', 1)[0]
+    df = DATA_STORE[dataset_id]["df"]
+    filename = DATA_STORE[dataset_id]["filename"].rsplit('.', 1)[0]
     
     if format_type == "csv":
         csv_data = df.to_csv(index=False, encoding='utf-8-sig')
