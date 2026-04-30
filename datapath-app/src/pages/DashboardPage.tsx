@@ -19,6 +19,7 @@ import { PredictiveSuite } from '../components/Analysis/PredictiveSuite';
 import { SourceManager } from '../components/SourceManager';
 import { CreatorFooter } from '../components/CreatorFooter';
 import { exportBrandedPDF, exportToExcel } from '../lib/exportUtils';
+import { convertBackendResultToDatasetInfo } from '../lib/dataUtils';
 import { generateAInarrative } from '../lib/narrativeEngine';
 import { generateExecutiveReport } from '../lib/report-gen';
 
@@ -75,7 +76,7 @@ const GrowthBadge: React.FC<{ pct: number; trend: 'up' | 'down' | 'flat' }> = ({
 
 export const DashboardPage: React.FC<Props> = ({ lang }) => {
   const {
-    info, rollback,
+    info, rollback, setDataset,
     crossFilters, crossFilteredData, isCrossFiltered,
     setCrossFilter, clearCrossFilters,
   } = useKimitData();
@@ -218,7 +219,13 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
                   <X size={18} />
                 </button>
               </div>
-              <SourceManager onFileUploadMode={() => setShowSourceManager(false)} />
+              <SourceManager
+                onFileUploadMode={() => setShowSourceManager(false)}
+                onSuccess={(res) => {
+                  setDataset(convertBackendResultToDatasetInfo(res));
+                  setShowSourceManager(false);
+                }}
+              />
             </motion.div>
           </motion.div>
         )}

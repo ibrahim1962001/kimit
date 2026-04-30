@@ -56,6 +56,8 @@ interface SourceManagerProps {
   onConnect?: (type: SourceType, config: SQLConfig | APIConfig | null) => Promise<void>;
   /** Current active source type */
   activeSource?: SourceType;
+  /** Callback on successful data import */
+  onSuccess?: (result: any) => void;
 }
 
 // ── Source Definitions ────────────────────────────────────────────────────────
@@ -93,9 +95,9 @@ const SOURCES: DataSource[] = [
     label: 'Google Sheets',
     description: 'Import data directly from a shared Google Sheets document',
     icon: <Sheet size={20} />,
-    badge: 'Coming Soon',
-    badgeColor: '#64748b',
-    available: false,
+    badge: 'New',
+    badgeColor: '#10b981',
+    available: true,
   },
 ];
 
@@ -251,6 +253,38 @@ const APIConfigForm: React.FC<{
   );
 };
 
+// ── Google Sheets Config Form ────────────────────────────────────────────────
+const SheetsConfigForm: React.FC<{
+  url: string;
+  onChange: (url: string) => void;
+}> = ({ url, onChange }) => {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <label style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Google Sheet URL
+        </label>
+        <input
+          type="url"
+          value={url}
+          onChange={e => onChange(e.target.value)}
+          placeholder="https://docs.google.com/spreadsheets/d/.../edit"
+          style={{
+            background: '#070c18', border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 8, padding: '9px 12px', color: '#e2e8f0',
+            fontSize: 13, outline: 'none', transition: 'border-color 0.2s',
+          }}
+          onFocus={e => e.currentTarget.style.borderColor = 'rgba(212,175,55,0.4)'}
+          onBlur={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'}
+        />
+        <p style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>
+          Ensure the sheet is "Public" or "Anyone with the link can view".
+        </p>
+      </div>
+    </div>
+  );
+};
+
 // ── Connection Status Banner ───────────────────────────────────────────────────
 
 const StatusBanner: React.FC<{ status: 'idle' | 'connecting' | 'connected' | 'error'; message: string }> = ({ status, message }) => {
@@ -281,6 +315,7 @@ const StatusBanner: React.FC<{ status: 'idle' | 'connecting' | 'connected' | 'er
 export const SourceManager: React.FC<SourceManagerProps> = ({
   onFileUploadMode,
   onConnect,
+  onSuccess,
   activeSource = 'file',
 }) => {
   const [selected, setSelected] = useState<SourceType>(activeSource);
@@ -294,6 +329,7 @@ export const SourceManager: React.FC<SourceManagerProps> = ({
   const [apiConfig, setApiConfig] = useState<APIConfig>({
     url: '', method: 'GET', headers: '{}', body: '', dataPath: 'data',
   });
+  const [sheetsUrl, setSheetsUrl] = useState('');
 
   const handleSelect = (id: SourceType) => {
     if (!SOURCES.find(s => s.id === id)?.available) return;
@@ -325,7 +361,15 @@ export const SourceManager: React.FC<SourceManagerProps> = ({
     setConnectionStatus('connecting');
     setStatusMessage('Establishing connection…');
     try {
-      await onConnect(selected, selected === 'sql' ? sqlConfig : apiConfig);
+      if (selected === 'sheets') {
+        const { datasetsApi } = await import('../api/datasets.api');
+        const result = await datasetsApi.importSheets(sheetsUrl);
+        if (onSuccess) onSuccess(result);
+        // If onConnect exists, we might still want to call it or just use the result
+        if (onConnect) await onConnect(selected, null);
+      } else {
+        await onConnect(selected, selected === 'sql' ? sqlConfig : apiConfig);
+      }
       setConnectionStatus('connected');
       setStatusMessage('Successfully connected!');
     } catch (err) {
@@ -338,6 +382,8 @@ export const SourceManager: React.FC<SourceManagerProps> = ({
     ? sqlConfig.host.length > 0 && sqlConfig.database.length > 0
     : selected === 'api'
     ? apiConfig.url.length > 0
+    : selected === 'sheets'
+    ? sheetsUrl.length > 0
     : false;
 
   return (
@@ -480,12 +526,28 @@ export const SourceManager: React.FC<SourceManagerProps> = ({
             </p>
           </motion.div>
         )}
+
+        {selected === 'sheets' && (
+          <motion.div
+            key="sheets"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Sheet size={14} color="#d4af37" />
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#d4af37' }}>Google Sheets Import</span>
+            </div>
+            <SheetsConfigForm url={sheetsUrl} onChange={setSheetsUrl} />
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* ── Status & Connect ── */}
       <StatusBanner status={connectionStatus} message={statusMessage} />
 
-      {(selected === 'sql' || selected === 'api') && (
+      {(selected === 'sql' || selected === 'api' || selected === 'sheets') && (
         <div style={{ display: 'flex', gap: 10 }}>
           <button
             onClick={handleConnect}
@@ -530,7 +592,7 @@ export const SourceManager: React.FC<SourceManagerProps> = ({
       )}
 
       {/* Pro feature notice */}
-      {(selected === 'sql' || selected === 'api') && (
+      {(selected === 'sql' || selected === 'api' || selected === 'sheets') && (
         <div style={{
           display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 14px',
           borderRadius: 10, background: 'rgba(212,175,55,0.05)',

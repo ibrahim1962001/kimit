@@ -38,7 +38,7 @@ def check_dependencies():
         try:
             subprocess.check_call([
                 sys.executable, "-m", "pip", "install", "-r", 
-                os.path.join(os.path.dirname(__file__), "requirements.txt")
+                os.path.join(os.path.dirname(os.path.dirname(__file__)), "requirements.txt")
             ])
             print("✅ Dependencies installed successfully")
             return True
@@ -60,7 +60,7 @@ def start_server():
     try:
         import uvicorn
         uvicorn.run(
-            "main:app",
+            "app.main:app",
             host="0.0.0.0",
             port=8000,
             reload=True,
@@ -83,8 +83,8 @@ def main():
         input("\nPress Enter to exit...")
         sys.exit(1)
     
-    # Change to backend directory
-    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    # Change to backend directory (root of the backend)
+    os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     
     # Check dependencies
     if not check_dependencies():

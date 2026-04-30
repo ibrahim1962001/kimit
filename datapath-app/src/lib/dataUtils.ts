@@ -273,3 +273,29 @@ function triggerDownload(blob: Blob, name: string) {
   a.href = url; a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
+export function convertBackendResultToDatasetInfo(result: any): DatasetInfo {
+  const columns: ColumnInfo[] = result.columns.map((name: string) => {
+    const dtype = result.dtypes[name] || '';
+    const type = (dtype.includes('int') || dtype.includes('float')) ? 'numeric' : 'text';
+    return {
+      name,
+      type,
+      nullCount: result.nullCounts[name] || 0,
+      uniqueCount: 0, // Not provided by backend currently, but could be added
+    };
+  });
+
+  return {
+    filename: result.filename,
+    fileSize: 0, // Remote file
+    rows: result.shape[0],
+    columns,
+    rawData: result.fullData || result.preview,
+    workData: JSON.parse(JSON.stringify(result.fullData || result.preview)),
+    anomalies: result.anomalies,
+    correlations: result.correlations,
+    charts: result.charts,
+    duplicates: result.duplicates,
+    totalNulls: Object.values(result.nullCounts as Record<string, number>).reduce((a, b) => a + b, 0),
+  };
+}
