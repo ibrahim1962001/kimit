@@ -1,12 +1,12 @@
 import React from 'react';
-import { LayoutDashboard, Shield, MessageCircle, Download, Home, Globe, X, Table, HelpCircle, Info, ShieldCheck, BookOpen, ArrowRightLeft, User, LogOut, Trash2 } from 'lucide-react';
+import { LayoutDashboard, Shield, MessageCircle, Download, Home, Globe, X, Table, HelpCircle, Info, ShieldCheck, BookOpen, ArrowRightLeft, User, LogOut, Trash2, Cloud } from 'lucide-react';
 import { AdSpace } from './AdSpace';
 import { getActiveAdProviders } from '../config/adConfig';
 import type { Lang } from '../types';
 import { type User as FirebaseUser, signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 
-type Tab = 'home' | 'dashboard' | 'cleaning' | 'chat' | 'export' | 'about' | 'privacy' | 'faq' | 'guide' | 'compare';
+type Tab = 'home' | 'dashboard' | 'cleaning' | 'chat' | 'export' | 'files' | 'about' | 'privacy' | 'faq' | 'guide' | 'compare';
 
 interface Props {
   tab: Tab;
@@ -29,7 +29,8 @@ const T = {
     dashboard: 'التحليل', 
     cleaning: 'التنقية', 
     chat: 'المستشار', 
-    export: 'تصدير', 
+    export: 'تصدير',
+    files: 'الملفات المحفوظة',
     close: 'إغلاق الملف',
     clearSession: 'مسح الجلسة',
     about: 'كيان',
@@ -43,7 +44,8 @@ const T = {
     dashboard: 'Analytics', 
     cleaning: 'Cleaning', 
     chat: 'AI Chat', 
-    export: 'Export', 
+    export: 'Export',
+    files: 'Saved Files',
     close: 'Close File',
     clearSession: 'Clear Session',
     about: 'About Us',
@@ -61,6 +63,7 @@ const mainItems: { tab: Tab; icon: React.ElementType; key: string }[] = [
   { tab: 'chat', icon: MessageCircle, key: 'chat' },
   { tab: 'compare', icon: ArrowRightLeft, key: 'compare' },
   { tab: 'export', icon: Download, key: 'export' },
+  { tab: 'files', icon: Cloud, key: 'files' },
 ];
 
 const supportItems: { tab: Tab; icon: React.ElementType; key: string }[] = [

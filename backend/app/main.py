@@ -6,7 +6,7 @@ import charset_normalizer
 import polars as pl
 from pyxlsb import open_workbook
 from typing import List, Dict, Any, Optional
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
@@ -14,6 +14,7 @@ from groq import Groq
 import pandas as pd
 import numpy as np
 from app.utils.storage import storage_manager
+from app.utils import minio_client
 import logging
 
 load_dotenv()
@@ -326,23 +327,43 @@ async def health_check():
 
 
 @app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(file: UploadFile = File(...), request: Request = None):
     """Upload and process CSV or Excel file."""
     try:
         contents = await file.read()
         if not contents:
             raise HTTPException(status_code=400, detail="The uploaded file is empty.")
 
-        # PERSISTENT STORAGE FIRST (Save raw file even if processing fails)
+        # ── MinIO: save raw bytes (additive layer, never blocks processing) ──
         dataset_id = len(DATA_STORE) + 1
-        file_path = f"user_uploads/{dataset_id}_{file.filename}"
+
+        # Extract user_id from Authorization header if present
+        user_id: str | None = None
+        if request:
+            auth_header = request.headers.get("Authorization", "")
+            if auth_header.startswith("Bearer "):
+                # Use a short hash of the token as anonymous user key
+                import hashlib
+                user_id = hashlib.md5(auth_header[7:].encode()).hexdigest()[:12]
+
+        ext = "." + (file.filename or "").rsplit(".", 1)[-1].lower()
+        content_type_map = {
+            ".csv":  "text/csv",
+            ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ".xls":  "application/vnd.ms-excel",
+        }
+        ct = content_type_map.get(ext, "application/octet-stream")
+        object_name = minio_client.build_object_name(file.filename or "unknown", user_id)
+        saved_to_storage = minio_client.upload_file_to_minio(contents, object_name, ct)
+        file_path = object_name
+
+        # Legacy boto3 backup (kept for compatibility, silent on failure)
         try:
             logger.info(f"Uploading raw file {file.filename} ({len(contents)} bytes) to MinIO path: {file_path}")
             storage_manager.upload_file(contents, file_path)
         except Exception as e:
-            logger.error(f"MinIO Backup Failed: {str(e)}")
-            # Continue anyway, but log the error
-        
+            logger.warning(f"Legacy storage backup failed: {str(e)}")
+
         try:
             df = robust_read_file(contents, file.filename)
         except HTTPException as he:
@@ -387,13 +408,50 @@ async def upload_file(file: UploadFile = File(...)):
             "preview": preview,
             "charts": generate_chart_config(df),
             "anomalies": anomalies,
-            "correlations": correlations
+            "correlations": correlations,
+            "minio_path": object_name,
+            "saved_to_storage": saved_to_storage,
         }
     
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+
+
+@app.get("/api/files")
+async def list_files(user_id: str | None = None):
+    """
+    List files stored in MinIO.
+    - user_id provided → return user_uploads/{user_id}/ files
+    - no user_id       → return user_uploads/guest/ files
+    """
+    prefix = f"user_uploads/{user_id}/" if user_id else "user_uploads/guest/"
+    files = minio_client.list_uploaded_files(prefix)
+    return {"files": files, "count": len(files)}
+
+
+@app.get("/api/files/download/{object_name:path}")
+async def download_minio_file(object_name: str):
+    """
+    Stream a file from MinIO back to the browser.
+    Uses StreamingResponse — no temp files written to disk.
+    """
+    result = minio_client.download_file_from_minio(object_name)
+    if result is None:
+        raise HTTPException(status_code=404, detail="File not found in storage.")
+
+    file_bytes, content_type = result
+    original_filename = object_name.split("/")[-1]
+    # Strip timestamp prefix from filename for download  e.g. "20250501_120000_sales.csv"
+    parts = original_filename.split("_", 2)
+    display_name = parts[2] if len(parts) == 3 else original_filename
+
+    return StreamingResponse(
+        io.BytesIO(file_bytes),
+        media_type=content_type,
+        headers={"Content-Disposition": f'attachment; filename="{display_name}"'},
+    )
 
 
 @app.post("/api/datasets/import-sheets")

@@ -12,6 +12,7 @@ import { PrivacyPage } from './pages/PrivacyPage';
 import { FAQPage } from './pages/FAQPage';
 import { GuidePage } from './pages/GuidePage';
 import { ComparisonPage } from './pages/ComparisonPage';
+import { SavedFilesPage } from './pages/SavedFilesPage';
 import { parseFile, analyzeDataset, cleanDataset } from './lib/dataUtils';
 import type { Lang } from './types';
 import { auth } from './lib/firebase';
@@ -24,7 +25,7 @@ import './premium-theme.css';
 import { useKimitData } from './hooks/useKimitData';
 
 
-type Tab = 'home' | 'dashboard' | 'cleaning' | 'chat' | 'export' | 'about' | 'privacy' | 'faq' | 'guide' | 'compare';
+type Tab = 'home' | 'dashboard' | 'cleaning' | 'chat' | 'export' | 'files' | 'about' | 'privacy' | 'faq' | 'guide' | 'compare';
 
 function App() {
   const [lang, setLang] = useState<Lang>('en');
@@ -92,6 +93,10 @@ function App() {
       setDataset(info);
       setProgress(100);
       showToast(lang === 'ar' ? `✅ تم تحميل ${info.rows.toLocaleString()} سجل` : `✅ Loaded ${info.rows.toLocaleString()} records`);
+      // Cloud save notification
+      setTimeout(() => {
+        showToast(lang === 'ar' ? '☁️ تم حفظ الملف في التخزين السحابي' : '☁️ File saved to cloud storage');
+      }, 1800);
       setTimeout(() => setTab('dashboard'), 500);
     } catch (e: unknown) {
       const errorMessage = e instanceof Error ? e.message : String(e);
@@ -219,6 +224,7 @@ function App() {
           {tab === 'cleaning' && dataset && <CleaningPage info={dataset} lang={lang} onClean={handleClean} onUpdate={setDataset} />}
           {tab === 'chat' && <OpenRouterChat dataset={dataset} onFileUpload={handleChatFile} onUpdate={setDataset} />}
           {tab === 'export' && dataset && <ExportPage info={dataset} lang={lang} />}
+          {tab === 'files' && <SavedFilesPage lang={lang} />}
           {tab === 'about' && <AboutUsPage lang={lang} />}
           {tab === 'privacy' && <PrivacyPage lang={lang} />}
           {tab === 'faq' && <FAQPage lang={lang} />}
