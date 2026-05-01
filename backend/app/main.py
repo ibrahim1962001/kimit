@@ -251,7 +251,7 @@ def generate_chart_config(df: pd.DataFrame) -> List[Dict]:
                 "type": "line",
                 "title": f"{col} Trend",
                 "data": [
-                    {"name": str(i), "value": float(v) if pd.notna(v) else 0}
+                    {"x": str(i), "y": float(v) if pd.notna(v) else 0}
                     for i, v in enumerate(df[col].head(30).tolist())
                 ]
             })
@@ -272,7 +272,7 @@ def generate_chart_config(df: pd.DataFrame) -> List[Dict]:
                 "id": chart_id,
                 "type": "pie",
                 "title": f"Top {col} Summary",
-                "data": [{"name": str(k)[:15], "value": int(v)} for k, v in value_counts.items()]
+                "data": [{"x": str(k)[:15], "y": int(v)} for k, v in value_counts.items()]
             })
         else:
             # BAR: names, IDs, or too many unique values
@@ -281,7 +281,7 @@ def generate_chart_config(df: pd.DataFrame) -> List[Dict]:
                 "id": chart_id,
                 "type": "bar",
                 "title": f"Top {col} Summary",
-                "data": [{"name": str(k)[:20], "value": int(v)} for k, v in value_counts.items()]
+                "data": [{"x": str(k)[:20], "y": int(v)} for k, v in value_counts.items()]
             })
         chart_id += 1
 
@@ -295,7 +295,7 @@ def generate_chart_config(df: pd.DataFrame) -> List[Dict]:
                 "type": "area",
                 "title": f"{col} Values",
                 "data": [
-                    {"index": i, "value": float(v) if pd.notna(v) else 0}
+                    {"x": str(i), "y": float(v) if pd.notna(v) else 0}
                     for i, v in enumerate(df[col].head(40).tolist())
                 ]
             })
@@ -432,6 +432,7 @@ async def import_sheets(request: dict):
     return {
         "datasetId": dataset_id,
         "filename": "Google Sheet Import",
+        "sourceUrl": url,
         "columns": df.columns.tolist(),
         "dtypes": df.dtypes.astype(str).to_dict(),
         "shape": list(df.shape),

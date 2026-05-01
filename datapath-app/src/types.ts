@@ -41,6 +41,8 @@ export interface ChartInfo {
 
 export interface DatasetInfo {
   filename: string;
+  datasetId?: number;
+  sourceUrl?: string;
   fileSize: number;
   rows: number;
   columns: ColumnInfo[];

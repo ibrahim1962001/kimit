@@ -16,6 +16,15 @@ export interface DataRow {
   [key: string]: string | number | null;
 }
 
+export interface DatasetInfo {
+  datasetId?: number;
+  sourceUrl?: string;
+  filename: string;
+  columns: ColumnMetadata[];
+  rows: number;
+  data: DataRow[];
+}
+
 export interface Dataset {
   id: string;
   filename: string;

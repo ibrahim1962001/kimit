@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useKimitData } from '../hooks/useKimitData';
 import { useKimitEngine } from '../hooks/useKimitEngine';
 import { DataChart } from '../components/DataChart';
@@ -159,6 +159,21 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
     setActiveChartFilter(value);
   }, [setCrossFilter]);
 
+  // ── Google Sheets Live Sync ────────────────────────────────────────
+  useEffect(() => {
+    if (!info?.sourceUrl) return;
+    const interval = setInterval(async () => {
+      try {
+        const { datasetsApi } = await import('../api/datasets.api');
+        const res = await datasetsApi.importSheets(info.sourceUrl!);
+        setDataset(convertBackendResultToDatasetInfo(res));
+      } catch (err) {
+        console.error("Live Sync failed", err);
+      }
+    }, 15000); // 15 seconds
+    return () => clearInterval(interval);
+  }, [info?.sourceUrl, setDataset]);
+
   const handleClearAllFilters = useCallback(() => {
     clearCrossFilters();
     setActiveChartFilter('');
@@ -238,7 +253,15 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
             className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <Sparkles className="text-primary" /> {t.title}
           </motion.h2>
-          <p className="page-sub">{info.filename} • {info.rows.toLocaleString()} {t.records}</p>
+          <p className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {info.filename} • {info.rows.toLocaleString()} {t.records}
+            {info.sourceUrl && (
+              <span style={{ fontSize: 10, background: 'rgba(16,185,129,0.15)', color: '#10b981', padding: '2px 8px', borderRadius: 20, border: '1px solid rgba(16,185,129,0.3)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }}></span>
+                Live Sync
+              </span>
+            )}
+          </p>
         </div>
         <div className="actions-group" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           {/* Source Manager */}

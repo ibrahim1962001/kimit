@@ -287,6 +287,8 @@ export function convertBackendResultToDatasetInfo(result: any): DatasetInfo {
 
   return {
     filename: result.filename,
+    datasetId: result.datasetId,
+    sourceUrl: result.sourceUrl,
     fileSize: 0, // Remote file
     rows: result.shape[0],
     columns,

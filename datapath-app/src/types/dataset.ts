@@ -27,6 +27,7 @@ export interface Correlation {
 export interface UploadResult {
   datasetId: number;
   filename: string;
+  sourceUrl?: string;
   columns: string[];
   dtypes: ColumnDtype;
   shape: [number, number];
