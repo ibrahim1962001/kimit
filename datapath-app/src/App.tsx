@@ -1,8 +1,9 @@
-﻿import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Menu, Bot, Loader2 } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
 import { HomePage } from './pages/HomePage';
 import { DashboardPage } from './pages/DashboardPage';
+import { SmartDashboardPage } from './pages/SmartDashboardPage';
 import { CleaningPage } from './pages/CleaningPage';
 import { OpenRouterChat } from './components/OpenRouterChat';
 import { ExportPage } from './pages/ExportPage';
@@ -26,7 +27,7 @@ import './premium-theme.css';
 import { useKimitData } from './hooks/useKimitData';
 
 
-type Tab = 'home' | 'dashboard' | 'cleaning' | 'chat' | 'export' | 'files' | 'about' | 'privacy' | 'faq' | 'guide' | 'compare';
+type Tab = 'home' | 'dashboard' | 'cleaning' | 'chat' | 'export' | 'files' | 'about' | 'privacy' | 'faq' | 'guide' | 'compare' | 'smart-dashboard';
 
 function App() {
   const [lang, setLang] = useState<Lang>('en');
@@ -247,6 +248,7 @@ function App() {
           {tab === 'faq' && <FAQPage lang={lang} />}
           {tab === 'guide' && <GuidePage lang={lang} />}
           {tab === 'compare' && <ComparisonPage lang={lang} />}
+          {tab === 'smart-dashboard' && dataset && <SmartDashboardPage onBack={() => setTab('dashboard')} />}
         </div>
 
         {dataset && (

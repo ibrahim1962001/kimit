@@ -8,7 +8,7 @@ import { auth } from '../lib/firebase';
 import { useKimitData } from '../hooks/useKimitData';
 import { exportToExcel } from '../lib/exportUtils';
 
-type Tab = 'home' | 'dashboard' | 'cleaning' | 'chat' | 'export' | 'files' | 'about' | 'privacy' | 'faq' | 'guide' | 'compare';
+type Tab = 'home' | 'dashboard' | 'cleaning' | 'chat' | 'export' | 'files' | 'about' | 'privacy' | 'faq' | 'guide' | 'compare' | 'smart-dashboard';
 
 interface Props {
   tab: Tab;
@@ -73,6 +73,48 @@ const supportItems: { tab: Tab; icon: React.ElementType; key: string }[] = [
   { tab: 'about', icon: Info, key: 'about' },
   { tab: 'privacy', icon: ShieldCheck, key: 'privacy' },
 ];
+
+// ── Smart Dashboard Button ──────────────────────────────────────
+const SmartDashBtn: React.FC<{ active: boolean; onClick: () => void }> = ({ active, onClick }) => {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        width: 'calc(100% - 20px)', margin: '4px 10px',
+        padding: '11px 14px',
+        background: active
+          ? 'linear-gradient(135deg, rgba(16,185,129,0.25), rgba(99,102,241,0.15))'
+          : hovered
+          ? 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(99,102,241,0.08))'
+          : 'rgba(255,255,255,0.03)',
+        border: `1px solid ${active || hovered ? '#10b98177' : 'rgba(255,255,255,0.07)'}`,
+        borderRadius: 12,
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+        boxShadow: active ? '0 0 18px rgba(16,185,129,0.25)' : hovered ? '0 0 12px rgba(16,185,129,0.12)' : 'none',
+      }}
+    >
+      <div style={{
+        width: 32, height: 32, borderRadius: 8,
+        background: 'linear-gradient(135deg, #10b981, #6366f1)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0,
+        boxShadow: '0 2px 8px rgba(16,185,129,0.4)',
+      }}>
+        <span style={{ fontSize: 16 }}>📊</span>
+      </div>
+      <div style={{ textAlign: 'left', flex: 1 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: active ? '#10b981' : '#e2e8f0', lineHeight: 1.2 }}>Smart Dashboard</div>
+        <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>Context-aware analytics</div>
+      </div>
+      {active && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', flexShrink: 0, boxShadow: '0 0 6px #10b981' }} />}
+    </button>
+  );
+};
 
 // ── Sidebar Dashboard Panel ─────────────────────────────────────
 const DashboardPanel: React.FC<{ onTab: (t: Tab) => void }> = ({ onTab }) => {
@@ -369,6 +411,11 @@ export const Sidebar: React.FC<Props> = ({ tab, lang, hasData, onTab, onLang, on
             <Table size={19} strokeWidth={1.8} />
             <span className="nav-label">{isAr ? 'جدول الإكسيل' : 'Excel Editor'}</span>
           </button>
+        )}
+
+        {/* ─── Smart Dashboard Button ─── */}
+        {hasData && (
+          <SmartDashBtn active={tab === 'smart-dashboard'} onClick={() => onTab('smart-dashboard')} />
         )}
 
         {/* ─── Dashboard Analyst Panel ─── */}

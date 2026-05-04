@@ -1,4 +1,5 @@
 # KIMIT AI STUDIO — DASHBOARD UPGRADE PROMPT
+
 # انسخ كل ده وحطه مباشرة في Cursor / Claude Code / ChatGPT
 
 ---
@@ -8,6 +9,7 @@
 You are working inside the project **Kimit AI Studio** (github: ibrahim1962001/kimit).
 
 ### Project Structure:
+
 ```
 kimit/
 ├── datapath-app/          ← React 19 + TypeScript + Vite (FRONTEND)
@@ -28,6 +30,7 @@ kimit/
 ```
 
 ### Tech Stack (confirmed from codebase):
+
 - **Frontend:** React 19 + TypeScript + Vite
 - **Charts:** Apache ECharts (echarts-for-react)
 - **File Parsing:** PapaParse (CSV) + SheetJS (Excel) — done in-browser
@@ -39,6 +42,7 @@ kimit/
 - **Backend:** FastAPI at http://localhost:8000 with in-memory DATA_STORE
 
 ### Existing Features (DO NOT BREAK ANY OF THESE):
+
 - ✅ Data Health Score meter
 - ✅ Live Slicers (filters by text column values)
 - ✅ Custom Chart Builder (user picks X-axis, Y-axis, chart type from ECharts)
@@ -51,21 +55,15 @@ kimit/
 - ✅ Export: Excel (.xlsx), PDF, CSV, JSON
 
 ### Color System (match exactly, no changes):
-```css
---bg-primary:    #0f172a   /* main background */
---bg-secondary:  #1e293b   /* sidebar, panels */
---bg-card:       #334155   /* card backgrounds */
---accent-green:  #10b981   /* primary CTA, active nav */
---accent-blue:   #3b82f6   /* secondary accent */
---accent-amber:  #f59e0b   /* warnings */
---accent-red:    #ef4444   /* errors, danger */
---text-primary:  #f8fafc
---text-muted:    #94a3b8
---radius:        14px
---border-color:  rgba(255,255,255,0.08)
 
-/* Glassmorphism pattern used throughout: */
-background: rgba(30, 41, 59, 0.7);
+```css
+--bg-primary: #0f172a /* main background */ --bg-secondary: #1e293b
+  /* sidebar, panels */ --bg-card: #334155 /* card backgrounds */
+  --accent-green: #10b981 /* primary CTA, active nav */ --accent-blue: #3b82f6
+  /* secondary accent */ --accent-amber: #f59e0b /* warnings */
+  --accent-red: #ef4444 /* errors, danger */ --text-primary: #f8fafc
+  --text-muted: #94a3b8 --radius: 14px --border-color: rgba(255, 255, 255, 0.08)
+  /* Glassmorphism pattern used throughout: */ background: rgba(30, 41, 59, 0.7);
 backdrop-filter: blur(12px);
 border: 1px solid rgba(255, 255, 255, 0.08);
 border-radius: 14px;
@@ -96,14 +94,19 @@ const totalCols = dataset.length > 0 ? Object.keys(dataset[0]).length : 0;
 
 const totalMissing = useMemo(() => {
   return dataset.reduce((acc, row) => {
-    return acc + Object.values(row).filter(v => v === null || v === undefined || v === '').length;
+    return (
+      acc +
+      Object.values(row).filter(
+        (v) => v === null || v === undefined || v === "",
+      ).length
+    );
   }, 0);
 }, [dataset]);
 
 const totalDuplicates = useMemo(() => {
   const seen = new Set<string>();
   let count = 0;
-  dataset.forEach(row => {
+  dataset.forEach((row) => {
     const key = JSON.stringify(row);
     if (seen.has(key)) count++;
     else seen.add(key);
@@ -115,6 +118,7 @@ const totalDuplicates = useMemo(() => {
 **KPI Card specs:**
 
 Each card must have:
+
 - Glassmorphism background (pattern above)
 - 4px solid left border in its accent color
 - Icon (use inline SVG — no icon library needed)
@@ -123,12 +127,12 @@ Each card must have:
 - Entrance animation: `slideUpFade` CSS keyframe, staggered delays: 0ms / 100ms / 200ms / 300ms
 - Hover: `transform: scale(1.02); box-shadow: 0 0 20px {accentColor}33;`
 
-| Card | Label | Value | Border Color |
-|------|-------|-------|-------------|
-| 1 | إجمالي الصفوف / Total Rows | totalRows | #10b981 |
-| 2 | إجمالي الأعمدة / Total Columns | totalCols | #3b82f6 |
-| 3 | قيم مفقودة / Missing Values | totalMissing | #f59e0b |
-| 4 | مكررات / Duplicates | totalDuplicates | #ef4444 |
+| Card | Label                          | Value           | Border Color |
+| ---- | ------------------------------ | --------------- | ------------ |
+| 1    | إجمالي الصفوف / Total Rows     | totalRows       | #10b981      |
+| 2    | إجمالي الأعمدة / Total Columns | totalCols       | #3b82f6      |
+| 3    | قيم مفقودة / Missing Values    | totalMissing    | #f59e0b      |
+| 4    | مكررات / Duplicates            | totalDuplicates | #ef4444      |
 
 **Count-up animation (implement exactly like this):**
 
@@ -136,7 +140,10 @@ Each card must have:
 function useCountUp(target: number, duration = 1200) {
   const [value, setValue] = useState(0);
   useEffect(() => {
-    if (target === 0) { setValue(0); return; }
+    if (target === 0) {
+      setValue(0);
+      return;
+    }
     let start: number | null = null;
     const step = (timestamp: number) => {
       if (!start) start = timestamp;
@@ -155,8 +162,14 @@ function useCountUp(target: number, duration = 1200) {
 
 ```css
 @keyframes slideUpFade {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 ```
 
@@ -197,17 +210,21 @@ function useCountUp(target: number, duration = 1200) {
 ### LEFT CARD — "Data Quality Score"
 
 Compute:
+
 ```typescript
 const qualityScore = useMemo(() => {
   if (totalRows === 0) return 0;
-  const score = ((totalRows - totalMissing - totalDuplicates) / totalRows) * 100;
+  const score =
+    ((totalRows - totalMissing - totalDuplicates) / totalRows) * 100;
   return Math.max(0, Math.min(100, Math.round(score)));
 }, [totalRows, totalMissing, totalDuplicates]);
 
-const scoreColor = qualityScore >= 80 ? '#10b981' : qualityScore >= 60 ? '#f59e0b' : '#ef4444';
+const scoreColor =
+  qualityScore >= 80 ? "#10b981" : qualityScore >= 60 ? "#f59e0b" : "#ef4444";
 ```
 
 SVG circular progress ring:
+
 ```tsx
 const r = 54;
 const circumference = 2 * Math.PI * r; // ≈ 339.3
@@ -218,35 +235,68 @@ const offset = circumference * (1 - qualityScore / 100);
 
 <svg width="140" height="140" viewBox="0 0 140 140">
   {/* Track circle */}
-  <circle cx="70" cy="70" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10"/>
+  <circle
+    cx="70"
+    cy="70"
+    r={r}
+    fill="none"
+    stroke="rgba(255,255,255,0.06)"
+    strokeWidth="10"
+  />
   {/* Progress circle */}
   <circle
-    cx="70" cy="70" r={r}
+    cx="70"
+    cy="70"
+    r={r}
     fill="none"
     stroke={scoreColor}
     strokeWidth="10"
     strokeLinecap="round"
     strokeDasharray={circumference}
-    strokeDashoffset={animatedOffset}  // animated value
+    strokeDashoffset={animatedOffset} // animated value
     transform="rotate(-90 70 70)"
-    style={{ transition: 'stroke 0.3s ease' }}
+    style={{ transition: "stroke 0.3s ease" }}
   />
   {/* Center text */}
-  <text x="70" y="65" textAnchor="middle" fill="#f8fafc" fontSize="28" fontWeight="bold">
+  <text
+    x="70"
+    y="65"
+    textAnchor="middle"
+    fill="#f8fafc"
+    fontSize="28"
+    fontWeight="bold"
+  >
     {qualityScore}
   </text>
   <text x="70" y="85" textAnchor="middle" fill="#94a3b8" fontSize="13">
     %
   </text>
-</svg>
+</svg>;
 ```
 
 Below the ring, show 3 status lines:
+
 ```tsx
-<div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
-  <StatusLine color="#10b981" label={`بيانات محللة: ${totalRows.toLocaleString()} صف`} />
-  <StatusLine color="#f59e0b" label={`مشاكل مكتشفة: ${totalMissing + totalDuplicates}`} />
-  <StatusLine color="#3b82f6" label={`قابل للإصلاح: ${totalMissing + totalDuplicates > 0 ? 'نعم ✓' : 'لا يوجد'}`} />
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+    marginTop: "16px",
+  }}
+>
+  <StatusLine
+    color="#10b981"
+    label={`بيانات محللة: ${totalRows.toLocaleString()} صف`}
+  />
+  <StatusLine
+    color="#f59e0b"
+    label={`مشاكل مكتشفة: ${totalMissing + totalDuplicates}`}
+  />
+  <StatusLine
+    color="#3b82f6"
+    label={`قابل للإصلاح: ${totalMissing + totalDuplicates > 0 ? "نعم ✓" : "لا يوجد"}`}
+  />
 </div>
 ```
 
@@ -260,22 +310,29 @@ Show a table with one row per column:
 const columnStats = useMemo(() => {
   if (dataset.length === 0) return [];
   const cols = Object.keys(dataset[0]);
-  return cols.map(col => {
-    const values = dataset.map(row => row[col]);
-    const missing = values.filter(v => v === null || v === undefined || v === '').length;
-    const nonNull = values.filter(v => v !== null && v !== undefined && v !== '');
-    const isNumeric = nonNull.every(v => !isNaN(Number(v)));
-    const isDate = !isNumeric && nonNull.some(v => !isNaN(Date.parse(String(v))));
-    const type = isNumeric ? 'رقمي' : isDate ? 'تاريخ' : 'نصي';
-    const typeColor = isNumeric ? '#3b82f6' : isDate ? '#8b5cf6' : '#10b981';
+  return cols.map((col) => {
+    const values = dataset.map((row) => row[col]);
+    const missing = values.filter(
+      (v) => v === null || v === undefined || v === "",
+    ).length;
+    const nonNull = values.filter(
+      (v) => v !== null && v !== undefined && v !== "",
+    );
+    const isNumeric = nonNull.every((v) => !isNaN(Number(v)));
+    const isDate =
+      !isNumeric && nonNull.some((v) => !isNaN(Date.parse(String(v))));
+    const type = isNumeric ? "رقمي" : isDate ? "تاريخ" : "نصي";
+    const typeColor = isNumeric ? "#3b82f6" : isDate ? "#8b5cf6" : "#10b981";
     const health = Math.round(((totalRows - missing) / totalRows) * 100);
-    const healthColor = health >= 80 ? '#10b981' : health >= 50 ? '#f59e0b' : '#ef4444';
+    const healthColor =
+      health >= 80 ? "#10b981" : health >= 50 ? "#f59e0b" : "#ef4444";
     return { col, type, typeColor, missing, health, healthColor };
   });
 }, [dataset, totalRows]);
 ```
 
 Table layout:
+
 ```
 | اسم العمود | النوع | مفقود | صحة البيانات       |
 |------------|-------|-------|---------------------|
@@ -307,29 +364,32 @@ Place this between the new dashboard sections and the existing content.
 
 4 action buttons:
 
-| Button | Icon (inline SVG) | Action |
-|--------|-------------------|--------|
-| 🧹 تنقية البيانات | broom/wrench SVG | navigate to CleaningPage or call setActiveTab('cleaning') |
-| 🤖 محادثة AI | message SVG | navigate to ChatPanel or call setActiveTab('ai') |
-| 📥 تصدير Excel | download SVG | trigger existing Excel export function |
-| 🔄 رفع ملف جديد | refresh SVG | clear dataset state (setDataset(null) or equivalent) |
+| Button            | Icon (inline SVG) | Action                                                    |
+| ----------------- | ----------------- | --------------------------------------------------------- |
+| 🧹 تنقية البيانات | broom/wrench SVG  | navigate to CleaningPage or call setActiveTab('cleaning') |
+| 🤖 محادثة AI      | message SVG       | navigate to ChatPanel or call setActiveTab('ai')          |
+| 📥 تصدير Excel    | download SVG      | trigger existing Excel export function                    |
+| 🔄 رفع ملف جديد   | refresh SVG       | clear dataset state (setDataset(null) or equivalent)      |
 
 Button style:
+
 ```css
 padding: 10px 20px;
-background: rgba(255,255,255,0.04);
-border: 1px solid rgba(255,255,255,0.08);
+background: rgba(255, 255, 255, 0.04);
+border: 1px solid rgba(255, 255, 255, 0.08);
 border-radius: 10px;
 color: #f8fafc;
 cursor: pointer;
-display: flex; align-items: center; gap: 8px;
+display: flex;
+align-items: center;
+gap: 8px;
 font-size: 14px;
 transition: all 0.2s ease;
 
 /* hover: */
 border-color: #10b981;
-background: rgba(16,185,129,0.08);
-box-shadow: 0 0 12px rgba(16,185,129,0.15);
+background: rgba(16, 185, 129, 0.08);
+box-shadow: 0 0 12px rgba(16, 185, 129, 0.15);
 ```
 
 ---
@@ -339,19 +399,24 @@ box-shadow: 0 0 12px rgba(16,185,129,0.15);
 If dataset is empty/null, show this INSTEAD of the KPI strip and quality cards:
 
 ```tsx
-<div style={{
-  display: 'flex', flexDirection: 'column', alignItems: 'center',
-  justifyContent: 'center', padding: '60px 20px',
-  background: 'rgba(30,41,59,0.4)',
-  borderRadius: '16px',
-  border: '2px dashed rgba(16,185,129,0.3)',
-  marginBottom: '24px'
-}}>
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "60px 20px",
+    background: "rgba(30,41,59,0.4)",
+    borderRadius: "16px",
+    border: "2px dashed rgba(16,185,129,0.3)",
+    marginBottom: "24px",
+  }}
+>
   {/* Upload cloud SVG icon, 64px, color #10b981 */}
-  <h3 style={{ color: '#f8fafc', margin: '16px 0 8px' }}>
+  <h3 style={{ color: "#f8fafc", margin: "16px 0 8px" }}>
     ارفع ملف البيانات للبدء
   </h3>
-  <p style={{ color: '#94a3b8', textAlign: 'center', maxWidth: '400px' }}>
+  <p style={{ color: "#94a3b8", textAlign: "center", maxWidth: "400px" }}>
     يدعم النظام ملفات CSV و Excel بأي حجم. سيتم تحليل بياناتك فوراً.
   </p>
   {/* 3 skeleton ghost KPI cards below — grey shimmer placeholders */}
@@ -359,13 +424,23 @@ If dataset is empty/null, show this INSTEAD of the KPI strip and quality cards:
 ```
 
 Skeleton shimmer effect:
+
 ```css
 @keyframes shimmer {
-  0%   { background-position: -400px 0; }
-  100% { background-position: 400px 0; }
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
 }
 .skeleton {
-  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
   background-size: 400px 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 8px;
