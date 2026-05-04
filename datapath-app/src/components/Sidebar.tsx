@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Shield, MessageCircle, Download, Home, Globe, X, Table, HelpCircle, Info, ShieldCheck, BookOpen, ArrowRightLeft, User, LogOut, Trash2, Cloud } from 'lucide-react';
+import { LayoutDashboard, Shield, MessageCircle, Download, Home, Globe, X, Table, HelpCircle, Info, ShieldCheck, BookOpen, ArrowRightLeft, User, LogOut, Trash2 } from 'lucide-react';
 import { AdSpace } from './AdSpace';
 import { getActiveAdProviders } from '../config/adConfig';
 import type { Lang } from '../types';
@@ -63,7 +63,6 @@ const mainItems: { tab: Tab; icon: React.ElementType; key: string }[] = [
   { tab: 'chat', icon: MessageCircle, key: 'chat' },
   { tab: 'compare', icon: ArrowRightLeft, key: 'compare' },
   { tab: 'export', icon: Download, key: 'export' },
-  { tab: 'files', icon: Cloud, key: 'files' },
 ];
 
 const supportItems: { tab: Tab; icon: React.ElementType; key: string }[] = [

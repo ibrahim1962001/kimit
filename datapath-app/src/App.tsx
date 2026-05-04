@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+﻿import { useState, useCallback, useEffect } from 'react';
 import { Menu, Bot, Loader2 } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
 import { HomePage } from './pages/HomePage';
@@ -14,6 +14,7 @@ import { GuidePage } from './pages/GuidePage';
 import { ComparisonPage } from './pages/ComparisonPage';
 import { SavedFilesPage } from './pages/SavedFilesPage';
 import { parseFile, analyzeDataset, cleanDataset } from './lib/dataUtils';
+import { datasetsApi } from './api/datasets.api';
 import type { Lang } from './types';
 import { auth } from './lib/firebase';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
@@ -63,6 +64,16 @@ function App() {
     return () => unsub();
   }, [setDataset]);
 
+  // Listen for navigation events from DashboardPage Quick Actions
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const navTab = (e as CustomEvent<string>).detail as Tab;
+      if (navTab) setTab(navTab);
+    };
+    window.addEventListener('kimit:navigate', handler);
+    return () => window.removeEventListener('kimit:navigate', handler);
+  }, []);
+
   useEffect(() => {
     if (dataset) {
       set('kimit_session_dataset', dataset).catch(console.error);
@@ -93,10 +104,16 @@ function App() {
       setDataset(info);
       setProgress(100);
       showToast(lang === 'ar' ? `✅ تم تحميل ${info.rows.toLocaleString()} سجل` : `✅ Loaded ${info.rows.toLocaleString()} records`);
-      // Cloud save notification
-      setTimeout(() => {
-        showToast(lang === 'ar' ? '☁️ تم حفظ الملف في التخزين السحابي' : '☁️ File saved to cloud storage');
-      }, 1800);
+      
+      // Send file to backend for MinIO persistence ONLY (bypass pandas)
+      datasetsApi.storeFileOnly(file)
+        .then(res => {
+          if (res.saved_to_storage) {
+            showToast(lang === 'ar' ? '☁️ تم حفظ الملف في التخزين السحابي' : '☁️ File saved to cloud storage');
+          }
+        })
+        .catch(err => console.error("Cloud save failed:", err));
+
       setTimeout(() => setTab('dashboard'), 500);
     } catch (e: unknown) {
       const errorMessage = e instanceof Error ? e.message : String(e);

@@ -38,6 +38,8 @@ export interface UploadResult {
   charts: ChartData[];
   anomalies: Anomaly[];
   correlations: Correlation[];
+  saved_to_storage?: boolean;
+  minio_path?: string;
 }
 
 export interface CleanResult {

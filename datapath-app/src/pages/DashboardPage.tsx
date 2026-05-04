@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useKimitData } from '../hooks/useKimitData';
 import { useKimitEngine } from '../hooks/useKimitEngine';
 import { DataChart } from '../components/DataChart';
@@ -49,6 +49,112 @@ const T = {
     growth: 'Growth Indicators',
   },
 };
+
+// ===== LIVE DASHBOARD SECTION — NEW =====
+
+// ── Count-Up Hook ────────────────────────────────────────────────
+function useCountUp(target: number, duration = 1200) {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    // Use rAF for all cases to avoid synchronous setState in effect body
+    let start: number | null = null;
+    let rafId: number;
+    const step = (timestamp: number) => {
+      if (!start) start = timestamp;
+      const progress = Math.min((timestamp - start) / duration, 1);
+      const eased = target === 0 ? 0 : 1 - Math.pow(1 - progress, 4);
+      setValue(Math.floor(eased * target));
+      if (progress < 1) rafId = requestAnimationFrame(step);
+    };
+    rafId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(rafId);
+  }, [target, duration]);
+  return value;
+}
+
+// ── Status Line ──────────────────────────────────────────────────
+const StatusLine: React.FC<{ color: string; label: string }> = ({ color, label }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
+    <span style={{ fontSize: 12, color: '#94a3b8' }}>{label}</span>
+  </div>
+);
+
+// ── KPI Card ─────────────────────────────────────────────────────
+interface KpiCardProps {
+  label: string;
+  value: number;
+  borderColor: string;
+  icon: React.ReactNode;
+  delay: number;
+}
+const KpiCard: React.FC<KpiCardProps> = ({ label, value, borderColor, icon, delay }) => {
+  const animated = useCountUp(value);
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: 'rgba(30, 41, 59, 0.7)',
+        backdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255, 255, 255, 0.08)',
+        borderLeft: `4px solid ${borderColor}`,
+        borderRadius: 14,
+        padding: '18px 20px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        animation: `slideUpFade 0.5s ease both`,
+        animationDelay: `${delay}ms`,
+        transform: hovered ? 'scale(1.02)' : 'scale(1)',
+        boxShadow: hovered ? `0 0 20px ${borderColor}33` : 'none',
+        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+        cursor: 'default',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: borderColor }}>
+        {icon}
+        <span style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
+      </div>
+      <div style={{ fontSize: 32, fontWeight: 800, color: '#f8fafc', lineHeight: 1 }}>
+        {animated.toLocaleString()}
+      </div>
+    </div>
+  );
+};
+
+// ── Quick Action Button ──────────────────────────────────────────
+const QuickActionBtn: React.FC<{ label: string; color: string; icon: React.ReactNode; onClick: () => void }> = ({ label, color, icon, onClick }) => {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        padding: '10px 20px',
+        background: hovered ? `rgba(${color === '#10b981' ? '16,185,129' : color === '#3b82f6' ? '59,130,246' : color === '#f59e0b' ? '245,158,11' : '239,68,68'},0.08)` : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${hovered ? color : 'rgba(255,255,255,0.08)'}`,
+        borderRadius: 10,
+        color: '#f8fafc',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        fontSize: 14,
+        fontWeight: 600,
+        transition: 'all 0.2s ease',
+        boxShadow: hovered ? `0 0 12px ${color}26` : 'none',
+      }}
+    >
+      <span style={{ color: hovered ? color : '#94a3b8', transition: 'color 0.2s' }}>{icon}</span>
+      {label}
+    </button>
+  );
+};
+
+// ===== END LIVE DASHBOARD SECTION =====
 
 // ── Growth Badge Component ──────────────────────────────────────
 const GrowthBadge: React.FC<{ pct: number; trend: 'up' | 'down' | 'flat' }> = ({ pct, trend }) => {
@@ -103,6 +209,75 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
     () => (info ? generateAInarrative(info) : []),
     [info]
   );
+
+  // ===== LIVE DASHBOARD MEMOS =====
+  const dataset = useMemo(() => info?.workData ?? [], [info]);
+  const totalRows = dataset.length;
+  const totalCols = useMemo(() => dataset.length > 0 ? Object.keys(dataset[0]).length : 0, [dataset]);
+
+  const totalMissing = useMemo(() => {
+    return dataset.reduce((acc, row) => {
+      return acc + Object.values(row).filter(v => v === null || v === undefined || v === '').length;
+    }, 0);
+  }, [dataset]);
+
+  const totalDuplicates = useMemo(() => {
+    const seen = new Set<string>();
+    let count = 0;
+    dataset.forEach(row => {
+      const key = JSON.stringify(row);
+      if (seen.has(key)) count++;
+      else seen.add(key);
+    });
+    return count;
+  }, [dataset]);
+
+  const qualityScore = useMemo(() => {
+    if (totalRows === 0) return 0;
+    const score = ((totalRows - totalMissing - totalDuplicates) / totalRows) * 100;
+    return Math.max(0, Math.min(100, Math.round(score)));
+  }, [totalRows, totalMissing, totalDuplicates]);
+
+  const scoreColor = qualityScore >= 80 ? '#10b981' : qualityScore >= 60 ? '#f59e0b' : '#ef4444';
+
+  const columnStats = useMemo(() => {
+    if (dataset.length === 0) return [];
+    const cols = Object.keys(dataset[0]);
+    return cols.map(col => {
+      const values = dataset.map(row => row[col]);
+      const missing = values.filter(v => v === null || v === undefined || v === '').length;
+      const nonNull = values.filter(v => v !== null && v !== undefined && v !== '');
+      const isNumeric = nonNull.length > 0 && nonNull.every(v => !isNaN(Number(v)));
+      const isDate = !isNumeric && nonNull.some(v => !isNaN(Date.parse(String(v))));
+      const type = isNumeric ? 'رقمي' : isDate ? 'تاريخ' : 'نصي';
+      const typeColor = isNumeric ? '#3b82f6' : isDate ? '#8b5cf6' : '#10b981';
+      const colHealth = totalRows > 0 ? Math.round(((totalRows - missing) / totalRows) * 100) : 0;
+      const healthColor = colHealth >= 80 ? '#10b981' : colHealth >= 50 ? '#f59e0b' : '#ef4444';
+      return { col, type, typeColor, missing, health: colHealth, healthColor };
+    });
+  }, [dataset, totalRows]);
+
+  // ── SVG ring animation ─────────────────────────────────────────
+  const r = 54;
+  const circumference = 2 * Math.PI * r;
+  const targetOffset = circumference * (1 - qualityScore / 100);
+  const [animatedOffset, setAnimatedOffset] = useState(circumference);
+  const ringAnimRef = useRef<number | null>(null);
+  useEffect(() => {
+    const start = performance.now();
+    const duration = 1500;
+    const from = circumference;
+    const to = targetOffset;
+    const animate = (now: number) => {
+      const progress = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 4);
+      setAnimatedOffset(from + (to - from) * eased);
+      if (progress < 1) ringAnimRef.current = requestAnimationFrame(animate);
+    };
+    ringAnimRef.current = requestAnimationFrame(animate);
+    return () => { if (ringAnimRef.current) cancelAnimationFrame(ringAnimRef.current); };
+  }, [targetOffset, circumference]);
+  // ===== END LIVE DASHBOARD MEMOS =====
 
   // ── All hooks MUST be declared before any early return ───────────────────
 
@@ -180,10 +355,53 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
   }, [clearCrossFilters]);
 
   // ── Early return guard — AFTER all hooks ──────────────────────────────────
-  if (!info) return <div className="p-20 text-center">No Data found. Please upload a file.</div>;
+  const hasData = !!info && dataset.length > 0;
 
   // Growth: pick first 3 numeric columns for KPI display
   const kpiGrowth = growthIndicators.slice(0, 3);
+
+  if (!info) {
+    return (
+      <div className="dash-layout-container">
+        {/* ===== EMPTY STATE ===== */}
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', padding: '60px 20px',
+          background: 'rgba(30,41,59,0.4)',
+          borderRadius: 16,
+          border: '2px dashed rgba(16,185,129,0.3)',
+          marginBottom: 24,
+        }}>
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="1.5">
+            <polyline points="16 16 12 12 8 16"/>
+            <line x1="12" y1="12" x2="12" y2="21"/>
+            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+          </svg>
+          <h3 style={{ color: '#f8fafc', margin: '16px 0 8px', fontSize: 20 }}>ارفع ملف البيانات للبدء</h3>
+          <p style={{ color: '#94a3b8', textAlign: 'center', maxWidth: 400, fontSize: 14 }}>
+            يدعم النظام ملفات CSV و Excel بأي حجم. سيتم تحليل بياناتك فوراً.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 24, width: '100%', maxWidth: 500 }}>
+            {[0,1,2].map(i => (
+              <div key={i} className="skeleton" style={{ height: 80, borderRadius: 12 }} />
+            ))}
+          </div>
+        </div>
+        <style>{`
+          @keyframes shimmer {
+            0%   { background-position: -400px 0; }
+            100% { background-position:  400px 0; }
+          }
+          .skeleton {
+            background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+            background-size: 400px 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 8px;
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
     <div className="dash-layout-container">
@@ -319,6 +537,204 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
           </button>
         </div>
       </div>
+
+      {/* ===== LIVE DASHBOARD SECTION — NEW ===== */}
+      {hasData && (
+        <>
+          {/* ── SECTION 1: KPI Strip ── */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: 16,
+            marginBottom: 16,
+          }} className="live-kpi-grid">
+            <KpiCard
+              label="إجمالي الصفوف / Total Rows"
+              value={totalRows}
+              borderColor="#10b981"
+              delay={0}
+              icon={
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/>
+                  <line x1="3" y1="9" x2="21" y2="9"/>
+                  <line x1="3" y1="15" x2="21" y2="15"/>
+                </svg>
+              }
+            />
+            <KpiCard
+              label="إجمالي الأعمدة / Total Columns"
+              value={totalCols}
+              borderColor="#3b82f6"
+              delay={100}
+              icon={
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/>
+                  <line x1="9" y1="3" x2="9" y2="21"/>
+                  <line x1="15" y1="3" x2="15" y2="21"/>
+                </svg>
+              }
+            />
+            <KpiCard
+              label="قيم مفقودة / Missing Values"
+              value={totalMissing}
+              borderColor="#f59e0b"
+              delay={200}
+              icon={
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+              }
+            />
+            <KpiCard
+              label="مكررات / Duplicates"
+              value={totalDuplicates}
+              borderColor="#ef4444"
+              delay={300}
+              icon={
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+              }
+            />
+          </div>
+
+          {/* ── SECTION 2: Quality Ring + Column Health ── */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '2fr 3fr',
+            gap: 16,
+            marginBottom: 16,
+          }} className="live-quality-grid">
+            {/* Left: Quality Ring */}
+            <div style={{
+              background: 'rgba(30, 41, 59, 0.7)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: 14,
+              padding: '24px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', marginBottom: 16 }}>جودة البيانات / Data Quality</div>
+              <svg width="140" height="140" viewBox="0 0 140 140">
+                <circle cx="70" cy="70" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10"/>
+                <circle
+                  cx="70" cy="70" r={r}
+                  fill="none"
+                  stroke={scoreColor}
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={animatedOffset}
+                  transform="rotate(-90 70 70)"
+                  style={{ transition: 'stroke 0.3s ease' }}
+                />
+                <text x="70" y="65" textAnchor="middle" fill="#f8fafc" fontSize="28" fontWeight="bold">{qualityScore}</text>
+                <text x="70" y="85" textAnchor="middle" fill="#94a3b8" fontSize="13">%</text>
+              </svg>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16, width: '100%' }}>
+                <StatusLine color="#10b981" label={`بيانات محللة: ${totalRows.toLocaleString()} صف`} />
+                <StatusLine color="#f59e0b" label={`مشاكل مكتشفة: ${totalMissing + totalDuplicates}`} />
+                <StatusLine color="#3b82f6" label={`قابل للإصلاح: ${totalMissing + totalDuplicates > 0 ? 'نعم ✓' : 'لا يوجد'}`} />
+              </div>
+            </div>
+
+            {/* Right: Column Health */}
+            <div style={{
+              background: 'rgba(30, 41, 59, 0.7)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: 14,
+              padding: '20px',
+              overflow: 'hidden',
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', marginBottom: 12 }}>صحة الأعمدة / Column Health</div>
+              <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ color: '#64748b', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 600 }}>اسم العمود</th>
+                      <th style={{ textAlign: 'center', padding: '6px 8px', fontWeight: 600 }}>النوع</th>
+                      <th style={{ textAlign: 'center', padding: '6px 8px', fontWeight: 600 }}>مفقود</th>
+                      <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 600 }}>صحة البيانات</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {columnStats.map((cs, i) => (
+                      <tr key={cs.col} style={{
+                        background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.025)',
+                        animation: 'fadeIn 0.3s ease both',
+                        animationDelay: `${i * 20}ms`,
+                      }}>
+                        <td style={{ padding: '8px', color: '#e2e8f0', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cs.col}</td>
+                        <td style={{ padding: '8px', textAlign: 'center' }}>
+                          <span style={{
+                            padding: '2px 8px', borderRadius: 99, fontSize: 11,
+                            background: `${cs.typeColor}22`, color: cs.typeColor,
+                            border: `1px solid ${cs.typeColor}44`,
+                          }}>{cs.type}</span>
+                        </td>
+                        <td style={{ padding: '8px', textAlign: 'center', color: cs.missing > 0 ? '#f59e0b' : '#94a3b8' }}>{cs.missing}</td>
+                        <td style={{ padding: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)' }}>
+                              <div style={{ width: `${cs.health}%`, height: '100%', borderRadius: 3, background: cs.healthColor, transition: 'width 0.6s ease' }} />
+                            </div>
+                            <span style={{ fontSize: 10, color: cs.healthColor, minWidth: 28 }}>{cs.health}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* ── SECTION 3: Quick Actions Bar ── */}
+          <div style={{
+            display: 'flex', gap: 12, flexWrap: 'wrap',
+            padding: 16, marginBottom: 16,
+            background: 'rgba(30,41,59,0.5)',
+            borderRadius: 14,
+            border: '1px solid rgba(255,255,255,0.06)',
+          }}>
+            {([
+              {
+                label: 'تنقية البيانات / Clean',
+                color: '#10b981',
+                icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>,
+                onClick: () => window.dispatchEvent(new CustomEvent('kimit:navigate', { detail: 'cleaning' })),
+              },
+              {
+                label: 'محادثة AI / Chat',
+                color: '#3b82f6',
+                icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+                onClick: () => window.dispatchEvent(new CustomEvent('kimit:navigate', { detail: 'chat' })),
+              },
+              {
+                label: 'تصدير Excel / Export',
+                color: '#10b981',
+                icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+                onClick: () => { if (info) { exportToExcel(info.workData, `Kimit_Data_${info.filename}.xlsx`); } },
+              },
+              {
+                label: 'رفع ملف جديد / New File',
+                color: '#f59e0b',
+                icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.89"/></svg>,
+                onClick: () => { setDataset(null); window.dispatchEvent(new CustomEvent('kimit:navigate', { detail: 'home' })); },
+              },
+            ] as { label: string; color: string; icon: React.ReactNode; onClick: () => void }[]).map((btn) => (
+              <QuickActionBtn key={btn.label} {...btn} />
+            ))}
+          </div>
+        </>
+      )}
+      {/* ===== END LIVE DASHBOARD SECTION ===== */}
 
       <TransformationTimeline />
 
@@ -601,6 +1017,30 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
 
       <CreatorFooter lang={lang} />
 
+      <style>{`
+        @keyframes slideUpFade {
+          from { opacity: 0; transform: translateY(20px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+        @keyframes shimmer {
+          0%   { background-position: -400px 0; }
+          100% { background-position:  400px 0; }
+        }
+        .skeleton {
+          background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+          background-size: 400px 100%;
+          animation: shimmer 1.5s infinite;
+          border-radius: 8px;
+        }
+        @media (max-width: 768px) {
+          .live-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .live-quality-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
       <style>{`
         .kpi-card { padding: 14px 16px !important; cursor: default; display: flex; flex-direction: column; gap: 4px; transition: border-color 0.2s, background 0.2s; }
         .kpi-card:hover { border-color: rgba(212,175,55,0.2) !important; }

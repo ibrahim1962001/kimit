@@ -11,6 +11,14 @@ export const datasetsApi = {
     return data;
   },
 
+  /** Safe upload just to store in MinIO without Pandas processing */
+  storeFileOnly: async (file: File): Promise<{ saved_to_storage: boolean; minio_path: string }> => {
+    const form = new FormData();
+    form.append("file", file);
+    const { data } = await apiClient.post("/api/files/upload", form);
+    return data;
+  },
+
   /** Clean a dataset by its DB id */
   clean: async (datasetId: number): Promise<CleanResult> => {
     const { data } = await apiClient.post<CleanResult>("/api/clean", { datasetId });
