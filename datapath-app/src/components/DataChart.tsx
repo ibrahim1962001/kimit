@@ -95,31 +95,80 @@ export const DataChart: React.FC<Props> = ({ chart, onFilterClick }) => {
     };
 
     if (isPie) {
+      // Group small slices into "Other" for clarity
+      const totalVal = chart.data.reduce((s, d) => s + Number(d.y), 0);
+      const threshold = totalVal * 0.02; // < 2% → group into "Other"
+      const mainSlices: { name: string; value: number; itemStyle: { color: string } }[] = [];
+      let otherVal = 0;
+
+      chart.data.forEach((d, i) => {
+        const val = Number(d.y);
+        if (val >= threshold) {
+          mainSlices.push({
+            name: String(d.x).slice(0, 25),
+            value: val,
+            itemStyle: { color: COLORS[i % COLORS.length] }
+          });
+        } else {
+          otherVal += val;
+        }
+      });
+
+      if (otherVal > 0) {
+        mainSlices.push({ name: 'Other', value: otherVal, itemStyle: { color: '#475569' } });
+      }
+
       baseOption.legend = {
         type: 'scroll',
-        orient: 'vertical',
-        right: '5%',
-        top: 'middle',
-        textStyle: { color: '#cbd5e1', fontSize: 12 },
+        orient: isMobile ? 'horizontal' : 'vertical',
+        ...(isMobile
+          ? { bottom: 0, left: 'center', right: '5%' }
+          : { right: '2%', top: 'middle' }),
+        textStyle: { color: '#94a3b8', fontSize: isMobile ? 10 : 12 },
+        itemWidth: 10,
+        itemHeight: 10,
+        icon: 'circle',
         pageIconColor: '#38bdf8',
-        pageTextStyle: { color: '#fff' }
+        pageTextStyle: { color: '#fff' },
+        formatter: (name: string) => name.length > 18 ? name.slice(0, 18) + '…' : name,
       };
 
       baseOption.series.push({
         name: chart.title,
         type: 'pie',
-        // Responsive full circle
-        radius: '70%',
-        center: ['40%', '50%'],
-        itemStyle: { borderRadius: 5, borderColor: '#0f172a', borderWidth: 2 },
-        label: { show: false }, // Use Tooltip instead of inside labels for cleaner look
-        emphasis: { label: { show: false }, itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' } },
-        data: chart.data.map((d, i) => ({
-          name: String(d.x).slice(0, 20),
-          value: Number(d.y),
-          itemStyle: { color: COLORS[i % COLORS.length] }
-        }))
+        radius: isMobile ? ['38%', '65%'] : ['42%', '72%'],
+        center: isMobile ? ['50%', '42%'] : ['38%', '50%'],
+        avoidLabelOverlap: true,
+        itemStyle: {
+          borderRadius: 6,
+          borderColor: '#050810',
+          borderWidth: 3,
+        },
+        label: { show: false },
+        labelLine: { show: false },
+        emphasis: {
+          label: { show: true, fontSize: 14, fontWeight: '700', color: '#fff', formatter: '{b}\n{d}%' },
+          itemStyle: { shadowBlur: 20, shadowOffsetX: 0, shadowColor: 'rgba(0,0,0,0.5)', borderWidth: 0 },
+          scale: true,
+          scaleSize: 8,
+        },
+        data: mainSlices
       });
+
+      (baseOption as any).graphic = [
+        {
+          type: 'text',
+          left: isMobile ? '50%' : '38%',
+          top: isMobile ? '40%' : 'middle',
+          style: {
+            text: `${mainSlices.length} values`,
+            textAlign: 'center',
+            fill: '#475569',
+            font: 'bold 11px system-ui',
+            lineHeight: 18,
+          }
+        }
+      ];
     } else {
       let seriesType = chart.type;
       let areaStyle = undefined;
@@ -197,7 +246,9 @@ export const DataChart: React.FC<Props> = ({ chart, onFilterClick }) => {
         className="chart-body"
         style={{
           width: '100%',
-          height: chart.type === 'pie' ? '300px' : (isMobile ? '220px' : '300px'),
+          height: chart.type === 'pie'
+            ? (isMobile ? '320px' : '360px')
+            : (isMobile ? '240px' : '300px'),
           padding: '0 5px',
           overflow: 'visible',
           position: 'relative'
