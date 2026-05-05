@@ -19,7 +19,7 @@ import { PredictiveSuite } from '../components/Analysis/PredictiveSuite';
 import { SourceManager } from '../components/SourceManager';
 import { CreatorFooter } from '../components/CreatorFooter';
 import { exportBrandedPDF, exportToExcel } from '../lib/exportUtils';
-import { convertBackendResultToDatasetInfo } from '../lib/dataUtils';
+import { convertBackendResultToDatasetInfo, type BackendResult } from '../lib/dataUtils';
 import { generateAInarrative } from '../lib/narrativeEngine';
 import { generateExecutiveReport } from '../lib/report-gen';
 
@@ -336,7 +336,7 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
       try {
         const { datasetsApi } = await import('../api/datasets.api');
         const res = await datasetsApi.importSheets(info.sourceUrl!);
-        setDataset(convertBackendResultToDatasetInfo(res as any));
+        setDataset(convertBackendResultToDatasetInfo(res as unknown as BackendResult));
       } catch (err) {
         console.error("Live Sync failed", err);
       }
@@ -450,7 +450,7 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
               <SourceManager
                 onFileUploadMode={() => setShowSourceManager(false)}
                 onSuccess={(res) => {
-                  setDataset(convertBackendResultToDatasetInfo(res as any));
+                  setDataset(convertBackendResultToDatasetInfo(res as unknown as BackendResult));
                   setShowSourceManager(false);
                 }}
               />
