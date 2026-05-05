@@ -154,6 +154,61 @@ function radarOpt(indicators: { name: string; max: number }[], series: { name: s
 }
 
 
+function boxOpt(series: { name: string; vals: number[] }[], color: string) {
+  const boxData = series.map(s => {
+    const v = [...s.vals].sort((a, b) => a - b); const n = v.length;
+    if (!n) return [0, 0, 0, 0, 0];
+    return [v[0], v[Math.floor(n * 0.25)], n % 2 === 0 ? (v[n/2-1]+v[n/2])/2 : v[Math.floor(n/2)], v[Math.floor(n * 0.75)], v[n - 1]];
+  });
+  return {
+    backgroundColor: 'transparent', animation: true,
+    tooltip: { trigger: 'item', backgroundColor: '#0f172a', textStyle: { color: '#f8fafc', fontSize: 11 }, formatter: (p: { name: string; data: number[] }) => `${p.name}<br/>Min: ${fmt(p.data[1])}<br/>Q1: ${fmt(p.data[2])}<br/>Median: ${fmt(p.data[3])}<br/>Q3: ${fmt(p.data[4])}<br/>Max: ${fmt(p.data[5])}` },
+    grid: { left: 90, right: 20, top: 10, bottom: 30 },
+    xAxis: { type: 'value', axisLabel: { color: '#64748b', fontSize: 10, formatter: (v: number) => fmt(v) }, splitLine: { lineStyle: { color: '#1e293b' } }, axisLine: { show: false } },
+    yAxis: { type: 'category', data: series.map(s => s.name.length > 14 ? s.name.slice(0, 13) + '…' : s.name), axisLabel: { color: '#e2e8f0', fontSize: 10 }, axisLine: { show: false }, axisTick: { show: false } },
+    series: [{ type: 'boxplot', data: boxData, itemStyle: { color: color + '33', borderColor: color, borderWidth: 2 }, emphasis: { itemStyle: { borderWidth: 3 } } }],
+  };
+}
+function paretoOpt(labels: string[], vals: number[], color: string) {
+  const total = vals.reduce((a, b) => a + b, 0); let cum = 0;
+  const cumPcts = vals.map(v => { cum += (v / total) * 100; return Math.round(cum * 10) / 10; });
+  return {
+    backgroundColor: 'transparent', animation: true,
+    tooltip: { trigger: 'axis', backgroundColor: '#0f172a', textStyle: { color: '#f8fafc', fontSize: 11 } },
+    legend: { data: ['Value', 'Cumulative %'], top: 2, right: 8, textStyle: { color: '#94a3b8', fontSize: 10 }, itemWidth: 10, itemHeight: 8 },
+    grid: { left: 45, right: 50, top: 30, bottom: 42 },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 9, rotate: 30 }, axisLine: { lineStyle: { color: '#1e293b' } }, axisTick: { show: false } },
+    yAxis: [
+      { type: 'value', axisLabel: { color: '#64748b', fontSize: 10, formatter: (v: number) => fmt(v) }, splitLine: { lineStyle: { color: '#1e293b' } }, axisLine: { show: false } },
+      { type: 'value', max: 100, axisLabel: { color: '#64748b', fontSize: 10, formatter: (v: number) => v + '%' }, splitLine: { show: false }, axisLine: { show: false } },
+    ],
+    series: [
+      { name: 'Value', type: 'bar', data: vals, barMaxWidth: 30, itemStyle: { color, borderRadius: [4, 4, 0, 0] } },
+      { name: 'Cumulative %', type: 'line', yAxisIndex: 1, data: cumPcts, symbol: 'circle', symbolSize: 5, lineStyle: { color: '#f59e0b', width: 2 }, itemStyle: { color: '#f59e0b' }, markLine: { silent: true, data: [{ yAxis: 80, lineStyle: { color: '#ef444466', type: 'dashed' }, label: { color: '#ef4444', fontSize: 10, formatter: '80%' } }] } },
+    ],
+  };
+}
+function heatmapOpt(cols: string[], matrix: number[][]) {
+  const data: [number, number, number][] = [];
+  matrix.forEach((row, i) => row.forEach((v, j) => data.push([j, i, Math.round(v * 100) / 100])));
+  return {
+    backgroundColor: 'transparent', animation: true,
+    tooltip: { position: 'top', backgroundColor: '#0f172a', textStyle: { color: '#f8fafc', fontSize: 11 }, formatter: (p: { data: number[] }) => `${cols[p.data[1]]} × ${cols[p.data[0]]}<br/>r = <b>${p.data[2]}</b>` },
+    grid: { left: 80, right: 10, top: 10, bottom: 80 },
+    xAxis: { type: 'category', data: cols, axisLabel: { color: '#94a3b8', fontSize: 9, rotate: 30 }, axisLine: { show: false }, axisTick: { show: false } },
+    yAxis: { type: 'category', data: cols, axisLabel: { color: '#94a3b8', fontSize: 9 }, axisLine: { show: false }, axisTick: { show: false } },
+    visualMap: { min: -1, max: 1, calculable: false, orient: 'horizontal', bottom: 0, left: 'center', textStyle: { color: '#94a3b8', fontSize: 9 }, inRange: { color: ['#ef4444', '#1e293b', '#10b981'] } },
+    series: [{ type: 'heatmap', data, label: { show: true, fontSize: 9, color: '#f8fafc' } }],
+  };
+}
+function treemapOpt(data: { name: string; value: number }[], color: string) {
+  return {
+    backgroundColor: 'transparent', animation: true,
+    tooltip: { backgroundColor: '#0f172a', textStyle: { color: '#f8fafc', fontSize: 11 }, formatter: (p: { name: string; value: number; percent: number }) => `${p.name}<br/>${fmt(p.value)} (${p.percent?.toFixed(1) ?? '0'}%)` },
+    series: [{ type: 'treemap', data, roam: false, label: { show: true, fontSize: 11, color: '#fff', fontWeight: 600 }, breadcrumb: { show: false }, itemStyle: { borderColor: '#0f172a', borderWidth: 2, gapWidth: 3 }, levels: [{ itemStyle: { borderColor: color, borderWidth: 3, gapWidth: 4 }, colorSaturation: [0.5, 0.9] }] }],
+  };
+}
+
 // ── KPI Card ─────────────────────────────────────────────────────
 const KpiCard: React.FC<{ title: string; value: string; sub: string; color: string; sparkVals: number[]; icon: string }> = ({ title, value, sub, color, sparkVals, icon }) => (
   <div style={{ background: 'rgba(15,23,42,0.8)', backdropFilter: 'blur(12px)', border: `1px solid ${color}22`, borderTop: `3px solid ${color}`, borderRadius: 16, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minWidth: 160 }}>
@@ -327,7 +382,80 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
 
 
 
+  // Column profiling — per column detail
+  const columnProfile = useMemo(() =>
+    (info?.columns ?? []).map(col => {
+      const vals = data.map(r => r[col.name]);
+      const filled = vals.filter(v => v !== null && v !== undefined && v !== '').length;
+      const fillRate = Math.round((filled / (data.length || 1)) * 100);
+      const strVals = vals.map(v => String(v ?? '')).filter(v => v && v !== 'null' && v !== 'undefined');
+      const uniqCount = new Set(strVals).size;
+      const uniqRate = Math.round((uniqCount / (filled || 1)) * 100);
+      const freq = new Map<string, number>();
+      strVals.forEach(v => freq.set(v, (freq.get(v) ?? 0) + 1));
+      const top = [...freq.entries()].sort((a, b) => b[1] - a[1])[0];
+      const zeros = String(col.type) === 'numeric' ? vals.filter(v => Number(v) === 0).length : 0;
+      return { name: col.name, type: String(col.type), fillRate, uniqCount, uniqRate, topVal: top?.[0]?.slice(0, 20) ?? '—', topCount: top?.[1] ?? 0, zeros };
+    }), [data, info]);
+
+  // Dataset summary totals
+  const summaryStats = useMemo(() => {
+    const cols = info?.columns ?? [];
+    const totalCells = data.length * cols.length;
+    const emptyCells = data.reduce((a, r) => a + Object.values(r).filter(v => v === null || v === undefined || v === '').length, 0);
+    const seen = new Set<string>(); let dupRows = 0;
+    data.forEach(r => { const k = JSON.stringify(r); if (seen.has(k)) dupRows++; else seen.add(k); });
+    return {
+      totalCells, emptyCells, dupRows,
+      numColsCount: numCols.length,
+      catColsCount: cols.filter(c => String(c.type) !== 'numeric').length,
+      dateColsCount: cols.filter(c => String(c.type) === 'date').length,
+      fillRate: Math.round(((totalCells - emptyCells) / (totalCells || 1)) * 100),
+      uniqRows: data.length - dupRows,
+      colRowRatio: (cols.length / (data.length || 1)).toFixed(4),
+      density: Math.round(((totalCells - emptyCells) / (totalCells || 1)) * 100),
+    };
+  }, [data, info, numCols]);
+
+  // Box Plot per numeric column
+  const boxChart = useMemo(() => {
+    if (!numCols.length) return null;
+    const series = numCols.slice(0, 8).map(col => ({ name: col, vals: data.map(r => Number(r[col])).filter(v => !isNaN(v)) }));
+    return boxOpt(series, meta.p);
+  }, [data, numCols, meta]);
+
+  // Pareto chart (80/20 rule)
+  const paretoChart = useMemo(() => {
+    if (!catCols[0] || !numCols[0]) return null;
+    const rows = groupBySum(data, catCols[0], numCols[0], 15);
+    return paretoOpt(rows.map(r => r.l.length > 10 ? r.l.slice(0, 9) + '…' : r.l), rows.map(r => r.v), meta.p);
+  }, [data, catCols, numCols, meta]);
+
+  // Correlation Heatmap
+  const correlationChart = useMemo(() => {
+    if (numCols.length < 3) return null;
+    const cols = numCols.slice(0, 7);
+    const getVals = (col: string) => data.map(r => Number(r[col]) || 0);
+    const corr = (a: number[], b: number[]) => {
+      const n = a.length, ma = a.reduce((s, v) => s + v, 0) / n, mb = b.reduce((s, v) => s + v, 0) / n;
+      const num = a.reduce((s, v, i) => s + (v - ma) * (b[i] - mb), 0);
+      const da = Math.sqrt(a.reduce((s, v) => s + (v - ma) ** 2, 0));
+      const db = Math.sqrt(b.reduce((s, v) => s + (v - mb) ** 2, 0));
+      return da && db ? Math.round((num / (da * db)) * 100) / 100 : 0;
+    };
+    const matrix = cols.map(ca => cols.map(cb => corr(getVals(ca), getVals(cb))));
+    return heatmapOpt(cols.map(c => c.length > 8 ? c.slice(0, 7) + '…' : c), matrix);
+  }, [data, numCols]);
+
+  // Treemap
+  const treemapChart = useMemo(() => {
+    if (!catCols[0] || !numCols[0]) return null;
+    const rows = groupBySum(data, catCols[0], numCols[0], 25);
+    return treemapOpt(rows.map(r => ({ name: r.l.length > 20 ? r.l.slice(0, 19) + '…' : r.l, value: Math.max(1, Math.round(r.v)) })), meta.p);
+  }, [data, catCols, numCols, meta]);
+
   if (!info || data.length === 0) {
+
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', flexDirection: 'column', gap: 16 }}>
         <LayoutDashboard size={48} color="#334155" />
@@ -463,6 +591,110 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
             <ReactECharts key={refreshKey} option={radarChart} style={{ height: 320 }} theme="dark" />
           </div>
         )}
+
+        {/* ── Dataset Summary Cards (10 mini details) ── */}
+        <div style={{ background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '16px 20px', marginBottom: 20 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 14 }}>🗂️ Dataset Overview — Full Summary</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+            {[
+              { label: 'Total Cells', val: fmt(summaryStats.totalCells), icon: '📦', color: meta.p },
+              { label: 'Filled Cells', val: fmt(summaryStats.totalCells - summaryStats.emptyCells), icon: '✅', color: '#10b981' },
+              { label: 'Empty Cells', val: fmt(summaryStats.emptyCells), icon: '⬜', color: '#ef4444' },
+              { label: 'Data Density', val: summaryStats.density + '%', icon: '💧', color: meta.s },
+              { label: 'Unique Rows', val: fmt(summaryStats.uniqRows), icon: '🔑', color: '#6366f1' },
+              { label: 'Duplicate Rows', val: fmt(summaryStats.dupRows), icon: '📋', color: summaryStats.dupRows > 0 ? '#f59e0b' : '#10b981' },
+              { label: 'Numeric Cols', val: summaryStats.numColsCount.toString(), icon: '#️⃣', color: '#3b82f6' },
+              { label: 'Text Cols', val: summaryStats.catColsCount.toString(), icon: '🔤', color: '#8b5cf6' },
+              { label: 'Date Cols', val: summaryStats.dateColsCount.toString(), icon: '📅', color: '#f59e0b' },
+              { label: 'Col/Row Ratio', val: summaryStats.colRowRatio, icon: '⚖️', color: '#06b6d4' },
+            ].map(item => (
+              <div key={item.label} style={{ background: `${item.color}0e`, border: `1px solid ${item.color}22`, borderRadius: 10, padding: '10px 12px' }}>
+                <div style={{ fontSize: 16, marginBottom: 3 }}>{item.icon}</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: item.color, lineHeight: 1 }}>{item.val}</div>
+                <div style={{ fontSize: 10, color: '#64748b', marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{item.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Box Plot — IQR Visualization ── */}
+        {boxChart && (
+          <div style={{ background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '20px 20px 14px', marginBottom: 20 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>📦 Box Plot — Interquartile Range Analysis</div>
+            <div style={{ fontSize: 11, color: '#64748b', marginBottom: 12 }}>Shows Min, Q1, Median, Q3, Max for each numeric column — hover for details</div>
+            <ReactECharts key={refreshKey} option={boxChart} style={{ height: Math.min(40 * numCols.slice(0, 8).length + 60, 380) }} theme="dark" />
+          </div>
+        )}
+
+        {/* ── Pareto Chart (80/20 Rule) ── */}
+        {paretoChart && (
+          <div style={{ background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '20px 20px 14px', marginBottom: 20 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>📐 Pareto Analysis — 80/20 Rule</div>
+            <div style={{ fontSize: 11, color: '#64748b', marginBottom: 12 }}>Identify which {catCols[0]} categories drive 80% of total {numCols[0]} — dashed line marks the 80% threshold</div>
+            <ReactECharts key={refreshKey} option={paretoChart} style={{ height: 260 }} theme="dark" />
+          </div>
+        )}
+
+        {/* ── Treemap + Correlation ── */}
+        {(treemapChart || correlationChart) && (
+          <div style={{ display: 'grid', gridTemplateColumns: treemapChart && correlationChart ? '1fr 1fr' : '1fr', gap: 20, marginBottom: 20 }}>
+            {treemapChart && (
+              <div style={{ background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '20px 20px 14px' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>🗺️ Treemap — {catCols[0]} by {numCols[0]}</div>
+                <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>Size = value. Larger blocks = bigger share of total</div>
+                <ReactECharts key={refreshKey} option={treemapChart} style={{ height: 300 }} theme="dark" />
+              </div>
+            )}
+            {correlationChart && (
+              <div style={{ background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '20px 20px 14px' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>🌡️ Correlation Matrix Heatmap</div>
+                <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>Green = strong +ve, Red = strong -ve, Dark = no correlation</div>
+                <ReactECharts key={refreshKey} option={correlationChart} style={{ height: 300 }} theme="dark" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Column Profiling Table ── */}
+        <div style={{ background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, overflow: 'hidden', marginBottom: 20 }}>
+          <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>🔬 Column Profiling — Detailed Field Analysis</span>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
+                  {['Column', 'Type', 'Fill Rate', 'Fill Bar', 'Unique #', 'Unique %', 'Top Value', 'Top Freq', 'Zeros'].map(h => (
+                    <th key={h} style={{ padding: '9px 12px', textAlign: 'left', color: '#64748b', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255,255,255,0.06)', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {columnProfile.map((col, i) => (
+                  <tr key={col.name} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)' }}>
+                    <td style={{ padding: '8px 12px', color: meta.p, fontWeight: 700, whiteSpace: 'nowrap', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>{col.name}</td>
+                    <td style={{ padding: '8px 12px' }}>
+                      <span style={{ padding: '2px 7px', borderRadius: 20, fontSize: 10, fontWeight: 600, background: col.type === 'numeric' ? 'rgba(59,130,246,0.12)' : col.type === 'date' ? 'rgba(139,92,246,0.12)' : 'rgba(16,185,129,0.12)', color: col.type === 'numeric' ? '#3b82f6' : col.type === 'date' ? '#8b5cf6' : '#10b981' }}>
+                        {col.type === 'numeric' ? '#' : col.type === 'date' ? '📅' : 'A'} {col.type}
+                      </span>
+                    </td>
+                    <td style={{ padding: '8px 12px', color: col.fillRate < 80 ? '#ef4444' : col.fillRate < 95 ? '#f59e0b' : '#10b981', fontWeight: 700 }}>{col.fillRate}%</td>
+                    <td style={{ padding: '8px 12px', minWidth: 80 }}>
+                      <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', borderRadius: 3, width: `${col.fillRate}%`, background: col.fillRate < 80 ? '#ef4444' : col.fillRate < 95 ? '#f59e0b' : '#10b981' }} />
+                      </div>
+                    </td>
+                    <td style={{ padding: '8px 12px', color: '#e2e8f0', fontVariantNumeric: 'tabular-nums' }}>{col.uniqCount.toLocaleString()}</td>
+                    <td style={{ padding: '8px 12px', color: '#94a3b8' }}>{col.uniqRate}%</td>
+                    <td style={{ padding: '8px 12px', color: '#e2e8f0', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={col.topVal}>{col.topVal}</td>
+                    <td style={{ padding: '8px 12px', color: '#64748b', fontVariantNumeric: 'tabular-nums' }}>{col.topCount.toLocaleString()}</td>
+                    <td style={{ padding: '8px 12px', color: col.zeros > 0 ? '#f59e0b' : '#10b981' }}>{col.type === 'numeric' ? col.zeros : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
         {/* ── Descriptive Statistics Table ── */}
 
