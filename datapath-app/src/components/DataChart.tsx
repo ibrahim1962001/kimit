@@ -155,7 +155,7 @@ export const DataChart: React.FC<Props> = ({ chart, onFilterClick }) => {
         data: mainSlices
       });
 
-      (baseOption as any).graphic = [
+      (baseOption as unknown as Record<string, unknown>).graphic = [
         {
           type: 'text',
           left: isMobile ? '50%' : '38%',
