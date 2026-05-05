@@ -342,7 +342,6 @@ async def upload_file(file: UploadFile = File(...), request: Request = None):
         if request:
             auth_header = request.headers.get("Authorization", "")
             if auth_header.startswith("Bearer "):
-                # Use a short hash of the token as anonymous user key
                 import hashlib
                 user_id = hashlib.md5(auth_header[7:].encode()).hexdigest()[:12]
 
@@ -367,6 +366,7 @@ async def upload_file(file: UploadFile = File(...), request: Request = None):
         try:
             df = robust_read_file(contents, file.filename)
         except HTTPException as he:
+            # If pandas fails but it saved to MinIO, we still want to let the user know, but existing API behavior expects 400 here.
             raise he
         except Exception as e:
             raise HTTPException(
@@ -417,6 +417,40 @@ async def upload_file(file: UploadFile = File(...), request: Request = None):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+
+
+@app.post("/api/files/upload")
+async def store_file_only(file: UploadFile = File(...), request: Request = None):
+    """
+    Dedicated endpoint to JUST store the file in MinIO without any Pandas processing.
+    Used by the frontend to safely backup files since the frontend does its own parsing.
+    """
+    contents = await file.read()
+    if not contents:
+        raise HTTPException(status_code=400, detail="The uploaded file is empty.")
+
+    user_id: str | None = None
+    if request:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            import hashlib
+            user_id = hashlib.md5(auth_header[7:].encode()).hexdigest()[:12]
+
+    ext = "." + (file.filename or "").rsplit(".", 1)[-1].lower()
+    content_type_map = {
+        ".csv":  "text/csv",
+        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ".xls":  "application/vnd.ms-excel",
+    }
+    ct = content_type_map.get(ext, "application/octet-stream")
+    object_name = minio_client.build_object_name(file.filename or "unknown", user_id)
+    saved_to_storage = minio_client.upload_file_to_minio(contents, object_name, ct)
+    
+    return {
+        "filename": file.filename,
+        "minio_path": object_name,
+        "saved_to_storage": saved_to_storage
+    }
 
 
 @app.get("/api/files")
