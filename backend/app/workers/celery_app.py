@@ -5,7 +5,7 @@ celery_app = Celery(
     "kimit",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=["app.workers.alert_worker"],
+    include=["app.workers.alert_worker", "app.workers.file_processor"],
 )
 
 celery_app.conf.update(

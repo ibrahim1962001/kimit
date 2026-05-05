@@ -453,6 +453,91 @@ async def store_file_only(file: UploadFile = File(...), request: Request = None)
     }
 
 
+LARGE_FILE_THRESHOLD_MB = 10  # Files above this go to Celery
+
+
+@app.post("/api/upload/large")
+async def upload_large_file(file: UploadFile = File(...), request: Request = None):
+    """
+    Streaming upload for large files.
+    - Saves directly to MinIO chunk-by-chunk (no full RAM load).
+    - Dispatches a Celery task for background processing.
+    - Returns a job_id immediately; frontend polls /api/upload/status/{job_id}.
+    """
+    from app.workers.file_processor import process_large_file
+
+    user_id: str | None = None
+    if request:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            import hashlib
+            user_id = hashlib.md5(auth_header[7:].encode()).hexdigest()[:12]
+
+    ext = "." + (file.filename or "").rsplit(".", 1)[-1].lower()
+    content_type_map = {
+        ".csv":  "text/csv",
+        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ".xls":  "application/vnd.ms-excel",
+    }
+    ct = content_type_map.get(ext, "application/octet-stream")
+    object_name = minio_client.build_object_name(file.filename or "unknown", user_id)
+
+    # ── Stream file to MinIO in chunks (no full RAM load) ─────────────────
+    CHUNK = 1024 * 1024  # 1 MB chunks
+    buffer = io.BytesIO()
+    total_bytes = 0
+    while True:
+        chunk = await file.read(CHUNK)
+        if not chunk:
+            break
+        buffer.write(chunk)
+        total_bytes += len(chunk)
+
+    buffer.seek(0)
+    file_bytes = buffer.read()
+    saved = minio_client.upload_file_to_minio(file_bytes, object_name, ct)
+
+    if not saved:
+        raise HTTPException(status_code=500, detail="Failed to save file to storage.")
+
+    # ── Dispatch background task ───────────────────────────────────────────
+    dataset_id = len(DATA_STORE) + 1
+    task = process_large_file.delay(object_name, file.filename, dataset_id)
+
+    return {
+        "job_id": task.id,
+        "filename": file.filename,
+        "size_bytes": total_bytes,
+        "minio_path": object_name,
+        "status": "processing",
+        "message": "File saved. Processing in background — poll /api/upload/status/{job_id} for result."
+    }
+
+
+@app.get("/api/upload/status/{job_id}")
+async def get_upload_status(job_id: str):
+    """
+    Poll the status of a large-file processing job.
+    Returns: { status, progress, ...result_payload_when_done }
+    """
+    from celery.result import AsyncResult
+    from app.workers.celery_app import celery_app as _celery
+
+    result = AsyncResult(job_id, app=_celery)
+
+    if result.state == "PENDING":
+        return {"status": "pending", "progress": 0, "message": "Waiting in queue…"}
+    elif result.state == "PROGRESS":
+        meta = result.info or {}
+        return {"status": "processing", "progress": meta.get("progress", 0), "message": meta.get("status", "")}
+    elif result.state == "SUCCESS":
+        return result.result  # Full upload payload
+    elif result.state == "FAILURE":
+        return {"status": "error", "message": str(result.info)}
+    else:
+        return {"status": result.state.lower(), "progress": 0}
+
+
 @app.get("/api/files")
 async def list_files(user_id: str | None = None):
     """
