@@ -154,6 +154,90 @@ function radarOpt(indicators: { name: string; max: number }[], series: { name: s
 }
 
 
+// ── Statistical Helpers ──────────────────────────────────────────
+function calcSkew(vals: number[], mean: number, std: number): number {
+  const n = vals.length; if (n < 3 || !std) return 0;
+  return (vals.reduce((a, v) => a + Math.pow((v - mean) / std, 3), 0) / n);
+}
+function calcKurt(vals: number[], mean: number, std: number): number {
+  const n = vals.length; if (n < 4 || !std) return 0;
+  return (vals.reduce((a, v) => a + Math.pow((v - mean) / std, 4), 0) / n) - 3;
+}
+function calcMode(vals: number[]): number {
+  const freq = new Map<number, number>();
+  vals.forEach(v => freq.set(v, (freq.get(v) ?? 0) + 1));
+  return [...freq.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 0;
+}
+function percentile(sorted: number[], p: number): number {
+  const idx = (p / 100) * (sorted.length - 1);
+  const lo = Math.floor(idx); const hi = Math.ceil(idx);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+}
+
+// ── New Chart Options ─────────────────────────────────────────────
+function gaugeOpt(val: number, label: string, color: string) {
+  return {
+    backgroundColor: 'transparent', animation: true,
+    series: [{ type: 'gauge', startAngle: 200, endAngle: -20, min: 0, max: 100, splitNumber: 5,
+      axisLine: { lineStyle: { width: 16, color: [[val/100, color], [1, '#1e293b']] } },
+      pointer: { icon: 'path://M12.8,0.7l12,40.1H0.7L12.8,0.7z', length: '55%', width: 8, offsetCenter: [0,'5%'], itemStyle: { color } },
+      axisTick: { show: false }, splitLine: { show: false }, axisLabel: { show: false },
+      title: { color: '#94a3b8', fontSize: 12, offsetCenter: [0, '75%'] },
+      detail: { valueAnimation: true, fontSize: 28, fontWeight: 900, color, formatter: '{value}%', offsetCenter: [0, '35%'] },
+      data: [{ value: val, name: label }],
+    }],
+  };
+}
+function funnelOpt(items: { l: string; v: number }[], color: string) {
+  const max = items[0]?.v || 1;
+  return {
+    backgroundColor: 'transparent', animation: true,
+    tooltip: { trigger: 'item', backgroundColor: '#0f172a', textStyle: { color: '#f8fafc', fontSize: 11 }, formatter: '{b}: {c}' },
+    series: [{ type: 'funnel', left: '10%', top: 10, bottom: 10, width: '80%', min: 0, max, minSize: '10%', maxSize: '100%', sort: 'descending', gap: 3,
+      data: items.map((it, i) => ({ name: it.l.length > 16 ? it.l.slice(0, 15) + '…' : it.l, value: Math.round(it.v), itemStyle: { color: color + Math.floor(255 * (1 - i * 0.12)).toString(16).padStart(2, '0') } })),
+      label: { position: 'inside', color: '#fff', fontSize: 10, fontWeight: 600 },
+    }],
+  };
+}
+function waterfallOpt(labels: string[], vals: number[], color: string) {
+  let cum = 0;
+  const bases: number[] = []; const changes: number[] = [];
+  vals.forEach(v => { bases.push(cum); changes.push(Math.round(v)); cum += v; });
+  return {
+    backgroundColor: 'transparent', animation: true,
+    tooltip: { trigger: 'axis', backgroundColor: '#0f172a', textStyle: { color: '#f8fafc', fontSize: 11 } },
+    grid: { left: 45, right: 10, top: 10, bottom: 42 },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#94a3b8', fontSize: 9, rotate: 30 }, axisLine: { lineStyle: { color: '#1e293b' } }, axisTick: { show: false } },
+    yAxis: { type: 'value', axisLabel: { color: '#64748b', fontSize: 10, formatter: (v: number) => fmt(v) }, splitLine: { lineStyle: { color: '#1e293b' } }, axisLine: { show: false } },
+    series: [
+      { type: 'bar', stack: 'w', data: bases, itemStyle: { color: 'transparent' } },
+      { type: 'bar', stack: 'w', data: changes, barMaxWidth: 28, itemStyle: { color, borderRadius: [4, 4, 0, 0] } },
+    ],
+  };
+}
+function bubbleOpt(pts: [number,number,number][], xL: string, yL: string, zL: string, color: string) {
+  const maxZ = Math.max(...pts.map(p => p[2])) || 1;
+  return {
+    backgroundColor: 'transparent', animation: true,
+    tooltip: { trigger: 'item', backgroundColor: '#0f172a', textStyle: { color: '#f8fafc', fontSize: 11 }, formatter: (p: { data: number[] }) => `${xL}: ${fmt(p.data[0])}<br/>${yL}: ${fmt(p.data[1])}<br/>${zL}: ${fmt(p.data[2])}` },
+    grid: { left: 55, right: 16, top: 16, bottom: 36 },
+    xAxis: { type: 'value', name: xL.slice(0,10), nameTextStyle: { color: '#64748b', fontSize: 10 }, nameLocation: 'end', axisLabel: { color: '#64748b', fontSize: 10, formatter: (v: number) => fmt(v) }, splitLine: { lineStyle: { color: '#1e293b' } }, axisLine: { show: false } },
+    yAxis: { type: 'value', name: yL.slice(0,10), nameTextStyle: { color: '#64748b', fontSize: 10 }, nameLocation: 'end', axisLabel: { color: '#64748b', fontSize: 10, formatter: (v: number) => fmt(v) }, splitLine: { lineStyle: { color: '#1e293b' } }, axisLine: { show: false } },
+    series: [{ type: 'scatter', data: pts, symbolSize: (d: number[]) => Math.max(6, (d[2] / maxZ) * 40), itemStyle: { color, opacity: 0.6, borderColor: color + '88', borderWidth: 1 } }],
+  };
+}
+function stackedAreaOpt(labels: string[], series: {name: string; data: number[]; color: string}[]) {
+  return {
+    backgroundColor: 'transparent', animation: true,
+    tooltip: { trigger: 'axis', backgroundColor: '#0f172a', textStyle: { color: '#f8fafc', fontSize: 11 } },
+    legend: { top: 0, right: 8, textStyle: { color: '#94a3b8', fontSize: 10 }, itemWidth: 12, itemHeight: 8 },
+    grid: { left: 45, right: 16, top: 28, bottom: 36 },
+    xAxis: { type: 'category', data: labels, axisLabel: { color: '#64748b', fontSize: 9, interval: Math.floor(labels.length / 6) }, axisLine: { lineStyle: { color: '#1e293b' } }, axisTick: { show: false } },
+    yAxis: { type: 'value', axisLabel: { color: '#64748b', fontSize: 10, formatter: (v: number) => fmt(v) }, splitLine: { lineStyle: { color: '#1e293b' } }, axisLine: { show: false } },
+    series: series.map(s => ({ type: 'line', name: s.name, data: s.data, stack: 'total', smooth: true, symbol: 'none', lineStyle: { color: s.color, width: 2 }, areaStyle: { color: s.color + '44' } })),
+  };
+}
+
 function boxOpt(series: { name: string; vals: number[] }[], color: string) {
   const boxData = series.map(s => {
     const v = [...s.vals].sort((a, b) => a - b); const n = v.length;
@@ -454,7 +538,108 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
     return treemapOpt(rows.map(r => ({ name: r.l.length > 20 ? r.l.slice(0, 19) + '…' : r.l, value: Math.max(1, Math.round(r.v)) })), meta.p);
   }, [data, catCols, numCols, meta]);
 
+  // Advanced stats per numeric column (skewness, kurtosis, mode, CV, percentiles, IQR, sum, variance)
+  const advStats = useMemo(() =>
+    numCols.slice(0, 6).map(col => {
+      const vals = data.map(r => Number(r[col])).filter(v => !isNaN(v));
+      const sorted = [...vals].sort((a, b) => a - b);
+      const n = sorted.length; if (!n) return null;
+      const mean = vals.reduce((a, b) => a + b, 0) / n;
+      const variance = vals.reduce((a, v) => a + (v - mean) ** 2, 0) / n;
+      const std = Math.sqrt(variance);
+      const q1 = percentile(sorted, 25); const q3 = percentile(sorted, 75);
+      const p5 = percentile(sorted, 5);  const p95 = percentile(sorted, 95);
+      const skew = calcSkew(vals, mean, std);
+      const kurt = calcKurt(vals, mean, std);
+      const mode = calcMode(vals);
+      const cv = std / (mean || 1) * 100;
+      const sum = vals.reduce((a, b) => a + b, 0);
+      const iqr = q3 - q1;
+      const neg = vals.filter(v => v < 0).length;
+      const pos = vals.filter(v => v > 0).length;
+      const skewLabel = Math.abs(skew) < 0.5 ? 'Symmetric' : skew > 0 ? 'Right Skewed' : 'Left Skewed';
+      const kurtLabel = Math.abs(kurt) < 1 ? 'Normal' : kurt > 0 ? 'Leptokurtic' : 'Platykurtic';
+      return { col, mean, variance, std, q1, q3, p5, p95, skew, kurt, mode, cv, sum, iqr, neg, pos, skewLabel, kurtLabel };
+    }).filter(Boolean) as { col: string; mean: number; variance: number; std: number; q1: number; q3: number; p5: number; p95: number; skew: number; kurt: number; mode: number; cv: number; sum: number; iqr: number; neg: number; pos: number; skewLabel: string; kurtLabel: string }[],
+  [data, numCols]);
+
+  // Category Intelligence (15 metrics)
+  const catIntelligence = useMemo(() => {
+    if (!catCols[0]) return null;
+    const rows = groupByCount(data, catCols[0], 999);
+    const total = rows.reduce((a, r) => a + r.v, 0);
+    const n = rows.length;
+    const top1Pct = n ? Math.round((rows[0].v / total) * 100) : 0;
+    const top3Sum = rows.slice(0, 3).reduce((a, r) => a + r.v, 0);
+    const top3Pct = Math.round((top3Sum / total) * 100);
+    const avgPerCat = Math.round(total / (n || 1));
+    const singletons = rows.filter(r => r.v === 1).length;
+    // Entropy (Shannon)
+    const entropy = -rows.reduce((a, r) => { const p = r.v / total; return a + (p > 0 ? p * Math.log2(p) : 0); }, 0);
+    const maxEntropy = Math.log2(n || 1);
+    const balance = maxEntropy > 0 ? Math.round((entropy / maxEntropy) * 100) : 0;
+    // How many cats = 80% of total
+    let cum = 0; let cats80 = 0;
+    for (const r of rows) { cum += r.v; cats80++; if (cum / total >= 0.8) break; }
+    // Long tail: categories with < 1% share
+    const longTail = rows.filter(r => r.v / total < 0.01).length;
+    const rarest = rows[rows.length - 1];
+    // Concentration index (Herfindahl)
+    const hhi = Math.round(rows.reduce((a, r) => a + Math.pow(r.v / total, 2), 0) * 10000);
+    return { n, top1Pct, top3Pct, avgPerCat, singletons, entropy: Math.round(entropy * 100) / 100, balance, cats80, longTail, hhi, rarest: rarest?.l ?? '—', rarestV: rarest?.v ?? 0, top1: rows[0]?.l ?? '—', top1V: rows[0]?.v ?? 0, total };
+  }, [data, catCols]);
+
+  // Quality Grade (A-F)
+  const qualityGrade = useMemo(() => {
+    const cols = info?.columns ?? [];
+    const totalCells = data.length * cols.length;
+    const emptyCells = data.reduce((a, r) => a + Object.values(r).filter(v => v === null || v === undefined || v === '').length, 0);
+    const fillRate = totalCells > 0 ? ((totalCells - emptyCells) / totalCells) * 100 : 100;
+    const seen = new Set<string>(); let dups = 0;
+    data.forEach(r => { const k = JSON.stringify(r); if (seen.has(k)) dups++; else seen.add(k); });
+    const dupRate = data.length > 0 ? (dups / data.length) * 100 : 0;
+    const outlierPct = advStats.reduce((a, s) => a + (s as { outliers?: number; n?: number }).outliers! / ((s as { n?: number }).n! || 1) * 100, 0) / (advStats.length || 1);
+    const score = Math.round(fillRate * 0.5 + Math.max(0, 100 - dupRate * 5) * 0.3 + Math.max(0, 100 - outlierPct * 2) * 0.2);
+    const grade = score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
+    const gradeColor = score >= 90 ? '#10b981' : score >= 80 ? '#3b82f6' : score >= 70 ? '#f59e0b' : score >= 60 ? '#f97316' : '#ef4444';
+    return { score, grade, gradeColor, fillRate: Math.round(fillRate), dupRate: Math.round(dupRate * 10) / 10, outlierPct: Math.round(outlierPct * 10) / 10 };
+  }, [data, info, advStats]);
+
+  // Funnel chart (top categories by count)
+  const funnelChart = useMemo(() => {
+    if (!catCols[0]) return null;
+    const rows = groupByCount(data, catCols[0], 8);
+    return funnelOpt(rows, meta.p);
+  }, [data, catCols, meta]);
+
+  // Waterfall chart (cumulative sum of top categories)
+  const waterfallChart = useMemo(() => {
+    if (!catCols[0] || !numCols[0]) return null;
+    const rows = groupBySum(data, catCols[0], numCols[0], 10);
+    return waterfallOpt(rows.map(r => r.l.length > 8 ? r.l.slice(0, 7) + '…' : r.l), rows.map(r => r.v), meta.s);
+  }, [data, catCols, numCols, meta]);
+
+  // Bubble chart (3 numeric columns)
+  const bubbleChart = useMemo(() => {
+    if (numCols.length < 3) return null;
+    const pts: [number,number,number][] = data.slice(0, 200).map(r => [Number(r[numCols[0]]) || 0, Number(r[numCols[1]]) || 0, Number(r[numCols[2]]) || 0]);
+    return bubbleOpt(pts, numCols[0], numCols[1], numCols[2], meta.p);
+  }, [data, numCols, meta]);
+
+  // Stacked area chart (top 3 numeric cols over record index)
+  const stackedAreaChart = useMemo(() => {
+    if (numCols.length < 2) return null;
+    const cols = numCols.slice(0, 3);
+    const colors = [meta.p, meta.s, '#f59e0b'];
+    const step = Math.max(1, Math.floor(data.length / 50));
+    const sampled = data.filter((_, i) => i % step === 0).slice(0, 50);
+    const labels = sampled.map((_, i) => String(i * step + 1));
+    const series = cols.map((col, i) => ({ name: col.length > 12 ? col.slice(0, 11) + '…' : col, color: colors[i % colors.length], data: sampled.map(r => Number(r[col]) || 0) }));
+    return stackedAreaOpt(labels, series);
+  }, [data, numCols, meta]);
+
   if (!info || data.length === 0) {
+
 
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', flexDirection: 'column', gap: 16 }}>
@@ -564,7 +749,144 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
         </div>
 
         {/* ── Histogram + Multi-Metric Bar ── */}
+        {/* ── Quality Grade Card ── */}
+        <div style={{ background: 'rgba(15,23,42,0.8)', border: `1px solid ${qualityGrade.gradeColor}33`, borderRadius: 16, padding: '20px 24px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 28, flexWrap: 'wrap' }}>
+          <div style={{ textAlign: 'center', minWidth: 100 }}>
+            <div style={{ fontSize: 64, fontWeight: 900, color: qualityGrade.gradeColor, lineHeight: 1 }}>{qualityGrade.grade}</div>
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Quality Grade</div>
+          </div>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <ReactECharts key={refreshKey} option={gaugeOpt(qualityGrade.score, 'Data Quality Score', qualityGrade.gradeColor)} style={{ height: 140 }} theme="dark" />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, flex: 2, minWidth: 240 }}>
+            {[
+              { label: 'Quality Score', val: qualityGrade.score + '/100', color: qualityGrade.gradeColor },
+              { label: 'Fill Rate', val: qualityGrade.fillRate + '%', color: qualityGrade.fillRate > 95 ? '#10b981' : '#f59e0b' },
+              { label: 'Duplicate Rate', val: qualityGrade.dupRate + '%', color: qualityGrade.dupRate > 5 ? '#ef4444' : '#10b981' },
+            ].map(item => (
+              <div key={item.label} style={{ background: `${item.color}0d`, border: `1px solid ${item.color}22`, borderRadius: 10, padding: '10px 12px' }}>
+                <div style={{ fontSize: 20, fontWeight: 800, color: item.color }}>{item.val}</div>
+                <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{item.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Category Intelligence Panel (15 metrics) ── */}
+        {catIntelligence && (
+          <div style={{ background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '16px 20px', marginBottom: 20 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 14 }}>🧠 Category Intelligence — "{catCols[0]}"</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
+              {[
+                { label: 'Total Categories', val: catIntelligence.n.toLocaleString(), icon: '📂', color: meta.p },
+                { label: 'Total Records', val: catIntelligence.total.toLocaleString(), icon: '📊', color: '#3b82f6' },
+                { label: 'Top Category', val: catIntelligence.top1.slice(0, 16), icon: '🥇', color: '#10b981' },
+                { label: 'Top Cat Share', val: catIntelligence.top1Pct + '%', icon: '👑', color: '#f59e0b' },
+                { label: 'Top 3 Share', val: catIntelligence.top3Pct + '%', icon: '🏅', color: '#6366f1' },
+                { label: 'Avg per Category', val: catIntelligence.avgPerCat.toLocaleString(), icon: '📐', color: '#06b6d4' },
+                { label: 'Cats for 80%', val: catIntelligence.cats80.toString(), icon: '📐', color: '#8b5cf6' },
+                { label: 'Long Tail Cats', val: catIntelligence.longTail.toString(), icon: '🦀', color: '#94a3b8' },
+                { label: 'Singletons', val: catIntelligence.singletons.toString(), icon: '🔂', color: '#64748b' },
+                { label: 'Balance Score', val: catIntelligence.balance + '%', icon: '⚖️', color: catIntelligence.balance > 70 ? '#10b981' : '#f59e0b' },
+                { label: 'Shannon Entropy', val: catIntelligence.entropy.toFixed(2), icon: '🌊', color: '#3b82f6' },
+                { label: 'HHI (Concentration)', val: catIntelligence.hhi.toString(), icon: '🎯', color: catIntelligence.hhi > 2500 ? '#ef4444' : '#10b981' },
+                { label: 'Rarest Category', val: catIntelligence.rarest.slice(0, 14), icon: '💎', color: '#f43f5e' },
+                { label: 'Rarest Count', val: catIntelligence.rarestV.toString(), icon: '🔬', color: '#64748b' },
+                { label: 'Dominant?', val: catIntelligence.top1Pct > 50 ? 'Yes' : 'Distributed', icon: '📡', color: catIntelligence.top1Pct > 50 ? '#f59e0b' : '#10b981' },
+              ].map(item => (
+                <div key={item.label} style={{ background: `${item.color}0d`, border: `1px solid ${item.color}22`, borderRadius: 10, padding: '9px 11px' }}>
+                  <div style={{ fontSize: 14, marginBottom: 2 }}>{item.icon}</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: item.color, lineHeight: 1.1 }}>{item.val}</div>
+                  <div style={{ fontSize: 9, color: '#64748b', marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{item.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Advanced Statistical Analysis Table ── */}
+        {advStats.length > 0 && (
+          <div style={{ background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, overflow: 'hidden', marginBottom: 20 }}>
+            <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>🔭 Advanced Statistical Analysis</span>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
+                    {['Column','Sum','Variance','Skewness','Shape','Kurtosis','Type','Mode','CV%','P5','P95','IQR','Neg#','Pos#'].map(h => (
+                      <th key={h} style={{ padding: '8px 11px', textAlign: 'left', color: '#64748b', fontWeight: 600, fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255,255,255,0.06)', whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(advStats as unknown as {col:string;sum:number;variance:number;skew:number;skewLabel:string;kurt:number;kurtLabel:string;mode:number;cv:number;p5:number;p95:number;iqr:number;neg:number;pos:number}[]).map((s, i) => (
+                    <tr key={s.col} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)' }}>
+                      <td style={{ padding: '7px 11px', color: meta.p, fontWeight: 700, whiteSpace: 'nowrap' }}>{s.col}</td>
+                      <td style={{ padding: '7px 11px', color: '#e2e8f0', fontVariantNumeric: 'tabular-nums' }}>{fmt(s.sum)}</td>
+                      <td style={{ padding: '7px 11px', color: '#e2e8f0', fontVariantNumeric: 'tabular-nums' }}>{fmt(Math.round(s.variance))}</td>
+                      <td style={{ padding: '7px 11px', color: Math.abs(s.skew) > 1 ? '#f59e0b' : '#e2e8f0', fontVariantNumeric: 'tabular-nums' }}>{s.skew.toFixed(2)}</td>
+                      <td style={{ padding: '7px 11px' }}><span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 20, background: 'rgba(255,255,255,0.06)', color: '#94a3b8', whiteSpace: 'nowrap' }}>{s.skewLabel}</span></td>
+                      <td style={{ padding: '7px 11px', color: '#e2e8f0', fontVariantNumeric: 'tabular-nums' }}>{s.kurt.toFixed(2)}</td>
+                      <td style={{ padding: '7px 11px' }}><span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 20, background: 'rgba(255,255,255,0.06)', color: '#94a3b8', whiteSpace: 'nowrap' }}>{s.kurtLabel}</span></td>
+                      <td style={{ padding: '7px 11px', color: '#e2e8f0', fontVariantNumeric: 'tabular-nums' }}>{fmt(s.mode)}</td>
+                      <td style={{ padding: '7px 11px', color: s.cv > 100 ? '#f59e0b' : '#e2e8f0', fontVariantNumeric: 'tabular-nums' }}>{s.cv.toFixed(1)}%</td>
+                      <td style={{ padding: '7px 11px', color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>{fmt(Math.round(s.p5))}</td>
+                      <td style={{ padding: '7px 11px', color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>{fmt(Math.round(s.p95))}</td>
+                      <td style={{ padding: '7px 11px', color: '#e2e8f0', fontVariantNumeric: 'tabular-nums' }}>{fmt(Math.round(s.iqr))}</td>
+                      <td style={{ padding: '7px 11px', color: s.neg > 0 ? '#ef4444' : '#10b981', fontVariantNumeric: 'tabular-nums' }}>{s.neg}</td>
+                      <td style={{ padding: '7px 11px', color: '#10b981', fontVariantNumeric: 'tabular-nums' }}>{s.pos}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ── Funnel + Waterfall Charts ── */}
+        {(funnelChart || waterfallChart) && (
+          <div style={{ display: 'grid', gridTemplateColumns: funnelChart && waterfallChart ? '1fr 1fr' : '1fr', gap: 20, marginBottom: 20 }}>
+            {funnelChart && (
+              <div style={{ background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '20px 20px 14px' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>🔽 Funnel — Top {catCols[0]} by Count</div>
+                <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>Widest bar = most records, narrowest = fewest</div>
+                <ReactECharts key={refreshKey} option={funnelChart} style={{ height: 260 }} theme="dark" />
+              </div>
+            )}
+            {waterfallChart && (
+              <div style={{ background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '20px 20px 14px' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>💧 Waterfall — Cumulative {numCols[0]}</div>
+                <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>Each bar shows incremental contribution to running total</div>
+                <ReactECharts key={refreshKey} option={waterfallChart} style={{ height: 260 }} theme="dark" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Bubble Chart + Stacked Area ── */}
+        {(bubbleChart || stackedAreaChart) && (
+          <div style={{ display: 'grid', gridTemplateColumns: bubbleChart && stackedAreaChart ? '1fr 1fr' : '1fr', gap: 20, marginBottom: 20 }}>
+            {bubbleChart && (
+              <div style={{ background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '20px 20px 14px' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>🫧 Bubble Chart — 3-Variable Analysis</div>
+                <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>{numCols[0]} × {numCols[1]}, bubble size = {numCols[2]}</div>
+                <ReactECharts key={refreshKey} option={bubbleChart} style={{ height: 260 }} theme="dark" />
+              </div>
+            )}
+            {stackedAreaChart && (
+              <div style={{ background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '20px 20px 14px' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>📉 Stacked Area — Multi-Metric Trend</div>
+                <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>Cumulative trend across {numCols.slice(0,3).join(', ')}</div>
+                <ReactECharts key={refreshKey} option={stackedAreaChart} style={{ height: 260 }} theme="dark" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Histogram + Multi-Metric Bar ── */}
         {(histChart || multiBarChart) && (
+
           <div style={{ display: 'grid', gridTemplateColumns: histChart && multiBarChart ? '1fr 1fr' : '1fr', gap: 20, marginBottom: 20 }}>
             {histChart && numCols[0] && (
               <div style={{ background: 'rgba(15,23,42,0.8)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '20px 20px 14px' }}>
