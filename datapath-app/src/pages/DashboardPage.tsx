@@ -321,7 +321,7 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
       insights: insights.map(ins => ({ title: ins.title, description: ins.description, type: ins.type })),
     });
     setReportGenerating(false);
-  }, [info, health, customCharts, insights]);
+  }, [info, health, insights]);
 
   // ── Cross-Filter handlers (Task 4) ────────────────────────────────────────
   const handleChartSegmentClick = useCallback((column: string, value: string) => {
@@ -336,7 +336,7 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
       try {
         const { datasetsApi } = await import('../api/datasets.api');
         const res = await datasetsApi.importSheets(info.sourceUrl!);
-        setDataset(convertBackendResultToDatasetInfo(res));
+        setDataset(convertBackendResultToDatasetInfo(res as any));
       } catch (err) {
         console.error("Live Sync failed", err);
       }
@@ -450,7 +450,7 @@ export const DashboardPage: React.FC<Props> = ({ lang }) => {
               <SourceManager
                 onFileUploadMode={() => setShowSourceManager(false)}
                 onSuccess={(res) => {
-                  setDataset(convertBackendResultToDatasetInfo(res));
+                  setDataset(convertBackendResultToDatasetInfo(res as any));
                   setShowSourceManager(false);
                 }}
               />

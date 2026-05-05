@@ -57,7 +57,7 @@ interface SourceManagerProps {
   /** Current active source type */
   activeSource?: SourceType;
   /** Callback on successful data import */
-  onSuccess?: (result: any) => void;
+  onSuccess?: (result: unknown) => void;
 }
 
 // ── Source Definitions ────────────────────────────────────────────────────────

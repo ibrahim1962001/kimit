@@ -273,7 +273,24 @@ function triggerDownload(blob: Blob, name: string) {
   a.href = url; a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
-export function convertBackendResultToDatasetInfo(result: any): DatasetInfo {
+
+export interface BackendResult {
+  filename: string;
+  datasetId?: number;
+  sourceUrl?: string;
+  shape: number[];
+  columns: string[];
+  dtypes: Record<string, string>;
+  nullCounts: Record<string, number>;
+  fullData?: DataRow[];
+  preview?: DataRow[];
+  anomalies: Anomaly[];
+  correlations: Correlation[];
+  charts: ChartInfo[];
+  duplicates: number;
+}
+
+export function convertBackendResultToDatasetInfo(result: BackendResult): DatasetInfo {
   const columns: ColumnInfo[] = result.columns.map((name: string) => {
     const dtype = result.dtypes[name] || '';
     const type = (dtype.includes('int') || dtype.includes('float')) ? 'numeric' : 'text';
@@ -292,12 +309,12 @@ export function convertBackendResultToDatasetInfo(result: any): DatasetInfo {
     fileSize: 0, // Remote file
     rows: result.shape[0],
     columns,
-    rawData: result.fullData || result.preview,
-    workData: JSON.parse(JSON.stringify(result.fullData || result.preview)),
+    rawData: result.fullData || result.preview || [],
+    workData: JSON.parse(JSON.stringify(result.fullData || result.preview || [])),
     anomalies: result.anomalies,
     correlations: result.correlations,
     charts: result.charts,
     duplicates: result.duplicates,
-    totalNulls: Object.values(result.nullCounts as Record<string, number>).reduce((a, b) => a + b, 0),
+    totalNulls: Object.values(result.nullCounts).reduce((a, b) => a + b, 0),
   };
 }
