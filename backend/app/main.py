@@ -69,6 +69,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Admin router ─────────────────────────────────────────────────────────────
+from app.controllers.admin_router import router as admin_router
+app.include_router(admin_router)
+
+# ── Charge requests (user-facing) ────────────────────────────────────────────
+from app.controllers.charge_router import router as charge_router
+app.include_router(charge_router)
+
+
 # Initialize Groq client
 groq_api_key = os.getenv("GROQ_API_KEY")
 if not groq_api_key:
