@@ -149,7 +149,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           backdrop-filter: blur(20px);
           animation: auth-card-in 0.3s ease;
           direction: ltr;
-          font-family: 'Cairo', 'Inter', sans-serif;
+          font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', system-ui, -apple-system, sans-serif;
         }
 
         @keyframes auth-card-in {

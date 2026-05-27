@@ -1,10 +1,12 @@
 import React, { useCallback, useState } from 'react';
-import { useDropzone } from 'react-dropzone';
+import { useDropzone, type FileRejection } from 'react-dropzone';
 import { UploadCloud, FileSpreadsheet, PlayCircle } from 'lucide-react';
 import { GoogleSheetsPicker } from './GoogleSheetsPicker';
+import { getAppLang } from '../lib/i18n';
+import { isCloudSyncEnabled } from '../lib/cloudSyncPreference';
+import './dropzone-redesign.css';
 
 interface Props {
-  
   onFile: (file: File) => void;
 }
 
@@ -13,9 +15,21 @@ const T = {
     title: 'Drag your data file here',
     sub: 'or click to choose a file from your device',
     hint: 'Supports CSV & Excel (XLSX, XLS)',
-    badge: 'Fully browser-based · Your data never leaves your device',
+    badgeLocal: 'Under 10MB: analyzed locally in your browser',
+    badgeLarge: 'Over 10MB: processed on Kimit servers',
+    badgeCloud: 'Optional cloud backup is ON',
     sampleBtn: 'Try Sample File',
     or: '— OR —',
+  },
+  ar: {
+    title: 'اسحب ملف البيانات هنا',
+    sub: 'أو انقر لاختيار ملف من جهازك',
+    hint: 'يدعم CSV و Excel (XLSX, XLS)',
+    badgeLocal: 'أقل من 10MB: تحليل محلي في المتصفح',
+    badgeLarge: 'أكثر من 10MB: معالجة على خوادم Kimit',
+    badgeCloud: 'النسخ السحابي الاختياري مفعّل',
+    sampleBtn: 'جرب ملفاً تجريبياً',
+    or: '— أو —',
   },
 };
 
@@ -29,13 +43,15 @@ Omar,22,Jordan,900,2023-03-01
 Elena,27,Italy,2100,2023-03-05`;
 
 export const DropZone: React.FC<Props> = ({ onFile }) => {
-  const t = T.en;
+  const lang = getAppLang();
+  const t = lang === 'ar' ? T.ar : T.en;
   const [error, setError] = useState<string | null>(null);
+  const cloudOn = isCloudSyncEnabled();
 
   const onDrop = useCallback(
-    (acceptedFiles: File[], fileRejections: any[]) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+    (acceptedFiles: File[], fileRejections: FileRejection[]) => {
       if (fileRejections.length > 0) {
-        setError('Sorry, this file type is not supported');
+        setError(lang === 'ar' ? 'نوع الملف غير مدعوم' : 'Sorry, this file type is not supported');
         return;
       }
       if (acceptedFiles[0]) {
@@ -43,7 +59,7 @@ export const DropZone: React.FC<Props> = ({ onFile }) => {
         onFile(acceptedFiles[0]);
       }
     },
-    [onFile]
+    [onFile, lang],
   );
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
@@ -64,110 +80,38 @@ export const DropZone: React.FC<Props> = ({ onFile }) => {
   };
 
   return (
-    <div className="flex flex-col items-center gap-4 w-full max-w-[680px]">
-      {/* ─── File Drop Area ─── */}
+    <div className="dz2-shell">
       <div
         {...getRootProps()}
         onClick={open}
-        className={`dropzone w-full p-10 border-2 border-dashed rounded-[2rem] transition-all cursor-pointer text-center ${isDragActive ? 'dragging border-primary bg-primary/10 scale-[1.02]' : 'border-white/10 hover:border-primary/40 hover:bg-white/[0.02]'}`}
+        className={`dz2-drop ${isDragActive ? 'is-drag' : ''}`}
       >
         <input {...getInputProps()} />
-
-        <div className="dropzone-icon">
+        <div className="dz2-icon">
           {isDragActive ? (
-            <FileSpreadsheet size={52} className="animate-bounce" />
+            <FileSpreadsheet size={28} />
           ) : (
-            <UploadCloud size={52} strokeWidth={1.5} />
+            <UploadCloud size={28} strokeWidth={1.6} />
           )}
         </div>
-        <h3 className="dropzone-title">
-          {isDragActive ? 'Drop it now! 🎯' : t.title}
-        </h3>
-        <p className="dropzone-sub">{t.sub}</p>
-        <div className="dropzone-formats">
-          {['CSV', 'XLSX', 'XLS'].map((f) => (
-            <span key={f} className="format-tag">
-              {f}
-            </span>
-          ))}
+        <h3 className="dz2-title">{t.title}</h3>
+        <p className="dz2-sub">{t.sub}</p>
+        <p className="dz2-hint">{t.hint}</p>
+        <div className="dz2-badges">
+          <span className="dz2-badge dz2-badge--local">{t.badgeLocal}</span>
+          {cloudOn && <span className="dz2-badge dz2-badge--cloud">{t.badgeCloud}</span>}
         </div>
-        {error && (
-          <p className="text-red-400 text-sm mt-3 font-bold animate-pulse">{error}</p>
-        )}
-        <div className="dropzone-badge">{t.badge}</div>
+        {error && <p className="dz2-error">{error}</p>}
       </div>
 
-      {/* ─── Divider ─── */}
-      <div className="flex items-center w-full gap-3 text-white/30 text-xs font-bold tracking-widest uppercase before:content-[''] before:flex-1 before:h-[1px] before:bg-white/5 after:content-[''] after:flex-1 after:h-[1px] after:bg-white/5">
-        <span>{t.or}</span>
-      </div>
+      <div className="dz2-or">{t.or}</div>
 
-      {/* ─── Google Sheets Picker ─── */}
       <GoogleSheetsPicker onFile={onFile} />
 
-      {/* ─── Sample Button ─── */}
-      <button onClick={handleSample} className="sample-data-btn">
-        <PlayCircle size={20} className="sample-icon" />
+      <button type="button" className="dz2-sample" onClick={handleSample}>
+        <PlayCircle size={16} />
         {t.sampleBtn}
       </button>
-
-      <style>{`
-        .dropzone-outer {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 16px;
-          width: 100%;
-          max-width: 680px;
-        }
-
-        .dz-divider {
-          display: flex;
-          align-items: center;
-          width: 100%;
-          gap: 12px;
-          color: var(--muted);
-          font-size: 12px;
-          font-weight: 600;
-          letter-spacing: 1px;
-        }
-        .dz-divider::before,
-        .dz-divider::after {
-          content: '';
-          flex: 1;
-          height: 1px;
-          background: var(--border);
-        }
-
-        .sample-data-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 12px 28px;
-          border-radius: 99px;
-          background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.12);
-          color: rgba(255,255,255,0.75);
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          font-family: inherit;
-        }
-        .sample-data-btn:hover {
-          background: rgba(255,255,255,0.1);
-          border-color: rgba(255,255,255,0.22);
-          color: #fff;
-          transform: translateY(-2px);
-        }
-        .sample-icon {
-          color: var(--primary);
-          transition: transform 0.3s ease;
-        }
-        .sample-data-btn:hover .sample-icon {
-          transform: scale(1.15);
-        }
-      `}</style>
     </div>
   );
 };

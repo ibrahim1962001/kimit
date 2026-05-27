@@ -3,6 +3,7 @@ import { Columns, ArrowRightLeft, CheckCircle2 } from 'lucide-react';
 import { DropZone } from '../components/DropZone';
 import { parseFile, analyzeDataset } from '../lib/dataUtils';
 import type { DatasetInfo } from '../types';
+import './comparison-redesign.css';
 
 interface Props {}
 
@@ -27,7 +28,7 @@ export const ComparisonPage: React.FC<Props> = ({}) => {
   };
 
   return (
-    <div className="page p-6 md:p-12 max-w-6xl mx-auto">
+    <div className="page compare2 p-6 md:p-12 max-w-6xl mx-auto">
       <div className="text-center mb-12">
         <h1 className="text-3xl font-bold flex justify-center items-center gap-3">
           <ArrowRightLeft className="text-primary" />

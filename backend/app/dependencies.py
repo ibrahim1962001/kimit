@@ -1,4 +1,5 @@
-from typing import AsyncGenerator
+import logging
+from typing import AsyncGenerator, Optional
 
 import firebase_admin
 from firebase_admin import auth, credentials
@@ -8,10 +9,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.db.session import AsyncSessionLocal
 
-# ── Firebase Admin SDK init (once at import time) ──────────────────────────
+logger = logging.getLogger(__name__)
+
+# ── Firebase Admin SDK init (optional in local dev) ─────────────────────────
 if not firebase_admin._apps:
-    cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
-    firebase_admin.initialize_app(cred)
+    try:
+        cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
+        firebase_admin.initialize_app(cred)
+    except Exception as exc:
+        logger.warning("Firebase Admin not initialized: %s", exc)
 
 
 # ── DB session dependency ──────────────────────────────────────────────────
@@ -48,3 +54,18 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired Firebase token.",
         )
+
+
+async def get_optional_user(
+    authorization: Optional[str] = Header(default=None),
+) -> Optional[dict]:
+    """Return Firebase claims when Bearer token is valid; None for guest requests."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    if not firebase_admin._apps:
+        return None
+    token = authorization.split(" ", 1)[1]
+    try:
+        return auth.verify_id_token(token)
+    except Exception:
+        return None

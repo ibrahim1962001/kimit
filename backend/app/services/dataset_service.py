@@ -1,15 +1,12 @@
 """
 dataset_service.py
 All business logic for file parsing, cleaning, anomaly detection,
-chart generation, and dataset persistence.
-Extracted from main.py — routers must NOT duplicate any of this logic.
+chart generation, and dataset persistence (PostgreSQL + MinIO).
 """
 import io
-import json
+import logging
 from typing import Any
 
-import chardet
-import charset_normalizer
 import numpy as np
 import pandas as pd
 import polars as pl
@@ -18,14 +15,15 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from app.config import settings
 from app.models.dataset import Dataset
+from app.utils.storage import storage_manager
 
-# ── In-memory DataFrame store (replaced by DB in Milestone 2) ──────────────
-# Key: dataset DB id (str), Value: pd.DataFrame
+logger = logging.getLogger(__name__)
+
+# In-memory cache keyed by dataset id
 _DATA_STORE: dict[str, pd.DataFrame] = {}
 
-
-# ── File Parsing ───────────────────────────────────────────────────────────
 
 def _robust_read_file(content: bytes, filename: str) -> pd.DataFrame:
     """Multi-engine file reader supporting CSV, XLSX, XLS, XLSB."""
@@ -80,7 +78,26 @@ def _robust_read_file(content: bytes, filename: str) -> pd.DataFrame:
     )
 
 
-# ── Analytics helpers ──────────────────────────────────────────────────────
+def _persist_to_minio(user_id: int, dataset_id: int, filename: str, df: pd.DataFrame) -> str | None:
+    """Save DataFrame to MinIO; return object key or None on failure."""
+    key = f"datasets/{user_id}/{dataset_id}/{filename}"
+    try:
+        buf = io.BytesIO()
+        df.to_csv(buf, index=False, encoding="utf-8-sig")
+        storage_manager.upload_file(buf.getvalue(), key, "text/csv")
+        return key
+    except Exception as exc:
+        logger.warning("MinIO persist failed for dataset %s: %s", dataset_id, exc)
+        return None
+
+
+def _load_from_minio(storage_path: str, filename: str) -> pd.DataFrame:
+    content = storage_manager.download_file(storage_path)
+    ext = filename.lower().rsplit(".", 1)[-1]
+    if ext == "csv":
+        return pd.read_csv(io.BytesIO(content), encoding="utf-8-sig", encoding_errors="replace")
+    return pd.read_excel(io.BytesIO(content))
+
 
 def _detect_anomalies(df: pd.DataFrame) -> list[dict]:
     anomalies: list[dict] = []
@@ -160,7 +177,6 @@ def _generate_charts(df: pd.DataFrame) -> list[dict]:
 
 
 def _get_ai_summary(df: pd.DataFrame) -> str:
-    """Build a compact text summary of the DataFrame for the AI prompt."""
     lines = [f"Rows: {len(df)}, Columns: {len(df.columns)}", "Columns:"]
     for col in df.columns:
         lines.append(f"  - {col}: {df[col].dtype} ({df[col].nunique()} unique)")
@@ -173,8 +189,6 @@ def _get_ai_summary(df: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
-# ── Public service methods ─────────────────────────────────────────────────
-
 class DatasetService:
 
     async def process_upload(
@@ -184,7 +198,6 @@ class DatasetService:
         user_id: int,
         db: AsyncSession,
     ) -> dict[str, Any]:
-        """Parse file, persist metadata to DB, return analysis payload."""
         df = _robust_read_file(content, filename)
         df.columns = df.columns.str.strip()
         df.replace([np.inf, -np.inf], np.nan, inplace=True)
@@ -200,10 +213,13 @@ class DatasetService:
             source="upload",
         )
         db.add(dataset)
+        await db.flush()
+
+        storage_path = _persist_to_minio(user_id, dataset.id, filename, df)
+        dataset.storage_path = storage_path
         await db.commit()
         await db.refresh(dataset)
 
-        # Store DataFrame in memory keyed by DB id
         _DATA_STORE[str(dataset.id)] = df
 
         return {
@@ -226,8 +242,7 @@ class DatasetService:
         user_id: int,
         db: AsyncSession,
     ) -> dict[str, Any]:
-        """Impute nulls + drop duplicates, persist changes."""
-        df = self._get_df(dataset_id, user_id)
+        df = await self.get_dataframe(dataset_id, user_id, db)
         original_nulls = int(df.isnull().sum().sum())
         original_dupes = int(df.duplicated().sum())
 
@@ -243,7 +258,6 @@ class DatasetService:
         df.drop_duplicates(inplace=True)
         _DATA_STORE[str(dataset_id)] = df
 
-        # Update DB metadata
         result = await db.execute(
             select(Dataset).where(Dataset.id == dataset_id, Dataset.user_id == user_id)
         )
@@ -251,6 +265,8 @@ class DatasetService:
         if dataset:
             dataset.row_count = len(df)
             dataset.null_counts = df.isnull().sum().to_dict()
+            if dataset.storage_path:
+                _persist_to_minio(user_id, dataset_id, dataset.filename, df)
             await db.commit()
 
         return {
@@ -262,18 +278,32 @@ class DatasetService:
             "preview": df.head(10).to_dict(orient="records"),
         }
 
-    def get_summary_for_ai(self, dataset_id: int, user_id: int) -> str:
-        return _get_ai_summary(self._get_df(dataset_id, user_id))
+    async def get_summary_for_ai(self, dataset_id: int, user_id: int, db: AsyncSession) -> str:
+        df = await self.get_dataframe(dataset_id, user_id, db)
+        return _get_ai_summary(df)
 
-    def get_dataframe(self, dataset_id: int, user_id: int) -> pd.DataFrame:
-        return self._get_df(dataset_id, user_id)
+    async def get_dataframe(self, dataset_id: int, user_id: int, db: AsyncSession) -> pd.DataFrame:
+        key = str(dataset_id)
+        cached = _DATA_STORE.get(key)
+        if cached is not None:
+            return cached
 
-    def _get_df(self, dataset_id: int, user_id: int) -> pd.DataFrame:
-        """Retrieve DataFrame; raises 404 if not found."""
-        df = _DATA_STORE.get(str(dataset_id))
-        if df is None:
-            raise HTTPException(status_code=404, detail="Dataset not found. Please upload first.")
-        return df
+        result = await db.execute(
+            select(Dataset).where(Dataset.id == dataset_id, Dataset.user_id == user_id)
+        )
+        dataset = result.scalar_one_or_none()
+        if not dataset:
+            raise HTTPException(status_code=404, detail="Dataset not found.")
+
+        if dataset.storage_path:
+            try:
+                df = _load_from_minio(dataset.storage_path, dataset.filename)
+                _DATA_STORE[key] = df
+                return df
+            except Exception as exc:
+                logger.error("Failed to load dataset %s from storage: %s", dataset_id, exc)
+
+        raise HTTPException(status_code=404, detail="Dataset data unavailable. Please re-upload.")
 
 
 dataset_service = DatasetService()

@@ -196,14 +196,15 @@ export const GoogleSheetsPicker: React.FC<Props> = ({ onFile }) => {
   };
 
   return (
-    <div className="gsp-wrapper">
+    <div className="gsp2-wrapper">
       <button
-        className={`gsp-btn ${status}`}
+        className={`gsp2-btn ${status}`}
         onClick={handleClick}
         disabled={status === 'loading' || status === 'success'}
         title="Pick a spreadsheet from Google Drive"
+        type="button"
       >
-        {status === 'loading'  ? <Loader2 size={18} className="gsp-spin" />  :
+        {status === 'loading'  ? <Loader2 size={18} className="gsp2-spin" />  :
          status === 'success'  ? <CheckCircle2 size={18} />                   :
          status === 'error'    ? <AlertCircle size={18} />                    :
                                  <Sheet size={18} />}
@@ -214,44 +215,7 @@ export const GoogleSheetsPicker: React.FC<Props> = ({ onFile }) => {
         </span>
       </button>
 
-      {msg && <div className={`gsp-status ${status}`}>{msg}</div>}
-
-      <style>{`
-        .gsp-wrapper{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;}
-
-        .gsp-btn{
-          display:inline-flex;align-items:center;gap:10px;padding:13px 26px;
-          border-radius:999px;border:1px solid rgba(66,133,244,.35);
-          background:linear-gradient(135deg,rgba(66,133,244,.12),rgba(52,168,83,.08));
-          color:#93c5fd;font-size:14px;font-weight:700;cursor:pointer;
-          transition:all .3s cubic-bezier(.175,.885,.32,1.275);
-          font-family:inherit;white-space:nowrap;backdrop-filter:blur(10px);
-          position:relative;overflow:hidden;width:auto;max-width:100%;
-        }
-        .gsp-btn:hover:not(:disabled){
-          border-color:rgba(66,133,244,.6);color:#bfdbfe;
-          transform:translateY(-3px);box-shadow:0 8px 24px rgba(66,133,244,.25);
-          background:linear-gradient(135deg,rgba(66,133,244,.22),rgba(52,168,83,.15));
-        }
-        .gsp-btn:disabled{opacity:.7;cursor:not-allowed;}
-        .gsp-btn.success{border-color:rgba(16,185,129,.4);color:#6ee7b7;
-          background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(16,185,129,.08));}
-        .gsp-btn.error{border-color:rgba(239,68,68,.35);color:#fca5a5;
-          background:linear-gradient(135deg,rgba(239,68,68,.12),transparent);}
-
-        @keyframes gsp-spin{to{transform:rotate(360deg);}}
-        .gsp-spin{animation:gsp-spin .8s linear infinite;}
-
-        .gsp-status{
-          font-size:12px;font-weight:600;padding:8px 16px;
-          border-radius:999px;text-align:center;
-          animation:gsp-fadein .3s ease;
-        }
-        @keyframes gsp-fadein{from{opacity:0;transform:translateY(-5px);}to{opacity:1;transform:translateY(0);}}
-        .gsp-status.loading{color:#94a3b8;}
-        .gsp-status.success{color:#6ee7b7;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.2);}
-        .gsp-status.error{color:#fca5a5;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);}
-      `}</style>
+      {msg && <div className={`gsp2-status ${status}`}>{msg}</div>}
     </div>
   );
 };

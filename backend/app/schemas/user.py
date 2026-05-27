@@ -8,6 +8,8 @@ class UserOut(BaseModel):
     email: str
     display_name: str | None
     plan: str
+    credit_balance: float = 0.0
+    credit_status: str = "active"
     created_at: datetime.datetime
 
     model_config = {"from_attributes": True}

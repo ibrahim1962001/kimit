@@ -6,10 +6,16 @@ import charset_normalizer
 import polars as pl
 from pyxlsb import open_workbook
 from typing import List, Dict, Any, Optional
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 from groq import Groq
 import pandas as pd
 import numpy as np
@@ -19,6 +25,24 @@ import logging
 
 load_dotenv()
 logger = logging.getLogger("uvicorn.error")
+
+from app.config import settings
+
+limiter = Limiter(key_func=get_remote_address, default_limits=[settings.RATE_LIMIT_DEFAULT])
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Ensure DB tables exist on startup (dev-friendly)."""
+    try:
+        from app.db.session import engine, Base
+        from app.models import User, Dataset, ChatMessage  # noqa: F401
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database tables ready.")
+    except Exception as exc:
+        logger.warning("DB init skipped: %s", exc)
+    yield
 
 def detect_anomalies(df: pd.DataFrame) -> List[Dict]:
     """Detect anomalies (outliers) in numeric columns using Z-score."""
@@ -59,22 +83,28 @@ def get_correlations(df: pd.DataFrame) -> List[Dict]:
                     })
     return correlations
 
-app = FastAPI(title="DataPath Analyzer API", version="1.0.0")
+app = FastAPI(title="Kimit DataPath Analyzer API", version="2.0.0", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=(settings.ALLOWED_ORIGINS + ["*"]) if settings.DEBUG else settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ── Admin router ─────────────────────────────────────────────────────────────
+# ── Routers ───────────────────────────────────────────────────────────────────
 from app.controllers.admin_router import router as admin_router
-app.include_router(admin_router)
-
-# ── Charge requests (user-facing) ────────────────────────────────────────────
 from app.controllers.charge_router import router as charge_router
+from app.controllers.auth_router import router as auth_router
+from app.controllers.dataset_router import router as dataset_router
+
+app.include_router(auth_router)
+app.include_router(dataset_router)
+app.include_router(admin_router)
 app.include_router(charge_router)
 
 
@@ -335,97 +365,7 @@ async def health_check():
     }
 
 
-@app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...), request: Request = None):
-    """Upload and process CSV or Excel file."""
-    try:
-        contents = await file.read()
-        if not contents:
-            raise HTTPException(status_code=400, detail="The uploaded file is empty.")
-
-        # ── MinIO: save raw bytes (additive layer, never blocks processing) ──
-        dataset_id = len(DATA_STORE) + 1
-
-        # Extract user_id from Authorization header if present
-        user_id: str | None = None
-        if request:
-            auth_header = request.headers.get("Authorization", "")
-            if auth_header.startswith("Bearer "):
-                import hashlib
-                user_id = hashlib.md5(auth_header[7:].encode()).hexdigest()[:12]
-
-        ext = "." + (file.filename or "").rsplit(".", 1)[-1].lower()
-        content_type_map = {
-            ".csv":  "text/csv",
-            ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            ".xls":  "application/vnd.ms-excel",
-        }
-        ct = content_type_map.get(ext, "application/octet-stream")
-        object_name = minio_client.build_object_name(file.filename or "unknown", user_id)
-        saved_to_storage = minio_client.upload_file_to_minio(contents, object_name, ct)
-        file_path = object_name
-
-        # Legacy boto3 backup (kept for compatibility, silent on failure)
-        try:
-            logger.info(f"Uploading raw file {file.filename} ({len(contents)} bytes) to MinIO path: {file_path}")
-            storage_manager.upload_file(contents, file_path)
-        except Exception as e:
-            logger.warning(f"Legacy storage backup failed: {str(e)}")
-
-        try:
-            df = robust_read_file(contents, file.filename)
-        except HTTPException as he:
-            # If pandas fails but it saved to MinIO, we still want to let the user know, but existing API behavior expects 400 here.
-            raise he
-        except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"خطأ داخلي في معالجة الملف: {str(e)}. تواصل مع الدعم."
-            )
-        
-        if df.empty:
-            raise HTTPException(status_code=400, detail="The uploaded file is empty.")
-        
-        df.columns = df.columns.str.strip()
-        df = df.replace([np.inf, -np.inf], np.nan)
-        
-        preview = df.head(10).to_dict(orient='records')
-        duplicates = int(df.duplicated().sum())
-        
-        DATA_STORE[dataset_id] = {
-            "df": df,
-            "filename": file.filename,
-            "storage_path": file_path,
-            "columns": df.columns.tolist(),
-            "dtypes": df.dtypes.astype(str).to_dict(),
-            "shape": list(df.shape),
-            "null_counts": df.isnull().sum().to_dict(),
-            "duplicates": duplicates
-        }
-        
-        anomalies = detect_anomalies(df)
-        correlations = get_correlations(df)
-        
-        return {
-            "datasetId": dataset_id,
-            "filename": file.filename,
-            "columns": df.columns.tolist(),
-            "dtypes": df.dtypes.astype(str).to_dict(),
-            "shape": list(df.shape),
-            "nullCounts": df.isnull().sum().to_dict(),
-            "duplicates": duplicates,
-            "preview": preview,
-            "charts": generate_chart_config(df),
-            "anomalies": anomalies,
-            "correlations": correlations,
-            "minio_path": object_name,
-            "saved_to_storage": saved_to_storage,
-        }
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+# POST /api/upload, /api/clean, /api/ai/*, /api/export → dataset_router (authenticated)
 
 
 @app.post("/api/files/upload")
@@ -580,281 +520,6 @@ async def download_minio_file(object_name: str):
         media_type=content_type,
         headers={"Content-Disposition": f'attachment; filename="{display_name}"'},
     )
-
-
-@app.post("/api/datasets/import-sheets")
-async def import_sheets(request: dict):
-    url = request.get("url")
-    if not url:
-        raise HTTPException(status_code=400, detail="Google Sheet URL is required.")
-        
-    import re
-    match = re.search(r"/spreadsheets/d/([a-zA-Z0-9-_]+)", url)
-    if not match:
-        raise HTTPException(status_code=400, detail="Invalid Google Sheets URL.")
-    
-    spreadsheet_id = match.group(1)
-    gid_match = re.search(r"[#&]gid=([0-9]+)", url)
-    gid_param = f"&gid={gid_match.group(1)}" if gid_match else ""
-    
-    export_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv{gid_param}"
-    
-    try:
-        df = pd.read_csv(export_url)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to read Google Sheet: {str(e)}")
-        
-    if df.empty:
-        raise HTTPException(status_code=400, detail="The Google Sheet is empty.")
-        
-    # PERSISTENT STORAGE FIRST
-    dataset_id = len(DATA_STORE) + 1
-    sheet_path = f"google_sheets/{dataset_id}_import.csv"
-    try:
-        csv_bytes = df.to_csv(index=False).encode('utf-8')
-        logger.info(f"Saving Google Sheet import to MinIO: {sheet_path}")
-        storage_manager.upload_file(csv_bytes, sheet_path, content_type="text/csv")
-    except Exception as e:
-        logger.error(f"MinIO Backup Failed for sheet: {str(e)}")
-    
-    preview = df.head(10).to_dict(orient='records')
-    duplicates = int(df.duplicated().sum())
-    
-    DATA_STORE[dataset_id] = {
-        "df": df,
-        "filename": "Google Sheet Import",
-        "storage_path": sheet_path,
-        "columns": df.columns.tolist(),
-        "dtypes": df.dtypes.astype(str).to_dict(),
-        "shape": list(df.shape),
-        "null_counts": df.isnull().sum().to_dict(),
-        "duplicates": duplicates
-    }
-    
-    anomalies = detect_anomalies(df)
-    correlations = get_correlations(df)
-    
-    return {
-        "datasetId": dataset_id,
-        "filename": "Google Sheet Import",
-        "sourceUrl": url,
-        "columns": df.columns.tolist(),
-        "dtypes": df.dtypes.astype(str).to_dict(),
-        "shape": list(df.shape),
-        "nullCounts": df.isnull().sum().to_dict(),
-        "duplicates": duplicates,
-        "preview": preview,
-        "fullData": df.to_dict(orient='records'),
-        "charts": generate_chart_config(df),
-        "anomalies": anomalies,
-        "correlations": correlations
-    }
-
-
-@app.post("/api/clean")
-async def clean_data(request: dict):
-    """Auto-clean data: fill nulls and remove duplicates."""
-    dataset_id = int(request.get("datasetId", 0))
-    
-    if dataset_id not in DATA_STORE:
-        raise HTTPException(status_code=404, detail="Dataset not found. Please upload a file first.")
-    
-    df = DATA_STORE[dataset_id]["df"].copy()
-    
-    original_nulls = int(df.isnull().sum().sum())
-    original_duplicates = int(df.duplicated().sum())
-    
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    for col in numeric_cols:
-        if df[col].isnull().any():
-            median_val = df[col].median()
-            if pd.notna(median_val):
-                df[col].fillna(median_val, inplace=True)
-    
-    categorical_cols = df.select_dtypes(include=['object', 'category']).columns
-    for col in categorical_cols:
-        if df[col].isnull().any():
-            mode_val = df[col].mode()
-            if len(mode_val) > 0 and pd.notna(mode_val[0]):
-                df[col].fillna(mode_val[0], inplace=True)
-            else:
-                df[col].fillna("Unknown", inplace=True)
-    
-    df.drop_duplicates(inplace=True)
-    
-    DATA_STORE[dataset_id]["df"] = df
-    DATA_STORE[dataset_id]["shape"] = list(df.shape)
-    DATA_STORE[dataset_id]["null_counts"] = df.isnull().sum().to_dict()
-    DATA_STORE[dataset_id]["duplicates"] = int(df.duplicated().sum())
-    
-    return {
-        "cleaned": True,
-        "removedNulls": original_nulls,
-        "removedDuplicates": original_duplicates,
-        "newShape": list(df.shape),
-        "nullCounts": df.isnull().sum().to_dict(),
-        "preview": df.head(10).to_dict(orient='records')
-    }
-
-
-@app.post("/api/ai/summary")
-async def get_ai_summary(request: dict):
-    """Get AI-generated executive summary and suggestions."""
-    dataset_id = int(request.get("datasetId", 0))
-    language = request.get("language", "en")
-    
-    if dataset_id not in DATA_STORE:
-        raise HTTPException(status_code=404, detail="Dataset not found. Please upload a file first.")
-    
-    if not groq_client:
-        df = DATA_STORE[dataset_id]["df"]
-        return {
-            "summary": f"The dataset contains {len(df)} rows and {len(df.columns)} columns ready for analysis." if language == "en" else f"تحتوي مجموعة البيانات على {len(df)} صف و {len(df.columns)} عمود جاهزة للتحليل.",
-            "suggestions": [
-                "What are the main trends?" if language == "en" else "ما هي الاتجاهات الرئيسية؟",
-                "Show column statistics" if language == "en" else "عرض إحصائيات الأعمدة",
-                "Find missing values" if language == "en" else "البحث عن القيم المفقودة",
-                "Show data distribution" if language == "en" else "عرض توزيع البيانات",
-                "Identify correlations" if language == "en" else "تحديد العلاقات"
-            ]
-        }
-    
-    df = DATA_STORE[dataset_id]["df"]
-    data_summary = get_summary_for_ai(df)
-    lang_instruction = "Respond in Arabic language." if language == "ar" else "Respond in English language."
-    
-    prompt = f"""You are an expert data analyst assistant. Analyze the dataset and provide insights.
-
-{lang_instruction}
-
-Dataset Information:
-{data_summary}
-
-Please provide:
-1. A concise 3-sentence executive summary of the data
-2. 5 suggested questions the user might ask about this data
-
-Format your response as JSON with this exact structure:
-{{
-    "summary": "Your 3-sentence summary here...",
-    "suggestions": ["Question 1", "Question 2", "Question 3", "Question 4", "Question 5"]
-}}
-
-Make sure suggestions are practical and related to the actual data columns."""
-
-    try:
-        response = groq_client.chat.completions.create(
-            model="llama-3.1-70b-versatile",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.6,
-            max_tokens=600
-        )
-        
-        content = response.choices[0].message.content.strip()
-        
-        if content.startswith("```json"):
-            content = content[7:]
-        if content.startswith("```"):
-            content = content[3:]
-        if content.endswith("```"):
-            content = content[:-3]
-        
-        result = json.loads(content.strip())
-        return result
-        
-    except json.JSONDecodeError:
-        return {
-            "summary": f"The dataset contains {len(df)} rows and {len(df.columns)} columns with various data types ready for analysis." if language == "en" else f"تحتوي مجموعة البيانات على {len(df)} صف و {len(df.columns)} عمود جاهزة للتحليل.",
-            "suggestions": [
-                "What are the main trends in this data?" if language == "en" else "ما هي الاتجاهات الرئيسية في هذه البيانات؟",
-                "Which columns have missing values?" if language == "en" else "أي الأعمدة تحتوي على قيم مفقودة؟",
-                "What is the distribution of key metrics?" if language == "en" else "ما هو توزيع المقاييس الرئيسية؟",
-                "Are there any correlations between columns?" if language == "en" else "هل هناك علاقات بين الأعمدة؟",
-                "What insights can we derive?" if language == "en" else "ما هي الرؤى التي يمكننا استنتاجها؟"
-            ]
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI processing error: {str(e)}")
-
-
-@app.post("/api/ai/chat")
-async def chat_with_ai(request: dict):
-    """Chat with AI about the data."""
-    question = request.get("question", "")
-    dataset_id = int(request.get("datasetId", 0))
-    language = request.get("language", "en")
-    
-    if not question:
-        raise HTTPException(status_code=400, detail="Question is required.")
-    
-    if dataset_id not in DATA_STORE:
-        raise HTTPException(status_code=404, detail="Dataset not found. Please upload a file first.")
-    
-    if not groq_client:
-        return {
-            "answer": "AI is not configured. Please set GROQ_API_KEY in .env file." if language == "en" else "لم يتم تكوين الذكاء الاصطناعي. يرجى تعيين GROQ_API_KEY في ملف .env"
-        }
-    
-    df = DATA_STORE[dataset_id]["df"]
-    data_context = get_summary_for_ai(df)
-    lang_instruction = "Respond in Arabic language." if language == "ar" else "Respond in English language."
-    
-    prompt = f"""You are a helpful data analyst assistant. Answer the user's question about their dataset.
-
-{lang_instruction}
-
-Dataset Information:
-{data_context}
-
-User Question: {question}
-
-Provide a clear, helpful, and accurate answer based on the data. If the question requires calculations, show the results. If it requires filtering or analysis, explain what you would do and the insights you can derive.
-
-Keep your response concise but informative (2-3 paragraphs max)."""
-
-    try:
-        response = groq_client.chat.completions.create(
-            model="llama-3.1-70b-versatile",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
-            max_tokens=400
-        )
-        
-        return {"answer": response.choices[0].message.content}
-        
-    except Exception as e:
-        error_msg = "I apologize, but I encountered an error processing your question. Please try again." if language == "en" else "أعتذر، لكنني واجهت خطأ في معالجة سؤالك. يرجى المحاولة مرة أخرى."
-        return {"answer": error_msg}
-
-
-@app.post("/api/export")
-async def export_data(request: dict):
-    """Export data as CSV or JSON."""
-    dataset_id = int(request.get("datasetId", 0))
-    format_type = request.get("format", "csv")
-    
-    if dataset_id not in DATA_STORE:
-        raise HTTPException(status_code=404, detail="Dataset not found. Please upload a file first.")
-    
-    df = DATA_STORE[dataset_id]["df"]
-    filename = DATA_STORE[dataset_id]["filename"].rsplit('.', 1)[0]
-    
-    if format_type == "csv":
-        csv_data = df.to_csv(index=False, encoding='utf-8-sig')
-        return StreamingResponse(
-            io.StringIO(csv_data),
-            media_type="text/csv",
-            headers={"Content-Disposition": f"attachment; filename={filename}_cleaned.csv"}
-        )
-    elif format_type == "json":
-        json_data = df.to_json(orient='records', force_ascii=False, indent=2)
-        return StreamingResponse(
-            io.StringIO(json_data),
-            media_type="application/json",
-            headers={"Content-Disposition": f"attachment; filename={filename}_cleaned.json"}
-        )
-    else:
-        raise HTTPException(status_code=400, detail="Unsupported format. Use 'csv' or 'json'.")
 
 
 @app.get("/api/datasets/{dataset_id}/download")

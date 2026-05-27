@@ -1,0 +1,249 @@
+/* Global redesign: cleaner + lighter + faster-looking UI (visual only) */
+
+:root {
+  /* Premium neon (brand-aligned) */
+  --primary: #00e5ff !important;
+  --primary-dark: #00b8d4 !important;
+  --primary-glow: rgba(0, 229, 255, 0.28) !important;
+  --secondary: #7c3aed !important;
+  --accent: #10b981 !important;
+  --danger: #ff4d6a !important;
+  --bg: #050810 !important;
+  --bg-gradient:
+    radial-gradient(ellipse 70% 50% at 15% 10%, rgba(124,58,237,0.16) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 40% at 85% 90%, rgba(0,229,255,0.14) 0%, transparent 55%),
+    #050810 !important;
+  --card: rgba(255, 255, 255, 0.035) !important;
+  --surface: rgba(255, 255, 255, 0.02) !important;
+  --border: rgba(0, 229, 255, 0.18) !important;
+  --text: #eaf6ff !important;
+  --text-dim: rgba(147, 163, 184, 0.98) !important;
+  --muted: rgba(148, 163, 184, 0.95) !important;
+  --sidebar-percent: 17% !important;
+}
+
+body::after,
+body::before {
+  display: none !important;
+}
+
+.app::before {
+  content: none !important;
+  display: none !important;
+  animation: none !important;
+}
+
+.main::before,
+.main::after {
+  content: none !important;
+  display: none !important;
+}
+
+.page,
+.home-page,
+.feature-card,
+.stat-box,
+.chart-card {
+  animation: none !important;
+}
+
+.main {
+  padding: 24px clamp(16px, 2.2vw, 34px) !important;
+}
+
+.page {
+  padding: 0 !important;
+}
+
+.page-header {
+  margin-bottom: 18px !important;
+}
+
+.page-title {
+  font-size: clamp(24px, 2.3vw, 34px) !important;
+  letter-spacing: -0.5px !important;
+}
+
+.page-sub {
+  color: var(--text-dim) !important;
+}
+
+.section-title {
+  margin: 22px 0 12px !important;
+  letter-spacing: 0.06em !important;
+}
+
+.sidebar {
+  background: rgba(5, 8, 16, 0.68) !important;
+  border: 1px solid rgba(0, 229, 255, 0.18) !important;
+  border-radius: 24px !important;
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.42) !important;
+  backdrop-filter: blur(14px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(140%) !important;
+}
+
+.sidebar-logo {
+  margin-bottom: 20px !important;
+}
+
+.nav-btn {
+  border-radius: 14px !important;
+  margin-bottom: 4px !important;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease !important;
+}
+
+.nav-btn:hover:not(.disabled):not(.active) {
+  transform: translateX(-2px) !important;
+}
+
+.ltr .nav-btn:hover:not(.disabled):not(.active) {
+  transform: translateX(2px) !important;
+}
+
+.nav-btn.active {
+  background: linear-gradient(135deg, rgba(0,229,255,0.22), rgba(124,58,237,0.16)) !important;
+  border-color: rgba(0,229,255,0.35) !important;
+  box-shadow: 0 12px 28px rgba(0,229,255,0.16) !important;
+}
+
+.glass-panel,
+.glass-card,
+.glass,
+.chart-card,
+.feature-card,
+.export-card,
+.insight-box,
+.panel-card,
+.premium-card,
+.col-card,
+.clean-banner,
+.p-card {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(0,229,255,0.18) !important;
+  border-radius: 18px !important;
+  box-shadow:
+    0 20px 60px rgba(2, 6, 23, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 26px rgba(0,229,255,0.08);
+  backdrop-filter: blur(9px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(9px) saturate(150%) !important;
+}
+
+.chart-card:hover,
+.feature-card:hover,
+.export-card:hover,
+.premium-card:hover,
+.p-card:hover {
+  transform: translateY(-3px) !important;
+  border-color: rgba(0,229,255,0.32) !important;
+  box-shadow:
+    0 26px 70px rgba(2, 6, 23, 0.42),
+    0 0 0 1px rgba(0, 229, 255, 0.18),
+    0 0 36px rgba(124,58,237,0.10);
+}
+
+.premium-button,
+.btn-primary {
+  border-radius: 14px !important;
+  padding: 10px 18px !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 14px 34px rgba(0, 229, 255, 0.18) !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.15px !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease !important;
+}
+
+.premium-button:hover:not(:disabled),
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px) !important;
+  filter: brightness(1.04) !important;
+}
+
+.premium-button.secondary {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(148, 163, 184, 0.25) !important;
+  box-shadow: none !important;
+}
+
+.kimit-select,
+.or-input,
+.sheet-input,
+.input,
+input,
+select,
+textarea {
+  border-radius: 12px !important;
+  border: 1px solid rgba(148, 163, 184, 0.24) !important;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: rgba(0, 229, 255, 0.65) !important;
+  box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.18) !important;
+}
+
+.dropzone {
+  border-radius: 18px !important;
+  border: 2px dashed rgba(0, 229, 255, 0.32) !important;
+  background: rgba(0, 229, 255, 0.04) !important;
+  animation: none !important;
+}
+
+.data-table,
+.table-wrap {
+  border-radius: 14px !important;
+  overflow: hidden !important;
+}
+
+.data-table th {
+  background: rgba(79, 124, 255, 0.12) !important;
+  color: #dce6ff !important;
+}
+
+.data-table tr:hover td {
+  background: rgba(79, 124, 255, 0.08) !important;
+}
+
+@media (max-width: 900px) {
+  .main {
+    padding: 16px 12px !important;
+  }
+  .page-title {
+    font-size: 24px !important;
+  }
+  .glass-panel,
+  .glass-card,
+  .chart-card,
+  .feature-card,
+  .export-card,
+  .insight-box,
+  .panel-card,
+  .premium-card,
+  .col-card,
+  .clean-banner,
+  .p-card {
+    border-radius: 14px !important;
+  }
+}
+
+html[dir="rtl"] .page,
+html[dir="rtl"] .main {
+  text-align: right !important;
+}
+
+/* Font sanity: ensure no "Space Mono" / "Syne" leaks */
+.clean-page,
+.clean-page * {
+  font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', system-ui, -apple-system, sans-serif !important;
+}
+
+.clean-page .clean-stat-value,
+.clean-page .clean-num-val,
+.clean-page .clean-col-type,
+.clean-page .clean-page-info,
+.clean-page .clean-issue-count,
+.clean-page .clean-stat-box-val {
+  font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', system-ui, -apple-system, sans-serif !important;
+}
+

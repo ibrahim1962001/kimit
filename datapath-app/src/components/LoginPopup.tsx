@@ -275,7 +275,7 @@ export const LoginPopup: React.FC<LoginPopupProps> = ({ isOpen, onClose, onSucce
           backdrop-filter: blur(24px);
           animation: lp-slide 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
           direction: ltr;
-          font-family: 'Cairo', 'Inter', sans-serif;
+          font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', system-ui, -apple-system, sans-serif;
         }
 
         @keyframes lp-slide {

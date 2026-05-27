@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { X, Table, Sparkles, Save } from 'lucide-react';
 import { DataGrid } from 'react-data-grid';
 import 'react-data-grid/lib/styles.css';
@@ -18,8 +18,35 @@ const T = {
     title: 'Excel Playground',
     hint: 'Double click on any cell to edit it. You can change any data manually before exporting!',
     saveBtn: 'Save & Update Dashboard',
-  }
+    liveSync: 'Live Sync',
+    on: 'ON',
+    off: 'OFF',
+    syncing: 'Syncing…',
+    notSynced: 'Not synced yet',
+    lastSynced: 'Last synced',
+    manualOnly: 'Manual save only (large dataset)',
+  },
+  ar: {
+    title: 'محرر Excel',
+    hint: 'انقر مرتين على أي خلية للتعديل. يمكنك تعديل البيانات يدويًا قبل التصدير!',
+    saveBtn: 'حفظ وتحديث الداشبورد',
+    liveSync: 'مزامنة مباشرة',
+    on: 'تشغيل',
+    off: 'إيقاف',
+    syncing: 'جاري المزامنة…',
+    notSynced: 'لم تتم المزامنة بعد',
+    lastSynced: 'آخر مزامنة',
+    manualOnly: 'حفظ يدوي فقط (بيانات كبيرة)',
+  },
 };
+
+function formatSyncTime(date: Date, isAr: boolean): string {
+  return date.toLocaleString(isAr ? 'ar-EG' : 'en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
 
 interface TextEditorProps {
   row: DataRow;
@@ -41,16 +68,34 @@ const CustomTextEditor = ({ row, column, onRowChange, onClose }: TextEditorProps
 };
 
 export const EditorSidebar: React.FC<Props> = ({ isOpen, onClose, info, onUpdate }) => {
-  const t = T.en;
+  const lang = (typeof localStorage !== 'undefined' ? localStorage.getItem('kimit_lang') : null) || 'en';
+  const isAr = lang === 'ar';
+  const t = isAr ? T.ar : T.en;
   const [gridData, setGridData] = useState<DataRow[]>([]);
+  const [isDirty, setIsDirty] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const autoSyncTimerRef = useRef<number | null>(null);
+  const canAutoSync = (info?.workData.length ?? 0) <= 5000;
+  const liveSyncOn = canAutoSync;
 
   useEffect(() => {
     if (!info) return;
     const tId = setTimeout(() => {
-      setGridData(info.workData as DataRow[]);
+      setGridData(JSON.parse(JSON.stringify(info.workData)) as DataRow[]);
+      setIsDirty(false);
+      setLastSyncedAt(new Date());
     }, 0);
     return () => clearTimeout(tId);
   }, [info]);
+
+  useEffect(() => {
+    return () => {
+      if (autoSyncTimerRef.current) {
+        window.clearTimeout(autoSyncTimerRef.current);
+      }
+    };
+  }, []);
 
   const columns = useMemo(() => {
     if (!info) return [];
@@ -63,13 +108,50 @@ export const EditorSidebar: React.FC<Props> = ({ isOpen, onClose, info, onUpdate
     }));
   }, [info]);
 
-  const handleSave = () => {
-     if (!onUpdate || !info) return;
+  const buildUpdatedDataset = useCallback((rows: DataRow[]): DatasetInfo | null => {
+     if (!info) return null;
      const dummyFile = new File([''], info.filename);
      Object.defineProperty(dummyFile, 'size', { value: info.fileSize });
-     onUpdate(analyzeDataset(dummyFile, [...gridData]));
-     alert('✅ Edits saved and all charts updated successfully!');
+     const analyzed = analyzeDataset(dummyFile, [...rows]);
+     return {
+       ...analyzed,
+       datasetId: info.datasetId,
+       sourceUrl: info.sourceUrl,
+     };
+  }, [info]);
+
+  useEffect(() => {
+    if (!isOpen || !isDirty || !onUpdate || !info || !canAutoSync) return;
+    if (autoSyncTimerRef.current) window.clearTimeout(autoSyncTimerRef.current);
+    setIsSyncing(true);
+    autoSyncTimerRef.current = window.setTimeout(() => {
+      const updated = buildUpdatedDataset(gridData);
+      if (updated) {
+        onUpdate(updated);
+        setIsDirty(false);
+        setLastSyncedAt(new Date());
+      }
+      setIsSyncing(false);
+    }, 700);
+  }, [gridData, isDirty, isOpen, onUpdate, info, canAutoSync, buildUpdatedDataset]);
+
+  const handleSave = () => {
+     if (!onUpdate || !info) return;
+     const updated = buildUpdatedDataset(gridData);
+     if (!updated) return;
+     onUpdate(updated);
+     setIsDirty(false);
+     setLastSyncedAt(new Date());
+     alert(isAr ? '✅ تم الحفظ وتحديث كل الشارتات بنجاح!' : '✅ Edits saved and all charts updated successfully!');
   };
+
+  const syncStatusText = useMemo(() => {
+    if (!liveSyncOn) return t.manualOnly;
+    if (isSyncing) return t.syncing;
+    if (isDirty && canAutoSync) return isAr ? 'تغييرات بانتظار المزامنة…' : 'Changes pending sync…';
+    if (lastSyncedAt) return `${t.lastSynced}: ${formatSyncTime(lastSyncedAt, isAr)}`;
+    return t.notSynced;
+  }, [liveSyncOn, isSyncing, isDirty, canAutoSync, lastSyncedAt, t, isAr]);
 
   if (!info) return null;
 
@@ -77,7 +159,7 @@ export const EditorSidebar: React.FC<Props> = ({ isOpen, onClose, info, onUpdate
     <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: isOpen ? 'flex' : 'none', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', opacity: isOpen ? 1 : 0, transition: 'opacity 0.3s ease' }}>
       <div className="editor-modal" style={{ width: '95%', maxWidth: '1200px', height: '90vh', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '24px', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', transform: isOpen ? 'scale(1)' : 'scale(0.95)', transition: 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>
       
-      <div className="editor-header" style={{ padding: '20px 30px', borderBottom: '1px solid var(--border)' }}>
+      <div className="editor-header" style={{ padding: '20px 30px 12px', borderBottom: '1px solid var(--border)' }}>
          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
            <Table size={24} color="#10b981" />
            <span className="editor-title" style={{ fontSize: 18 }}>{t.title}</span>
@@ -88,6 +170,23 @@ export const EditorSidebar: React.FC<Props> = ({ isOpen, onClose, info, onUpdate
            </button>
            <button className="editor-close" onClick={onClose}><X size={26} /></button>
          </div>
+      </div>
+
+      <div
+        className={`editor-sync-bar ${liveSyncOn ? 'editor-sync-bar--on' : 'editor-sync-bar--off'}${isSyncing ? ' editor-sync-bar--syncing' : ''}`}
+        role="status"
+        aria-live="polite"
+      >
+        <div className="editor-sync-bar-main">
+          <span className={`editor-sync-pill ${liveSyncOn ? 'is-on' : 'is-off'}`}>
+            <span className="editor-sync-dot" aria-hidden />
+            {t.liveSync}: {liveSyncOn ? t.on : t.off}
+          </span>
+          <span className="editor-sync-meta">{syncStatusText}</span>
+        </div>
+        {isDirty && liveSyncOn && !isSyncing && (
+          <span className="editor-sync-pending">{isAr ? 'معلّق' : 'Pending'}</span>
+        )}
       </div>
 
       <div className="editor-content" style={{ padding: '20px 30px' }}>
@@ -129,7 +228,10 @@ export const EditorSidebar: React.FC<Props> = ({ isOpen, onClose, info, onUpdate
            <DataGrid
              columns={columns}
              rows={gridData}
-             onRowsChange={setGridData}
+            onRowsChange={(rows) => {
+              setGridData(rows);
+              setIsDirty(true);
+            }}
              className="rdg-light"
              direction="ltr"
            />

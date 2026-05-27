@@ -1,18 +1,32 @@
-# DataPath Analyzer - Autonomous Data Intelligence Platform
+# Kimit AI Studio
 
-## Quick Start
+**Kimit** is a browser-first data analytics platform: upload CSV/Excel, get an auto-built Smart Dashboard, clean data, chat with AI, and export Excel + interactive HTML — without installing desktop software.
 
-### Backend (FastAPI)
+- **Live app:** [https://kimit.cloud](https://kimit.cloud)
+- **Repository:** [github.com/ibrahim1962001/kimit](https://github.com/ibrahim1962001/kimit)
 
-```bash
-cd backend
-pip install -r requirements.txt
-python main.py
-```
+## Features
 
-The API will run at `http://localhost:8000`
+- Smart Dashboard (up to 6 auto charts by data domain)
+- Local-first analysis for files under 10MB (optional cloud backup)
+- Data cleaning, comparison, Excel editor with live sync
+- AI chat (Groq) with dataset context
+- Arabic & English UI
+- Export: CSV, JSON, Excel, Smart Dashboard bundle (`.xlsx` + `.html`)
 
-### Frontend
+## Project structure
+
+| Path | Description |
+|------|-------------|
+| `datapath-app/` | Main React + Vite app (Firebase Hosting) |
+| `backend/` | FastAPI API — auth, uploads, credits, AI, MinIO |
+| `admin-dashboard/` | Admin panel (users, credits) |
+| `excel-addin/` | Optional Office.js task pane (advanced Excel sync) |
+| `docker-compose.yml` | Postgres, MinIO, Redis, Celery, Metabase |
+
+## Quick start
+
+### Frontend only (local analysis)
 
 ```bash
 cd datapath-app
@@ -20,36 +34,36 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173` in your browser.
+Open [http://localhost:5173](http://localhost:5173)
 
-## Features
-
-- Upload CSV / XLS / XLSX files directly in the browser
-- Automatic data cleaning and duplicate detection
-- AI-driven insights and chat assistant via Groq API
-- Interactive dashboard with charts and data health scoring
-- Export cleaned data as CSV or JSON
-- Arabic and English bilingual support
-
-## Firebase / Deployment
-
-- Firebase Hosting is configured in `firebase.json`
-- Frontend output directory is `datapath-app/dist`
-- Deploy with:
+### Full stack
 
 ```bash
+docker-compose up -d
+cd backend && pip install -r requirements.txt && cp .env.example .env
+cd backend && alembic upgrade head && python -m app.run
+cd datapath-app && npm install && npm run dev
+```
+
+See [DEVELOPMENT.md](./DEVELOPMENT.md) for API routes, credits, and environment variables.
+
+## Deploy
+
+```bash
+cd datapath-app && npm run build
 firebase deploy --only hosting
 ```
 
-## Important Notes
+## Privacy model
 
-- The frontend already includes a Firebase config file at `datapath-app/src/firebase.ts`
-- The AI backend uses a Groq API key from `backend/.env`
+- **Default:** files &lt; 10MB are parsed in the browser; row data is not uploaded unless you enable *Optional cloud backup* on the home page.
+- **Large files (&gt; 10MB):** processed on Kimit servers for performance.
+- **AI Chat:** sends excerpts to Groq — see [SECURITY.md](./SECURITY.md) and in-app Privacy page.
 
-## Project Structure
+## Contributing
 
-- `backend/` — FastAPI server and AI endpoints
-- `datapath-app/` — React + Vite frontend application
-- `firebase.json` — Firebase Hosting configuration
-- `.firebaserc` — Firebase project alias
-- `report.md` — project data persistence report
+See [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+## License
+
+MIT — see [LICENSE](./LICENSE).

@@ -5,6 +5,7 @@ import { analyzeDataset } from '../lib/dataUtils';
 import { AdSpace } from '../components/AdSpace';
 import { CreatorFooter } from '../components/CreatorFooter';
 import { AD_PROVIDERS } from '../config/adConfig';
+import './cleaning-redesign.css';
 
 interface Props { info: DatasetInfo;  onClean: () => void; onUpdate?: (info: DatasetInfo) => void; }
 
@@ -82,7 +83,7 @@ export const CleaningPage: React.FC<Props> = ({ info, onClean, onUpdate }) => {
   const cleaningAdProvider = AD_PROVIDERS.filter(p => p.id === 'adsterra_main');
 
   return (
-    <div className="page clean-page" dir="ltr">
+    <div className="page clean-page clean2" dir="ltr">
       {/* Ad Banner */}
       <div className="cleaning-ad-top">
         <AdSpace type="responsive" providers={cleaningAdProvider} minHeight={90} />

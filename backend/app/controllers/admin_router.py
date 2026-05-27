@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session, joinedload
 
-from app.db.session import get_db
+from app.db.session import get_sync_db
 from app.models import User, Dataset, UserCredit, CreditTransaction, ChargeRequest, AdminRole
 
 # Optional: verify Firebase ID token server-side
@@ -95,7 +95,7 @@ def list_users(
     limit: int = 20,
     search: str = "",
     authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
 ) -> Any:
     _verify_admin(authorization, db)
 
@@ -129,7 +129,7 @@ def list_users(
 def get_user_detail(
     user_id: int,
     authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
 ) -> Any:
     _verify_admin(authorization, db)
 
@@ -185,7 +185,7 @@ def adjust_credit(
     user_id: int,
     body: CreditAdjust,
     authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
 ) -> Any:
     admin = _verify_admin(authorization, db)
     user = db.get(User, user_id)
@@ -215,7 +215,7 @@ def update_user_status(
     user_id: int,
     body: StatusUpdate,
     authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
 ) -> Any:
     _verify_admin(authorization, db)
     valid_statuses = {"active", "frozen", "disabled", "banned"}
@@ -246,7 +246,7 @@ def list_charge_requests(
     page: int = 1,
     limit: int = 20,
     authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
 ) -> Any:
     admin = _verify_admin(authorization, db)
     # sub_admins without can_approve_charges only see pending (read-only listing)
@@ -288,7 +288,7 @@ def review_charge_request(
     request_id: int,
     body: ChargeReview,
     authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
 ) -> Any:
     admin = _verify_admin(authorization, db)
     if not admin.can_approve_charges:
@@ -334,7 +334,7 @@ def review_charge_request(
 @router.get("/sub-admins")
 def list_sub_admins(
     authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
 ) -> Any:
     _verify_admin(authorization, db, require_super=True)
     admins = db.scalars(select(AdminRole)).all()
@@ -356,7 +356,7 @@ def list_sub_admins(
 def add_sub_admin(
     body: SubAdminCreate,
     authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
 ) -> Any:
     admin = _verify_admin(authorization, db, require_super=True)
     existing = db.scalar(select(AdminRole).where(AdminRole.firebase_uid == body.firebase_uid))
@@ -380,7 +380,7 @@ def update_sub_admin(
     admin_id: int,
     body: dict,
     authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
 ) -> Any:
     _verify_admin(authorization, db, require_super=True)
     target = db.get(AdminRole, admin_id)
@@ -400,7 +400,7 @@ def update_sub_admin(
 def remove_sub_admin(
     admin_id: int,
     authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
 ) -> Any:
     _verify_admin(authorization, db, require_super=True)
     target = db.get(AdminRole, admin_id)
@@ -412,13 +412,33 @@ def remove_sub_admin(
 
 
 # ──────────────────────────────────────────────
+# Admin session (for dashboard login gate)
+# ──────────────────────────────────────────────
+
+@router.get("/me")
+def get_admin_me(
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_sync_db),
+) -> Any:
+    """Return current admin role — used by admin-dashboard frontend."""
+    admin = _verify_admin(authorization, db)
+    return {
+        "firebase_uid": admin.firebase_uid,
+        "email": admin.email,
+        "role": admin.role,
+        "can_approve_charges": admin.can_approve_charges,
+        "is_active": getattr(admin, "is_active", True),
+    }
+
+
+# ──────────────────────────────────────────────
 # Stats
 # ──────────────────────────────────────────────
 
 @router.get("/stats")
 def get_dashboard_stats(
     authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
 ) -> Any:
     _verify_admin(authorization, db)
     total_users = db.scalar(select(func.count(User.id))) or 0

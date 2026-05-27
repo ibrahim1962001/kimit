@@ -20,6 +20,9 @@ interface UserContextType {
   user: User | null;
   userData: UserData | null;
   loading: boolean;
+  creditBalance: number;
+  creditStatus: string;
+  plan: string;
   smartRegisterOrLogin: (email: string, password: string) => Promise<void>;
   fetchUserData: (uid: string, email: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -31,6 +34,9 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [creditBalance, setCreditBalance] = useState(0);
+  const [creditStatus, setCreditStatus] = useState('active');
+  const [plan, setPlan] = useState('free');
 
   // Fetch all user data from different collections
   const fetchUserData = async (uid: string, email: string) => {
@@ -73,13 +79,19 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       setUser(currentUser);
       if (currentUser && currentUser.email) {
         try {
-          await authApi.sync(); // Sync user to backend!
+          const synced = await authApi.sync();
+          setCreditBalance(synced.credit_balance);
+          setCreditStatus(synced.credit_status);
+          setPlan(synced.plan);
           await fetchUserData(currentUser.uid, currentUser.email);
         } catch (err) {
           console.error("Failed to sync user or fetch data:", err);
         }
       } else {
         setUserData(null);
+        setCreditBalance(0);
+        setCreditStatus('active');
+        setPlan('free');
       }
       setLoading(false);
     });
@@ -130,7 +142,10 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <UserContext.Provider value={{ user, userData, loading, smartRegisterOrLogin, fetchUserData, logout }}>
+    <UserContext.Provider value={{
+      user, userData, loading, creditBalance, creditStatus, plan,
+      smartRegisterOrLogin, fetchUserData, logout,
+    }}>
       {children}
     </UserContext.Provider>
   );

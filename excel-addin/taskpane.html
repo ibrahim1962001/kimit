@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kimit Smart Dashboard</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="./taskpane.css" />
+</head>
+<body>
+  <div class="pane-shell">
+    <header class="pane-header">
+      <div>
+        <h1>Kimit Smart Dashboard</h1>
+        <p>Excel ↔ Kimit interactive bridge</p>
+      </div>
+      <button id="reloadBtn" type="button">Reload</button>
+    </header>
+
+    <div class="pane-url-row">
+      <input id="dashboardUrl" type="text" value="http://localhost:5173" />
+      <button id="openExternalBtn" type="button">Open External</button>
+    </div>
+
+    <div class="pane-note">
+      Use the actions below to push sheet data into Kimit or pull dashboard data back into Excel.
+    </div>
+
+    <div class="pane-actions">
+      <button id="importSheetBtn" type="button">Import Active Sheet</button>
+      <button id="pushToDashBtn" type="button">Push to Dashboard</button>
+      <button id="pullFromDashBtn" type="button">Pull from Dashboard</button>
+      <button id="applyToSheetBtn" type="button">Apply to Sheet</button>
+    </div>
+
+    <div id="statusBox" class="pane-status">Waiting for actions...</div>
+
+    <iframe id="dashboardFrame" title="Kimit Dashboard"></iframe>
+  </div>
+
+  <script type="module" src="./taskpane.js"></script>
+</body>
+</html>

@@ -1,47 +1,110 @@
+/**
+ * Gamma-style executive presentation PDF
+ * — light canvas, slide-per-topic, card grids, large type, minimal chrome
+ */
 import jsPDF from 'jspdf';
 import type { DatasetInfo } from '../types';
 import logoImg from '../assets/logo.png';
+import {
+  ensurePdfArabicFont,
+  pickPdfFont,
+  PDF_FONT_ARABIC,
+  PDF_FONT_LATIN,
+} from './pdfFonts';
+import { latinizeBriefingForPdf, latinizeColumnName } from './reportPdfLabels';
 
-// ── Ultra-Premium Color Palette ─────────────────────────────────────
-const C = {
-  bgDark:   [10, 15, 30]    as [number,number,number], // Deep Obsidian Blue
-  bgCard:   [18, 25, 45]    as [number,number,number],
-  gold:     [212, 175, 55]  as [number,number,number], // Luxury Gold
-  goldLight:[235, 205, 110] as [number,number,number],
-  white:    [255, 255, 255] as [number,number,number],
-  offWhite: [240, 244, 252] as [number,number,number],
-  slate:    [100, 116, 139] as [number,number,number],
-  slateLight:[148, 163, 184] as [number,number,number],
-  green:    [16, 185, 129]  as [number,number,number],
-  red:      [239, 68, 68]   as [number,number,number],
-  orange:   [245, 158, 11]  as [number,number,number],
-  cyan:     [6, 182, 212]   as [number,number,number],
-  border:   [40, 50, 75]    as [number,number,number],
+// ── Gamma-inspired palette (light deck) ───────────────────────────────
+const G = {
+  canvas: [252, 251, 249] as [number, number, number],
+  white: [255, 255, 255] as [number, number, number],
+  ink: [23, 23, 33] as [number, number, number],
+  inkSoft: [71, 71, 95] as [number, number, number],
+  inkMuted: [130, 130, 155] as [number, number, number],
+  border: [230, 228, 240] as [number, number, number],
+  accent: [99, 91, 255] as [number, number, number],
+  accent2: [56, 189, 248] as [number, number, number],
+  accentSoft: [237, 236, 255] as [number, number, number],
+  mint: [16, 185, 129] as [number, number, number],
+  mintSoft: [236, 253, 245] as [number, number, number],
+  amber: [245, 158, 11] as [number, number, number],
+  amberSoft: [255, 251, 235] as [number, number, number],
+  rose: [244, 63, 94] as [number, number, number],
+  roseSoft: [255, 241, 242] as [number, number, number],
+  violet: [139, 92, 246] as [number, number, number],
+  violetSoft: [245, 243, 255] as [number, number, number],
 };
+
+export interface ReportBriefing {
+  executiveSummary: string;
+  insights: string[];
+  warnings: string[];
+  qualityIssues: string[];
+  recommendations: string[];
+  opportunities: string[];
+  isLocal?: boolean;
+}
 
 export interface ReportOptions {
   title?: string;
   subtitle?: string;
   author?: string;
   aiSummary?: string;
-  insights?: { title: string; description: string; type: 'info'|'positive'|'warning' }[];
+  insights?: { title: string; description: string; type: 'info' | 'positive' | 'warning' }[];
+  briefing?: ReportBriefing;
 }
 
-// ── High-End Rendering Helpers ────────────────────────────────────────
-const rgb = (d: jsPDF, c: [number,number,number]) => d.setTextColor(...c);
-const fill = (d: jsPDF, c: [number,number,number], x: number, y: number, w: number, h: number, rx = 0) => {
-  d.setFillColor(...c); 
-  if (rx > 0) d.roundedRect(x, y, w, h, rx, rx, 'F');
-  else d.rect(x, y, w, h, 'F');
+type RGB = [number, number, number];
+type PdfFont = typeof PDF_FONT_LATIN | typeof PDF_FONT_ARABIC;
+type SlideCtx = {
+  doc: jsPDF;
+  W: number;
+  H: number;
+  logo: HTMLImageElement | null;
+  file: string;
+  font: PdfFont;
+  rtl: boolean;
 };
-const line = (d: jsPDF, c: [number,number,number], x1: number, y1: number, x2: number, lw = 0.4) => {
-  d.setDrawColor(...c); d.setLineWidth(lw); d.line(x1, y1, x2, y1);
-};
-const fmtN = (n: number) =>
-  n >= 1e6 ? (n/1e6).toFixed(2)+'M' : n >= 1000 ? (n/1000).toFixed(1)+'K' : n.toLocaleString();
-const pct = (a: number, b: number) => b === 0 ? '0%' : ((a/b)*100).toFixed(1)+'%';
 
-async function loadLogo(): Promise<HTMLImageElement|null> {
+const LINE = 5.2;
+
+function setPdfFont(ctx: SlideCtx, size: number, bold = false) {
+  if (ctx.font === PDF_FONT_ARABIC) {
+    ctx.doc.setFont(PDF_FONT_ARABIC, 'normal');
+    ctx.doc.setFontSize(bold ? size + 0.5 : size);
+  } else {
+    ctx.doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    ctx.doc.setFontSize(size);
+  }
+}
+
+function pdfSplit(ctx: SlideCtx, text: string, maxW: number): string[] {
+  setPdfFont(ctx, ctx.doc.getFontSize() || 9);
+  return ctx.doc.splitTextToSize(text, maxW);
+}
+
+/** Draw wrapped text; returns bottom Y. */
+function pdfWrite(
+  ctx: SlideCtx,
+  text: string,
+  x: number,
+  y: number,
+  maxW: number,
+  opts?: { align?: 'left' | 'right' | 'center'; size?: number; bold?: boolean; lineHeight?: number },
+): number {
+  const lh = opts?.lineHeight ?? LINE;
+  if (opts?.size) setPdfFont(ctx, opts.size, opts.bold);
+  const lines = pdfSplit(ctx, text, maxW);
+  const align = opts?.align ?? (ctx.rtl ? 'right' : 'left');
+  const ax = align === 'right' ? x + maxW : align === 'center' ? x + maxW / 2 : x;
+  ctx.doc.text(lines, ax, y, { align });
+  return y + lines.length * lh;
+}
+
+const fmtN = (n: number) =>
+  n >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : n >= 1000 ? (n / 1000).toFixed(1) + 'K' : n.toLocaleString();
+const pct = (a: number, b: number) => (b === 0 ? '0%' : ((a / b) * 100).toFixed(1) + '%');
+
+async function loadLogo(): Promise<HTMLImageElement | null> {
   return new Promise(res => {
     const img = new Image();
     img.crossOrigin = 'Anonymous';
@@ -51,433 +114,650 @@ async function loadLogo(): Promise<HTMLImageElement|null> {
   });
 }
 
-function drawHexagon(d: jsPDF, x: number, y: number, size: number, color: [number,number,number], alpha = 1) {
-  d.setFillColor(...color);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  d.setGState(new (d as any).GState({ opacity: alpha }));
-  const points: [number, number][] = [];
-  for (let i = 0; i < 6; i++) {
-    const angle = (Math.PI / 3) * i;
-    points.push([x + size * Math.cos(angle), y + size * Math.sin(angle)]);
+function fill(d: jsPDF, c: RGB, x: number, y: number, w: number, h: number, r = 0) {
+  d.setFillColor(...c);
+  if (r > 0) d.roundedRect(x, y, w, h, r, r, 'F');
+  else d.rect(x, y, w, h, 'F');
+}
+
+function textRgb(d: jsPDF, c: RGB) {
+  d.setTextColor(...c);
+}
+
+function slideBg(ctx: SlideCtx) {
+  const { doc, W, H } = ctx;
+  fill(doc, G.canvas, 0, 0, W, H);
+  // soft gradient accent (top-right blob)
+  fill(doc, G.accentSoft, W - 95, -25, 120, 90, 60);
+  fill(doc, G.violetSoft, W - 140, 15, 70, 50, 35);
+}
+
+function slideChrome(ctx: SlideCtx, page: number, total: number, tag?: string) {
+  const { doc, W, H, logo, file } = ctx;
+  if (logo) doc.addImage(logo, 'PNG', 14, 10, 11, 11);
+  setPdfFont(ctx, 8, true);
+  textRgb(doc, G.inkMuted);
+  doc.text('KIMIT AI STUDIO', logo ? 28 : 14, 17);
+
+  if (tag) {
+    setPdfFont(ctx, 7, true);
+    const tw = doc.getTextWidth(tag) + 10;
+    fill(doc, G.accentSoft, W - tw - 14, 10, tw, 9, 4);
+    textRgb(doc, G.accent);
+    doc.text(tag.toUpperCase(), W - 14 - tw / 2, 16.5, { align: 'center' });
   }
-  d.lines(points.map((p, i) => i === 0 ? [p[0]-x, p[1]-y] : [p[0] - points[i-1][0], p[1] - points[i-1][1]]), x, y, [1, 1], 'F');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  d.setGState(new (d as any).GState({ opacity: 1 }));
+
+  setPdfFont(ctx, 7);
+  textRgb(doc, G.inkMuted);
+  const fname = file.length > 42 ? file.slice(0, 39) + '…' : file;
+  doc.text(fname, ctx.rtl ? W - 14 : 14, H - 8, { align: ctx.rtl ? 'right' : 'left' });
+  doc.text(`${page} / ${total}`, ctx.rtl ? 14 : W - 14, H - 8, { align: ctx.rtl ? 'left' : 'right' });
 }
 
-// ── PAGE CHROME (Dark Theme) ──────────────────────────────────────────
-function pageChrome(d: jsPDF, page: number, total: number, filename: string, logo: HTMLImageElement|null) {
-  const W = d.internal.pageSize.getWidth();
-  const H = d.internal.pageSize.getHeight();
-
-  // Background is already drawn before page content
-
-  // Header
-  fill(d, C.bgCard, 0, 0, W, 20);
-  fill(d, C.gold, 0, 20, W, 0.5);
-  
-  if (logo) d.addImage(logo, 'PNG', 12, 4, 12, 12);
-  d.setFont('helvetica', 'bold'); d.setFontSize(10);
-  rgb(d, C.gold); d.text('KIMIT AI STUDIO', 30, 12.5);
-  
-  d.setFont('helvetica', 'italic'); d.setFontSize(8);
-  rgb(d, C.slateLight); d.text(filename, W/2, 12.5, { align: 'center' });
-  
-  d.setFont('helvetica', 'normal'); d.setFontSize(8);
-  rgb(d, C.goldLight); d.text(`PAGE ${page} / ${total}`, W - 12, 12.5, { align: 'right' });
-
-  // Footer
-  fill(d, C.bgCard, 0, H - 14, W, 14);
-  line(d, C.border, 0, H - 14, W, 0.5);
-  d.setFontSize(7); rgb(d, C.slate);
-  d.text('© KIMIT AI STUDIO • CONFIDENTIAL EXECUTIVE INTELLIGENCE', W/2, H - 6, { align: 'center', charSpace: 1 });
+function accentBar(doc: jsPDF, y: number, W: number, h = 3) {
+  const seg = W / 4;
+  fill(doc, G.accent, 0, y, seg, h);
+  fill(doc, G.violet, seg, y, seg, h);
+  fill(doc, G.accent2, seg * 2, y, seg, h);
+  fill(doc, G.mint, seg * 3, y, seg, h);
 }
 
-// ── SECTION HEADING ───────────────────────────────────────────────────
-function secHead(d: jsPDF, label: string, y: number, accent: [number,number,number] = C.gold): number {
-  const W = d.internal.pageSize.getWidth();
-  fill(d, C.bgCard, 12, y, W - 24, 14, 2);
-  fill(d, accent, 12, y, 4, 14); // Left accent bar
-  d.setFont('helvetica', 'bold'); d.setFontSize(10);
-  d.setTextColor(...accent); 
-  d.text(label.toUpperCase(), 22, y + 9.5, { charSpace: 1.5 });
-  return y + 22;
+function slideTitle(ctx: SlideCtx, title: string, subtitle: string, y: number): number {
+  const { doc, W, rtl } = ctx;
+  const pad = 28;
+  const maxW = W - 56;
+  const x = rtl ? W - pad : pad;
+  setPdfFont(ctx, 26, true);
+  textRgb(doc, G.ink);
+  const lines = pdfSplit(ctx, title, maxW);
+  doc.text(lines, x, y, { align: rtl ? 'right' : 'left' });
+  y += lines.length * 11 + 4;
+  setPdfFont(ctx, 11);
+  textRgb(doc, G.inkSoft);
+  const sub = pdfSplit(ctx, subtitle, maxW);
+  doc.text(sub, x, y, { align: rtl ? 'right' : 'left' });
+  return y + sub.length * 6 + 8;
 }
 
-// ── PREMIUM KPI CARDS ─────────────────────────────────────────────────
-function kpiCards(
-  d: jsPDF,
-  cards: { label: string; val: string; sub?: string; color: [number,number,number] }[],
-  y: number
-): number {
-  const W = d.internal.pageSize.getWidth();
-  const n = cards.length;
-  const cw = (W - 24 - (n - 1) * 6) / n;
-  cards.forEach((c, i) => {
-    const cx = 12 + i * (cw + 6);
-    fill(d, C.bgCard, cx, y, cw, 26, 3);
-    d.setDrawColor(...C.border); d.setLineWidth(0.5);
-    d.roundedRect(cx, y, cw, 26, 3, 3, 'S');
-    
-    // Top colored line
-    fill(d, c.color, cx + 2, y, cw - 4, 1.5);
-    
-    d.setFont('helvetica', 'bold'); d.setFontSize(7);
-    rgb(d, C.slateLight); d.text(c.label.toUpperCase(), cx + 6, y + 10, { charSpace: 0.5 });
-    
-    d.setFont('helvetica', 'bold'); d.setFontSize(16);
-    d.setTextColor(...c.color); d.text(c.val, cx + 6, y + 21);
-    
-    if (c.sub) { 
-      d.setFont('helvetica', 'normal'); d.setFontSize(6.5); 
-      rgb(d, C.slate); 
-      d.text(c.sub, cx + cw - 6, y + 21, { align: 'right' }); 
-    }
-  });
-  return y + 34;
+function pill(ctx: SlideCtx, label: string, x: number, y: number, bg: RGB, fg: RGB): number {
+  const { doc } = ctx;
+  setPdfFont(ctx, 7, true);
+  const w = doc.getTextWidth(label) + 12;
+  fill(doc, bg, x, y, w, 8, 4);
+  textRgb(doc, fg);
+  doc.text(label.toUpperCase(), x + 6, y + 5.5);
+  return w + 6;
 }
 
-// ── ELEGANT TABLE ROW ─────────────────────────────────────────────────
-function tableRow(
-  d: jsPDF,
-  cols: string[],
+function metricCard(
+  ctx: SlideCtx,
+  x: number,
   y: number,
-  widths: number[],
-  startX: number,
-  isHeader = false,
-  isAlt = false
-): number {
-  const rowH = isHeader ? 11 : 9;
-  const totalW = widths.reduce((a, b) => a + b, 0) + (cols.length - 1) * 0.5;
-  
-  if (isHeader) {
-    fill(d, C.gold, startX, y, totalW, rowH, 1);
-  } else if (isAlt) {
-    fill(d, C.bgCard, startX, y, totalW, rowH);
-  }
-
-  d.setFont('helvetica', isHeader ? 'bold' : 'normal');
-  d.setFontSize(isHeader ? 8 : 7.5);
-  rgb(d, isHeader ? C.bgDark : C.offWhite);
-
-  let x = startX;
-  cols.forEach((col, i) => {
-    const txt = d.splitTextToSize(col, widths[i] - 4);
-    d.text(txt[0] ?? '', x + 4, y + (isHeader ? 7.5 : 6.5));
-    x += widths[i] + 0.5;
-  });
-  
-  if (!isHeader) {
-    line(d, C.border, startX, y + rowH, startX + totalW, 0.2);
-  }
-  
-  return y + rowH;
-}
-
-// ══════════════════════════════════════════════════════════════════
-// PAGE 1 — LUXURY COVER
-// ══════════════════════════════════════════════════════════════════
-async function drawCover(
-  d: jsPDF,
-  opts: { title?: string; subtitle?: string; filename: string; rows: number; cols: number; generatedAt: string }
+  w: number,
+  h: number,
+  label: string,
+  value: string,
+  sub: string,
+  accent: RGB,
+  soft: RGB,
 ) {
-  const W = d.internal.pageSize.getWidth();
-  const H = d.internal.pageSize.getHeight();
+  const { doc, rtl } = ctx;
+  fill(doc, G.white, x, y, w, h, 8);
+  doc.setDrawColor(...G.border);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(x, y, w, h, 8, 8, 'S');
+  fill(doc, soft, x + 1, y + 1, w - 2, 14, 7);
+  fill(doc, accent, x + 1, y + 1, w - 2, 2.5, 7);
 
-  // Deep Background
-  fill(d, C.bgDark, 0, 0, W, H);
-  
-  // Decorative Geometric Background (Hexagons)
-  drawHexagon(d, W, 0, 120, C.gold, 0.03);
-  drawHexagon(d, W - 40, -20, 80, C.cyan, 0.02);
-  drawHexagon(d, 0, H, 150, C.gold, 0.03);
+  const tx = rtl ? x + w - 10 : x + 10;
+  setPdfFont(ctx, 7, true);
+  textRgb(doc, G.inkMuted);
+  doc.text(label.toUpperCase(), tx, y + 11, { align: rtl ? 'right' : 'left' });
+  setPdfFont(ctx, 22, true);
+  textRgb(doc, G.ink);
+  doc.text(value, tx, y + 28, { align: rtl ? 'right' : 'left' });
+  setPdfFont(ctx, 8);
+  textRgb(doc, G.inkSoft);
+  const subLines = pdfSplit(ctx, sub, w - 16);
+  doc.text(subLines[0] ?? sub, tx, y + h - 8, { align: rtl ? 'right' : 'left' });
+}
 
-  // Logo + Brand
-  const logo = await loadLogo();
-  if (logo) d.addImage(logo, 'PNG', 20, 30, 30, 30);
-  d.setFont('helvetica', 'bold'); d.setFontSize(28);
-  rgb(d, C.gold); d.text('KIMIT', 55, 45, { charSpace: 4 });
-  rgb(d, C.white); d.text('AI STUDIO', 95, 45, { charSpace: 4 });
-  
-  d.setFont('helvetica', 'normal'); d.setFontSize(10);
-  rgb(d, C.cyan); d.text('ENTERPRISE DATA INTELLIGENCE PLATFORM', 56, 55, { charSpace: 2 });
+function measureInsightHeight(ctx: SlideCtx, text: string, w: number): number {
+  setPdfFont(ctx, 9.5);
+  const lines = pdfSplit(ctx, text, w - 32);
+  return Math.max(40, 26 + lines.length * LINE + 8);
+}
 
-  // Title Block
-  const tY = 110;
-  fill(d, C.bgCard, 0, tY, W, 70);
-  fill(d, C.gold, 0, tY, 6, 70);
-  
-  d.setFont('helvetica', 'bold'); d.setFontSize(32);
-  rgb(d, C.white);
-  const titleLines = d.splitTextToSize((opts.title || 'Executive Intelligence').toUpperCase(), W - 40);
-  d.text(titleLines, 24, tY + 28);
-  
-  d.setFont('helvetica', 'italic'); d.setFontSize(14);
-  rgb(d, C.goldLight);
-  d.text(opts.subtitle || 'Strategic Data Analysis & Automated Insights', 24, tY + 52);
+function insightCard(
+  ctx: SlideCtx,
+  x: number,
+  y: number,
+  w: number,
+  index: number,
+  text: string,
+  accent: RGB,
+  soft: RGB,
+): number {
+  const { doc, rtl } = ctx;
+  const h = measureInsightHeight(ctx, text, w);
+  fill(doc, soft, x, y, w, h, 10);
+  fill(doc, accent, rtl ? x + w - 6 : x, y, 6, h, 10);
 
-  // Meta Info Grid
-  const metaY = tY + 95;
+  const numX = rtl ? x + w - 18 : x + 14;
+  setPdfFont(ctx, 16, true);
+  textRgb(doc, accent);
+  doc.text(String(index).padStart(2, '0'), numX, y + 16, { align: rtl ? 'right' : 'left' });
+
+  const textX = rtl ? x + w - 22 : x + 22;
+  const textW = w - 32;
+  setPdfFont(ctx, 9.5);
+  textRgb(doc, G.ink);
+  const lines = pdfSplit(ctx, text, textW);
+  doc.text(lines, textX, y + 24, { align: rtl ? 'right' : 'left' });
+  return h;
+}
+
+function bulletCard(
+  ctx: SlideCtx,
+  x: number,
+  y: number,
+  w: number,
+  text: string,
+  n: number,
+  accent: RGB,
+): number {
+  const { doc, rtl } = ctx;
+  setPdfFont(ctx, 9);
+  const lines = pdfSplit(ctx, text, w - 36);
+  const h = Math.max(24, 14 + lines.length * LINE);
+  fill(doc, G.white, x, y, w, h, 6);
+  doc.setDrawColor(...G.border);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(x, y, w, h, 6, 6, 'S');
+
+  const badgeX = rtl ? x + w - 20 : x + 8;
+  fill(doc, accent, badgeX, y + 6, 10, 10, 5);
+  setPdfFont(ctx, 9, true);
+  textRgb(doc, G.white);
+  doc.text(String(n), badgeX + 5, y + 13.5, { align: 'center' });
+
+  const textX = rtl ? x + w - 26 : x + 24;
+  setPdfFont(ctx, 9);
+  textRgb(doc, G.ink);
+  doc.text(lines, textX, y + 12, { align: rtl ? 'right' : 'left' });
+  return h + 8;
+}
+
+// ── SLIDE: Cover ──────────────────────────────────────────────────────
+function slideCover(ctx: SlideCtx, opts: {
+  title: string;
+  subtitle: string;
+  filename: string;
+  rows: number;
+  cols: number;
+  generatedAt: string;
+  author?: string;
+}) {
+  const { doc, W, H } = ctx;
+  slideBg(ctx);
+  accentBar(doc, 0, W, 5);
+
+  fill(doc, G.white, 24, 32, W - 48, H - 64, 14);
+  doc.setDrawColor(...G.border);
+  doc.setLineWidth(0.35);
+  doc.roundedRect(24, 32, W - 48, H - 64, 14, 14, 'S');
+
+  const pad = ctx.rtl ? W - 40 : 40;
+  let y = 58;
+  pill(ctx, 'Executive Report', ctx.rtl ? pad - 80 : pad, y, G.accentSoft, G.accent);
+  y += 22;
+
+  setPdfFont(ctx, 34, true);
+  textRgb(doc, G.ink);
+  const titleLines = pdfSplit(ctx, opts.title, W - 96);
+  doc.text(titleLines, pad, y, { align: ctx.rtl ? 'right' : 'left' });
+  y += titleLines.length * 14 + 6;
+
+  setPdfFont(ctx, 14);
+  textRgb(doc, G.inkSoft);
+  pdfWrite(ctx, opts.subtitle, pad, y, W - 96, { align: ctx.rtl ? 'right' : 'left' });
+  y += 20;
+
+  const metaW = (W - 96) / 4;
   const metas = [
-    { l: 'SOURCE DATASET', v: opts.filename },
-    { l: 'TOTAL RECORDS', v: fmtN(opts.rows) },
-    { l: 'DATA DIMENSIONS', v: String(opts.cols) + ' Columns' },
-    { l: 'TIMESTAMP', v: opts.generatedAt },
+    { l: 'Dataset', v: opts.filename },
+    { l: 'Records', v: fmtN(opts.rows) },
+    { l: 'Columns', v: String(opts.cols) },
+    { l: 'Generated', v: opts.generatedAt.split(',')[0] ?? opts.generatedAt },
   ];
-  
   metas.forEach((m, i) => {
-    const cx = 20 + (i % 2) * 90;
-    const cy = metaY + Math.floor(i / 2) * 25;
-    d.setFont('helvetica', 'bold'); d.setFontSize(8);
-    rgb(d, C.slate); d.text(m.l, cx, cy, { charSpace: 1 });
-    d.setFont('helvetica', 'bold'); d.setFontSize(12);
-    rgb(d, C.offWhite); d.text(m.v, cx, cy + 6);
+    const mx = 40 + i * (metaW + 4);
+    const my = H - 72;
+    fill(doc, G.canvas, mx, my, metaW - 4, 28, 6);
+    setPdfFont(ctx, 7, true);
+    textRgb(doc, G.inkMuted);
+    doc.text(m.l.toUpperCase(), mx + 8, my + 10);
+    setPdfFont(ctx, 10);
+    textRgb(doc, G.ink);
+    const vl = pdfSplit(ctx, m.v, metaW - 16);
+    doc.text(vl[0] ?? '', mx + 8, my + 20);
   });
 
-  // Footer Confidentiality
-  const prepY = H - 40;
-  line(d, C.border, 20, prepY, W - 20, 0.5);
-  d.setFont('helvetica', 'bold'); d.setFontSize(9);
-  rgb(d, C.gold); d.text('STRICTLY CONFIDENTIAL', W/2, prepY + 12, { align: 'center', charSpace: 2 });
-  d.setFont('helvetica', 'normal'); d.setFontSize(8);
-  rgb(d, C.slateLight); d.text('Prepared exclusively for Executive Leadership and Management Teams.', W/2, prepY + 20, { align: 'center' });
-}
-
-// ══════════════════════════════════════════════════════════════════
-// PAGE 2 — EXECUTIVE SUMMARY
-// ══════════════════════════════════════════════════════════════════
-function drawPage2(d: jsPDF, info: DatasetInfo, health: { score: number; label: string }) {
-  const W = d.internal.pageSize.getWidth();
-  let y = 30;
-
-  const completeness = info.totalNulls > 0
-    ? (100 - (info.totalNulls / (info.rows * info.columns.length) * 100)).toFixed(1)
-    : '100.0';
-
-  y = secHead(d, '01. Executive Overview', y, C.gold);
-
-  // Situation block
-  fill(d, C.bgCard, 12, y, W - 24, 28, 2);
-  d.setDrawColor(...C.border); d.roundedRect(12, y, W - 24, 28, 2, 2, 'S');
-  fill(d, C.cyan, 12, y, 4, 28);
-  
-  d.setFont('helvetica', 'bold'); d.setFontSize(8); rgb(d, C.cyan);
-  d.text('DATASET PROFILE', 22, y + 8, { charSpace: 1 });
-  d.setFont('helvetica', 'normal'); d.setFontSize(9); rgb(d, C.offWhite);
-  const sit = `The dataset "${info.filename}" comprises ${fmtN(info.rows)} records across ${info.columns.length} dimensions. Overall data completeness is currently evaluated at ${completeness}%. System health algorithm assigns a status of "${health.label}".`;
-  const sitW = d.splitTextToSize(sit, W - 36);
-  d.text(sitW, 22, y + 16);
-  y += 36;
-
-  // KPI Cards
-  y = kpiCards(d, [
-    { label: 'Dataset Volume',  val: fmtN(info.rows),        color: C.cyan },
-    { label: 'Data Density',    val: `${completeness}%`,     color: info.totalNulls > 0 ? C.orange : C.green },
-    { label: 'Null Values',     val: fmtN(info.totalNulls),  sub: pct(info.totalNulls, info.rows * info.columns.length), color: info.totalNulls > 0 ? C.red : C.green },
-    { label: 'Duplications',    val: fmtN(info.duplicates),  sub: pct(info.duplicates, info.rows), color: info.duplicates > 0 ? C.red : C.green },
-    { label: 'Health Index',    val: `${health.score}/100`,  color: health.score >= 80 ? C.green : health.score >= 60 ? C.orange : C.red },
-  ], y + 4) + 12;
-
-  // 02 — COLUMN SUMMARY TABLE
-  y = secHead(d, '02. Dimensional Architecture', y, C.cyan);
-
-  const colW = [60, 25, 25, 25, 25, 20];
-  y = tableRow(d, ['Dimension Name', 'Data Type', 'Null Count', 'Null %', 'Distinct Vals', 'Health'], y, colW, 12, true);
-  
-  info.columns.slice(0, 18).forEach((col, i) => {
-    const missPct = info.rows > 0 ? ((col.nullCount ?? 0) / info.rows * 100).toFixed(1) + '%' : '0%';
-    const colHealth = info.rows > 0 ? Math.round(((info.rows - (col.nullCount ?? 0)) / info.rows) * 100) : 100;
-    y = tableRow(d, [
-      col.name.length > 25 ? col.name.substring(0,22)+'...' : col.name,
-      col.type.toUpperCase(),
-      fmtN(col.nullCount ?? 0),
-      missPct,
-      fmtN(col.uniqueCount ?? 0),
-      `${colHealth}%`,
-    ], y, colW, 12, false, i % 2 === 1);
-    if (y > 260) return;
+  setPdfFont(ctx, 8);
+  textRgb(doc, G.inkMuted);
+  doc.text(opts.author || 'Kimit AI Studio · Data Intelligence', pad, H - 38, {
+    align: ctx.rtl ? 'right' : 'left',
   });
-  
-  if (info.columns.length > 18) {
-    d.setFontSize(8); rgb(d, C.slateLight); d.setFont('helvetica', 'italic');
-    d.text(`... plus ${info.columns.length - 18} additional dimensions omitted for brevity.`, 16, y + 6);
-    y += 10;
-  }
+  slideChrome(ctx, 1, 0, 'Cover');
 }
 
-// ══════════════════════════════════════════════════════════════════
-// PAGE 3 — ANOMALIES & STRATEGY
-// ══════════════════════════════════════════════════════════════════
-function drawPage3(
-  d: jsPDF,
+// ── SLIDE: KPI overview ───────────────────────────────────────────────
+function slideOverview(
+  ctx: SlideCtx,
   info: DatasetInfo,
   health: { score: number; label: string },
-  insights: { title: string; description: string; type: string }[]
+  page: number,
+  total: number,
 ) {
-  const W = d.internal.pageSize.getWidth();
-  let y = 30;
+  const { doc, W, H } = ctx;
+  doc.addPage();
+  slideBg(ctx);
+  accentBar(doc, 0, W, 3);
 
-  const numCols = info.columns.filter(c => c.type === 'numeric');
-
-  y = secHead(d, '03. Risk Signals & Anomalies', y, C.red);
-
-  const anomalies: { tag: string; text: string; color: [number,number,number] }[] = [];
-  if (health.score < 100) {
-    anomalies.push({ tag: 'HEALTH STATUS', text: `System health score is ${health.score}/100. "${health.label}". Immediate attention to following anomalies is advised.`, color: health.score >= 80 ? C.green : health.score >= 60 ? C.orange : C.red });
-  }
-
-  if (info.duplicates > 0)
-    anomalies.push({ tag: 'CRITICAL RISK — DUPLICATES', text: `${fmtN(info.duplicates)} duplicate records detected (${pct(info.duplicates, info.rows)} of dataset). This heavily skews aggregations. Immediate sanitization required.`, color: C.red });
-  if (info.totalNulls > 0) {
-    const np = ((info.totalNulls / (info.rows * info.columns.length)) * 100).toFixed(1);
-    anomalies.push({ tag: 'WARNING — DATA SPARSITY', text: `${fmtN(info.totalNulls)} null elements (${np}%). Model training or financial analysis requires strict imputation protocols.`, color: C.orange });
-  }
-  numCols.forEach(c => {
-    if (c.min !== undefined && c.max !== undefined && c.mean !== undefined && c.max > 0) {
-      const ratio = (c.max - c.min) / (c.mean || 1);
-      if (ratio > 15)
-        anomalies.push({ tag: `OUTLIER DETECTED — ${c.name.toUpperCase()}`, text: `Variance extreme: Range [${fmtN(c.min)} → ${fmtN(c.max)}]. Ratio to mean is ${ratio.toFixed(1)}x. Investigate for data entry errors.`, color: C.cyan });
-    }
-  });
-  if (anomalies.length === 0)
-    anomalies.push({ tag: 'SYSTEM VALIDATED', text: 'Zero structural anomalies detected. All parameters fall within acceptable enterprise thresholds.', color: C.green });
-
-  anomalies.slice(0, 4).forEach(item => {
-    fill(d, C.bgCard, 12, y, W - 24, 18, 2);
-    fill(d, item.color, 12, y, 4, 18);
-    d.setFont('helvetica', 'bold'); d.setFontSize(8); d.setTextColor(...item.color);
-    d.text(item.tag, 22, y + 7, { charSpace: 0.5 });
-    d.setFont('helvetica', 'normal'); d.setFontSize(8); rgb(d, C.offWhite);
-    const w = d.splitTextToSize(item.text, W - 38);
-    d.text(w[0] ?? '', 22, y + 13);
-    y += 22;
-  });
+  let y = slideTitle(ctx, 'At a glance', 'Your dataset in four numbers that matter for decision-making.', 28);
   y += 6;
 
-  y = secHead(d, '04. AI Strategic Advisory', y, C.gold);
+  const completeness =
+    info.rows * info.columns.length > 0
+      ? (100 - (info.totalNulls / (info.rows * info.columns.length)) * 100).toFixed(1)
+      : '100.0';
 
-  fill(d, C.bgCard, 12, y, W - 24, 70, 2);
-  fill(d, C.gold, 12, y, W - 24, 3);
-  
-  const recs = [
-    info.duplicates > 0 || info.totalNulls > 0
-      ? `PHASE 1: Execute Automated Sanitization. Purge ${fmtN(info.duplicates)} duplicates and impute ${fmtN(info.totalNulls)} missing vectors.`
-      : `PHASE 1: Data Integrity Verified. Proceed immediately to advanced segmentation modeling.`,
-    numCols.length > 0
-      ? `PHASE 2: Establish KPI telemetry on dimension "${numCols[0].name}". Set variance triggers at ±20% of the baseline mean (${fmtN(numCols[0].mean ?? 0)}).`
-      : `PHASE 2: Ingest continuous numerical metrics to enable algorithmic forecasting.`,
-    `PHASE 3: Distribute this intelligence payload to Department Heads. Enforce 48-hour SLA for anomaly resolution.`,
-  ];
+  const cw = (W - 56 - 18) / 4;
+  const ch = 52;
+  metricCard(ctx, 28, y, cw, ch, 'Total records', fmtN(info.rows), info.filename, G.accent, G.accentSoft);
+  metricCard(ctx, 28 + cw + 6, y, cw, ch, 'Completeness', `${completeness}%`, 'Non-null cells', G.mint, G.mintSoft);
+  metricCard(
+    ctx,
+    28 + (cw + 6) * 2,
+    y,
+    cw,
+    ch,
+    'Duplicates',
+    fmtN(info.duplicates),
+    pct(info.duplicates, info.rows) + ' of rows',
+    info.duplicates > 0 ? G.rose : G.mint,
+    info.duplicates > 0 ? G.roseSoft : G.mintSoft,
+  );
+  metricCard(
+    ctx,
+    28 + (cw + 6) * 3,
+    y,
+    cw,
+    ch,
+    'Health score',
+    `${health.score}`,
+    health.label,
+    health.score >= 80 ? G.mint : health.score >= 60 ? G.amber : G.rose,
+    health.score >= 80 ? G.mintSoft : health.score >= 60 ? G.amberSoft : G.roseSoft,
+  );
 
-  recs.forEach((rec, i) => {
-    d.setFont('helvetica', 'bold'); d.setFontSize(10); rgb(d, C.goldLight);
-    d.text(`0${i+1}`, 20, y + 16 + i * 18);
-    d.setFont('helvetica', 'normal'); d.setFontSize(9); rgb(d, C.offWhite);
-    const w = d.splitTextToSize(rec, W - 40);
-    d.text(w, 32, y + 16 + i * 18);
-  });
-  y += 78;
+  y += ch + 16;
+  fill(doc, G.white, 28, y, W - 56, H - y - 28, 10);
+  doc.setDrawColor(...G.border);
+  doc.roundedRect(28, y, W - 56, H - y - 28, 10, 10, 'S');
 
-  if (insights.length > 0 && y < 220) {
-    y = secHead(d, '05. Automated Pattern Recognition', y, C.cyan);
-    const cfg: Record<string, { c: [number,number,number]; lbl: string }> = {
-      positive: { c: C.green, lbl: 'POSITIVE VARIANCE' },
-      warning:  { c: C.red,   lbl: 'RISK VECTOR'  },
-      info:     { c: C.cyan,  lbl: 'NEUTRAL INSIGHT'  },
-    };
-    insights.slice(0, 3).forEach(ins => {
-      if (y > 260) return;
-      const t = cfg[ins.type] ?? cfg.info;
-      fill(d, C.bgCard, 12, y, W - 24, 20, 2);
-      fill(d, t.c, 12, y, 4, 20);
-      d.setFont('helvetica', 'bold'); d.setFontSize(7); d.setTextColor(...t.c);
-      d.text(t.lbl, 22, y + 7, { charSpace: 0.5 });
-      d.setFont('helvetica', 'bold'); d.setFontSize(9); rgb(d, C.offWhite);
-      d.text(d.splitTextToSize(ins.title.toUpperCase(), W - 38)[0] ?? '', 22, y + 12);
-      d.setFont('helvetica', 'normal'); d.setFontSize(8); rgb(d, C.slateLight);
-      d.text(d.splitTextToSize(ins.description, W - 38)[0] ?? '', 22, y + 17);
-      y += 24;
-    });
+  setPdfFont(ctx, 10, true);
+  textRgb(doc, G.ink);
+  doc.text('Dataset snapshot', ctx.rtl ? W - 40 : 40, y + 14, { align: ctx.rtl ? 'right' : 'left' });
+  const snap = `This dataset has ${info.columns.length} dimensions (${info.columns.filter(c => c.type === 'numeric').length} numeric, ${info.columns.filter(c => c.type !== 'numeric').length} categorical). Missing values: ${fmtN(info.totalNulls)}. Use the following slides for insights, risks, and recommended actions.`;
+  pdfWrite(ctx, snap, ctx.rtl ? W - 40 : 40, y + 24, W - 80, { align: ctx.rtl ? 'right' : 'left', size: 9.5 });
+
+  slideChrome(ctx, page, total, 'Overview');
+}
+
+// ── SLIDE: Executive summary ──────────────────────────────────────────
+function slideExecutiveSummary(
+  ctx: SlideCtx,
+  summary: string,
+  isLocal: boolean | undefined,
+  page: number,
+  total: number,
+) {
+  const { doc, W, H } = ctx;
+  doc.addPage();
+  slideBg(ctx);
+  accentBar(doc, 0, W, 3);
+  slideTitle(ctx, 'Executive summary', 'The story your data tells — in plain language.', 28);
+
+  fill(doc, G.white, 28, 72, W - 56, H - 100, 12);
+  doc.setDrawColor(...G.border);
+  doc.roundedRect(28, 72, W - 56, H - 100, 12, 12, 'S');
+
+  setPdfFont(ctx, 11);
+  textRgb(doc, G.ink);
+  const lines = pdfSplit(ctx, summary, W - 88);
+  const maxLines = Math.min(lines.length, Math.floor((H - 120) / LINE));
+  doc.text(lines.slice(0, maxLines), ctx.rtl ? W - 44 : 44, 90, { align: ctx.rtl ? 'right' : 'left' });
+
+  if (isLocal) {
+    fill(doc, G.amberSoft, 44, H - 38, W - 88, 12, 4);
+    setPdfFont(ctx, 8);
+    textRgb(doc, G.amber);
+    doc.text('Statistical mode · Add VITE_OPENROUTER_KEY for AI-enhanced narrative', 52, H - 30);
   }
+  slideChrome(ctx, page, total, 'Summary');
 }
 
-// ══════════════════════════════════════════════════════════════════
-// PAGE 4 — LLM NARRATIVE
-// ══════════════════════════════════════════════════════════════════
-function drawAIStrategyPage(d: jsPDF, summary: string) {
-  const W = d.internal.pageSize.getWidth();
-  let y = 30;
+// ── SLIDES: Card grid (insights / risks / etc.) ─────────────────────────
+function slidesCardGrid(
+  ctx: SlideCtx,
+  sectionTitle: string,
+  sectionSub: string,
+  items: string[],
+  accent: RGB,
+  soft: RGB,
+  tag: string,
+  startPage: number,
+  total: number,
+): number {
+  if (items.length === 0) return startPage;
+  const { doc, W } = ctx;
+  const perSlide = ctx.rtl ? 2 : 3;
+  const chunks: string[][] = [];
+  for (let i = 0; i < items.length; i += perSlide) chunks.push(items.slice(i, i + perSlide));
 
-  y = secHead(d, '06. Executive LLM Synthesis', y, C.gold);
+  chunks.forEach((chunk, ci) => {
+    const page = startPage + ci;
+    doc.addPage();
+    slideBg(ctx);
+    accentBar(doc, 0, W, 3);
+    const sub =
+      chunks.length > 1
+        ? `${sectionSub} (${ci + 1}/${chunks.length})`
+        : sectionSub;
+    let y = slideTitle(ctx, sectionTitle, sub, 28);
+    y += 4;
 
-  fill(d, C.bgCard, 12, y, W - 24, 230, 3);
-  
-  // Fancy quote mark
-  d.setFont('helvetica', 'bold'); d.setFontSize(60); rgb(d, C.border);
-  d.text('"', 20, y + 30);
-
-  d.setFont('helvetica', 'normal'); d.setFontSize(10); rgb(d, C.offWhite);
-  
-  const lines = d.splitTextToSize(summary, W - 40);
-  let currentY = y + 20;
-  
-  lines.forEach((line: string) => {
-    if (line.includes('**')) {
-      const parts = line.split('**');
-      let currentX = 22;
-      parts.forEach((part, idx) => {
-        d.setFont('helvetica', idx % 2 === 1 ? 'bold' : 'normal');
-        d.setTextColor(...(idx % 2 === 1 ? C.goldLight : C.offWhite));
-        d.text(part, currentX, currentY);
-        currentX += d.getTextWidth(part);
-      });
-    } else {
-      d.setFont('helvetica', 'normal'); rgb(d, C.offWhite);
-      d.text(line, 22, currentY);
-    }
-    currentY += 6.5;
+    const cardW = W - 56;
+    chunk.forEach((item, i) => {
+      const cardH = insightCard(ctx, 28, y, cardW, i + 1 + ci * perSlide, item, accent, soft);
+      y += cardH + 10;
+    });
+    slideChrome(ctx, page, total, tag);
   });
+
+  return startPage + chunks.length;
 }
 
-// ══════════════════════════════════════════════════════════════════
+// ── SLIDE: Recommendations (numbered list) ──────────────────────────────
+function slidesRecommendations(
+  ctx: SlideCtx,
+  items: string[],
+  startPage: number,
+  total: number,
+): number {
+  if (items.length === 0) return startPage;
+  const { doc, W, H } = ctx;
+  doc.addPage();
+  slideBg(ctx);
+  accentBar(doc, 0, W, 3);
+  let y = slideTitle(ctx, 'Recommended actions', 'Prioritized steps you can take immediately.', 28);
+  y += 8;
+
+  items.slice(0, 5).forEach((item, i) => {
+    if (y > H - 30) return;
+    y += bulletCard(ctx, 28, y, W - 56, item, i + 1, G.accent);
+  });
+  slideChrome(ctx, startPage, total, 'Actions');
+  return startPage + 1;
+}
+
+// ── SLIDE: Data dimensions (compact table) ──────────────────────────────
+function slideDimensions(ctx: SlideCtx, info: DatasetInfo, page: number, total: number) {
+  const { doc, W, H } = ctx;
+  doc.addPage();
+  slideBg(ctx);
+  accentBar(doc, 0, W, 3);
+  slideTitle(ctx, 'Data dimensions', 'Column-level health at a glance.', 28);
+
+  const cols = info.columns.slice(0, 10);
+  const rowH = 12;
+  let y = 78;
+  const colW = [(W - 56) * 0.38, (W - 56) * 0.14, (W - 56) * 0.16, (W - 56) * 0.16, (W - 56) * 0.16];
+
+  fill(doc, G.accent, 28, y, W - 56, rowH, 4);
+  setPdfFont(ctx, 8, true);
+  textRgb(doc, G.white);
+  let x = 32;
+  ['Column', 'Type', 'Nulls', 'Distinct', 'Health'].forEach((h, i) => {
+    doc.text(h, x, y + 8);
+    x += colW[i];
+  });
+  y += rowH;
+
+  cols.forEach((col, i) => {
+    if (y > H - 28) return;
+    if (i % 2 === 0) fill(doc, G.white, 28, y, W - 56, rowH);
+    else fill(doc, G.canvas, 28, y, W - 56, rowH);
+    const healthPct =
+      info.rows > 0 ? Math.round(((info.rows - (col.nullCount ?? 0)) / info.rows) * 100) : 100;
+    setPdfFont(ctx, 8);
+    textRgb(doc, G.ink);
+    x = 32;
+    const displayName =
+      ctx.font === PDF_FONT_LATIN && /[\u0600-\u06FF]/.test(col.name)
+        ? latinizeColumnName(col.name, i)
+        : col.name;
+    const nameLines = pdfSplit(ctx, displayName, colW[0] - 4);
+    const cells = [
+      nameLines[0] ?? displayName,
+      col.type,
+      fmtN(col.nullCount ?? 0),
+      fmtN(col.uniqueCount ?? 0),
+      `${healthPct}%`,
+    ];
+    cells.forEach((cell, j) => {
+      doc.text(String(cell), x, y + 8);
+      x += colW[j];
+    });
+    y += rowH;
+  });
+
+  if (info.columns.length > 10) {
+    setPdfFont(ctx, 8);
+    textRgb(doc, G.inkMuted);
+    doc.text(`+ ${info.columns.length - 10} more columns in the full dataset`, 28, y + 6);
+  }
+  slideChrome(ctx, page, total, 'Schema');
+}
+
+// ── SLIDE: Closing ──────────────────────────────────────────────────────
+function slideClosing(ctx: SlideCtx, page: number, total: number) {
+  const { doc, W, H } = ctx;
+  doc.addPage();
+  slideBg(ctx);
+  accentBar(doc, 0, W, 5);
+  fill(doc, G.white, 28, 40, W - 56, H - 80, 14);
+
+  setPdfFont(ctx, 28, true);
+  textRgb(doc, G.ink);
+  doc.text('Thank you', W / 2, 95, { align: 'center' });
+  setPdfFont(ctx, 12);
+  textRgb(doc, G.inkSoft);
+  doc.text('Prepared with Kimit AI Studio', W / 2, 112, { align: 'center' });
+  setPdfFont(ctx, 9);
+  textRgb(doc, G.inkMuted);
+  doc.text('Confidential · For internal decision-making only', W / 2, 128, { align: 'center' });
+
+  slideChrome(ctx, page, total, 'End');
+}
+
+// ── Parse narrative sections into slides (optional appendix) ───────────
+function slidesNarrativeAppendix(ctx: SlideCtx, narrative: string, startPage: number, total: number): number {
+  const sections = narrative.split(/\n(?=\*\*)/).filter(s => s.trim());
+  if (sections.length === 0) return startPage;
+
+  const { doc, W, H } = ctx;
+  let page = startPage;
+
+  sections.slice(0, 4).forEach(block => {
+    doc.addPage();
+    slideBg(ctx);
+    accentBar(doc, 0, W, 3);
+
+    const titleMatch = block.match(/^\*\*(.+?)\*\*/);
+    const title = titleMatch ? titleMatch[1] : 'Details';
+    const body = block.replace(/^\*\*.+?\*\*\n?/, '').trim();
+
+    slideTitle(ctx, title, 'Supporting analysis', 28);
+    fill(doc, G.white, 28, 72, W - 56, H - 100, 10);
+    setPdfFont(ctx, 9.5);
+    textRgb(doc, G.ink);
+    const lines = pdfSplit(ctx, body.replace(/\*\*/g, ''), W - 88);
+    doc.text(lines.slice(0, 16), ctx.rtl ? W - 44 : 44, 88, { align: ctx.rtl ? 'right' : 'left' });
+    slideChrome(ctx, page, total, 'Appendix');
+    page++;
+  });
+
+  return page;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // PUBLIC API
-// ══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
 export async function generateExecutiveReport(
   info: DatasetInfo,
   health: { score: number; label: string; color: string },
-  options: ReportOptions = {}
+  options: ReportOptions = {},
 ): Promise<void> {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const file = info.filename || 'Dataset';
-  const now = new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' }).toUpperCase();
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  const file = (info.filename || 'Dataset').toUpperCase();
+  const now = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
   const logo = await loadLogo();
+  const arabicFontOk = await ensurePdfArabicFont(doc);
 
-  // Page 1
-  await drawCover(doc, { ...options, filename: file.toUpperCase(), rows: info.rows, cols: info.columns.length, generatedAt: now });
+  const rawBriefing = options.briefing;
+  const briefingTexts = rawBriefing
+    ? [
+        rawBriefing.executiveSummary,
+        ...rawBriefing.insights,
+        ...rawBriefing.warnings,
+        ...rawBriefing.qualityIssues,
+        ...rawBriefing.recommendations,
+        ...rawBriefing.opportunities,
+      ]
+    : [];
+  const briefing =
+    rawBriefing && !arabicFontOk
+      ? latinizeBriefingForPdf(rawBriefing, info.columns)
+      : rawBriefing;
 
-  // Page 2
-  doc.addPage();
-  fill(doc, C.bgDark, 0, 0, 210, 297);
-  drawPage2(doc, info, health);
+  const font = pickPdfFont(arabicFontOk, info.columns, briefingTexts);
+  const rtl = font === PDF_FONT_ARABIC;
+  const ctx: SlideCtx = { doc, W, H, logo, file, font, rtl };
 
-  // Page 3
-  doc.addPage();
-  fill(doc, C.bgDark, 0, 0, 210, 297);
-  drawPage3(doc, info, health, options.insights ?? []);
+  const perGrid = rtl ? 2 : 3;
+  const gridSlides = (items: string[]) => Math.max(0, Math.ceil(items.length / perGrid));
+  let planned =
+    1 + // cover
+    1 + // overview
+    1 + // dimensions
+    (briefing ? 1 : 0) + // exec summary
+    (briefing ? gridSlides(briefing.insights) : 0) +
+    (briefing ? gridSlides(briefing.warnings) : 0) +
+    (briefing ? gridSlides(briefing.qualityIssues) : 0) +
+    (briefing ? 1 : 0) + // recommendations
+    (briefing ? gridSlides(briefing.opportunities) : 0) +
+    (options.aiSummary ? Math.min(4, 4) : 0) +
+    1; // closing
+  let total = planned;
 
-  // Page 4 (Optional AI)
+  // ── Build deck ──────────────────────────────────────────────────────
+  slideCover(ctx, {
+    title: options.title || 'Executive Intelligence Report',
+    subtitle: options.subtitle || 'Data-driven insights for leadership',
+    filename: file,
+    rows: info.rows,
+    cols: info.columns.length,
+    generatedAt: now,
+    author: options.author,
+  });
+
+  let page = 2;
+  slideOverview(ctx, info, health, page++, total);
+
+  if (briefing) {
+    slideExecutiveSummary(ctx, briefing.executiveSummary, briefing.isLocal, page++, total);
+
+    page = slidesCardGrid(
+      ctx,
+      'Key insights',
+      'Patterns and metrics worth your attention',
+      briefing.insights,
+      G.accent,
+      G.accentSoft,
+      'Insights',
+      page,
+      total,
+    );
+
+    page = slidesCardGrid(
+      ctx,
+      'Risks & anomalies',
+      'Issues that may affect analysis accuracy',
+      briefing.warnings,
+      G.rose,
+      G.roseSoft,
+      'Risks',
+      page,
+      total,
+    );
+
+    page = slidesCardGrid(
+      ctx,
+      'Data quality',
+      'Completeness and integrity findings',
+      briefing.qualityIssues,
+      G.amber,
+      G.amberSoft,
+      'Quality',
+      page,
+      total,
+    );
+
+    page = slidesRecommendations(ctx, briefing.recommendations, page, total);
+
+    page = slidesCardGrid(
+      ctx,
+      'Strategic opportunities',
+      'Where to invest analysis effort next',
+      briefing.opportunities,
+      G.violet,
+      G.violetSoft,
+      'Opportunities',
+      page,
+      total,
+    );
+  }
+
+  slideDimensions(ctx, info, page++, total);
+
   if (options.aiSummary) {
-    doc.addPage();
-    fill(doc, C.bgDark, 0, 0, 210, 297);
-    drawAIStrategyPage(doc, options.aiSummary);
+    page = slidesNarrativeAppendix(ctx, options.aiSummary, page, total);
   }
 
-  // Apply Chrome
-  const total = doc.getNumberOfPages();
-  for (let p = 2; p <= total; p++) {
+  slideClosing(ctx, page, total);
+
+  // Fix total page numbers on all slides
+  total = doc.getNumberOfPages();
+  for (let p = 1; p <= total; p++) {
     doc.setPage(p);
-    pageChrome(doc, p, total, file.toUpperCase(), logo);
+    setPdfFont(ctx, 7);
+    textRgb(doc, G.inkMuted);
+    doc.text(`${p} / ${total}`, rtl ? 14 : W - 14, H - 8, { align: rtl ? 'left' : 'right' });
   }
 
-  doc.save(`KIMIT_EXECUTIVE_${file.replace(/[^a-z0-9_-]/gi, '_').toUpperCase()}.pdf`);
+  doc.save(`KIMIT_REPORT_${file.replace(/[^a-z0-9_-]/gi, '_')}.pdf`);
 }

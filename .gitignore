@@ -46,10 +46,27 @@ build/Release
 
 # Dependency directories
 node_modules/
-datapath-app/node_modules/
+**/node_modules/
 
 # Build output
+dist/
+**/dist/
+admin-dashboard/dist/
 datapath-app/dist/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+backend/.env
+
+# IDE / OS
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
 
 # Optional npm cache directory
 .npm

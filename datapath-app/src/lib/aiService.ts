@@ -82,10 +82,11 @@ RULES:
   return data.choices[0]?.message?.content ?? '';
 }
 
-export async function generateExecutiveSummary(dataset: DatasetInfo, apiKey: string | undefined): Promise<import('../types').SummaryReport> {
-  const numCols = dataset.columns.filter(c => c.type === 'numeric').map(c => c.name).join(', ');
-  const txtCols = dataset.columns.filter(c => c.type === 'text').map(c => c.name).join(', ');
-  
+export async function generateExecutiveSummary(
+  dataset: DatasetInfo,
+  apiKey: string | undefined,
+  lang: 'en' | 'ar' = 'en',
+): Promise<import('../types').SummaryReport> {
   const colStats = dataset.columns.map(c => 
     `${c.name}: Nulls=${c.nullCount}, Unique=${c.uniqueCount}` + 
     (c.type === 'numeric' && c.mean ? `, Mean=${c.mean?.toFixed(2)}` : '')
@@ -93,12 +94,16 @@ export async function generateExecutiveSummary(dataset: DatasetInfo, apiKey: str
 
   const sample = JSON.stringify(dataset.workData.slice(0, 3));
 
+  const colLabels = dataset.columns
+    .map((c, i) => `Column ${i + 1}${/[\u0600-\u06FF]/.test(c.name) ? '' : ` (${c.name})`}: type=${c.type}`)
+    .join('\n');
+
   const prompt = `You are an expert data analyst and economic specialist in operational and commercial data analysis.
 
 You have the following data:
 - Number of rows: ${dataset.rows}
-- Numeric columns: ${numCols}
-- Text columns: ${txtCols}
+- Column index map (use these labels in your report — do NOT paste raw non-Latin column names):
+${colLabels}
 - Column statistics: ${colStats}
 - Data sample: ${sample}
 
@@ -111,7 +116,7 @@ Analyze this data and produce a structured report containing:
 5. Actionable Recommendations — 3 specific actions the user can take right now to improve the data or boost performance
 6. Suggested Analysis Opportunities — Additional analyses that could deliver high value from this data
 
-Write in English. Be precise and actionable. Do not write generic statements — every point must be based on actual numbers from the data.
+Write in ${lang === 'ar' ? 'Arabic' : 'English'}. Be precise and actionable. Do not write generic statements — every point must be based on actual numbers from the data.
 You MUST respond with ONLY valid JSON in the following exact format:
 {
   "executiveSummary": "...",
@@ -161,54 +166,156 @@ You MUST respond with ONLY valid JSON in the following exact format:
     };
   } catch (err) {
     console.warn('AI Summary failed, falling back to local JS analysis:', err);
-    return generateLocalSummary(dataset);
+    return generateLocalSummary(dataset, lang);
   }
 }
 
-function generateLocalSummary(dataset: DatasetInfo): import('../types').SummaryReport {
-  // 1. Executive Summary
-  const executiveSummary = `Analyzed a dataset with ${dataset.rows} records and ${dataset.columns.length} columns. The data contains a mix of numeric and text variables.`;
+function fmtN(n: number): string {
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return n.toLocaleString();
+}
 
-  // 2. Insights
-  const insights: string[] = [];
+function generateLocalSummary(
+  dataset: DatasetInfo,
+  lang: 'en' | 'ar' = 'en',
+): import('../types').SummaryReport {
+  const totalCells = dataset.rows * dataset.columns.length;
+  const completeness =
+    totalCells > 0 ? (100 - (dataset.totalNulls / totalCells) * 100).toFixed(1) : '100';
   const numericCols = dataset.columns.filter(c => c.type === 'numeric');
-  numericCols.forEach(c => {
+  const textCols = dataset.columns.filter(c => c.type !== 'numeric');
+  const dupPct = dataset.rows > 0 ? ((dataset.duplicates / dataset.rows) * 100).toFixed(1) : '0';
+
+  const executiveSummary =
+    lang === 'ar'
+      ? `يحتوي ملف "${dataset.filename}" على ${fmtN(dataset.rows)} سجلاً موزّعة على ${dataset.columns.length} بُعداً (${numericCols.length} رقمية، ${textCols.length} نصية/فئوية). اكتمال البيانات ${completeness}% مع ${fmtN(dataset.duplicates)} تكراراً (${dupPct}%). هذا التقرير يقدّم تقييماً تنفيذياً لجودة البيانات والمخاطر والفرص التحليلية الفورية.`
+      : `Dataset "${dataset.filename}" contains ${fmtN(dataset.rows)} records across ${dataset.columns.length} dimensions (${numericCols.length} numeric, ${textCols.length} categorical/text). Data completeness is ${completeness}% with ${fmtN(dataset.duplicates)} duplicate rows (${dupPct}%). This report delivers an executive view of quality, risk exposure, and immediate analytical opportunities.`;
+
+  const insights: string[] = [];
+  numericCols.slice(0, 4).forEach((c, idx) => {
+    const colLabel = /[\u0600-\u06FF]/.test(c.name)
+      ? (lang === 'ar' ? `العمود ${idx + 1}` : `Column ${dataset.columns.indexOf(c) + 1}`)
+      : c.name;
     if (c.mean !== undefined && c.max !== undefined) {
-      insights.push(`Column "${c.name}" has an average of ${c.mean.toFixed(2)} with a maximum value of ${c.max.toFixed(2)}.`);
+      const spread = c.max - (c.min ?? 0);
+      insights.push(
+        lang === 'ar'
+          ? `المؤشر "${colLabel}": المتوسط ${fmtN(c.mean)}، الأقصى ${fmtN(c.max)}، مدى ${fmtN(spread)} — يشير إلى تباين ${spread > (c.mean || 1) * 2 ? 'مرتفع' : 'معتدل'}.`
+          : `Metric "${colLabel}": mean ${fmtN(c.mean)}, peak ${fmtN(c.max)}, range ${fmtN(spread)} — indicates ${spread > (c.mean || 1) * 2 ? 'high' : 'moderate'} variance.`,
+      );
     }
   });
-  if (insights.length === 0) insights.push('Not enough numeric data to extract insights.');
 
-  // 3. Warnings (Outliers > 3 std dev)
+  const topCat = textCols[0];
+  if (topCat) {
+    const catLabel = /[\u0600-\u06FF]/.test(topCat.name)
+      ? (lang === 'ar' ? `العمود ${dataset.columns.indexOf(topCat) + 1}` : `Column ${dataset.columns.indexOf(topCat) + 1}`)
+      : topCat.name;
+    insights.push(
+      lang === 'ar'
+        ? `البُعد "${catLabel}" يحتوي ${fmtN(topCat.uniqueCount ?? 0)} قيمة مميزة — مناسب للتقسيم والمقارنة بين الشرائح.`
+        : `Dimension "${catLabel}" has ${fmtN(topCat.uniqueCount ?? 0)} distinct values — suitable for segmentation and comparative analysis.`,
+    );
+  }
+  if (insights.length === 0) {
+    insights.push(
+      lang === 'ar'
+        ? 'لا توجد أعمدة رقمية كافية؛ يُنصح بتحويل الحقول أو إضافة مقاييس كمية.'
+        : 'Insufficient numeric fields; consider type conversion or adding quantitative KPIs.',
+    );
+  }
+
   const warnings: string[] = [];
-  if (dataset.anomalies && dataset.anomalies.length > 0) {
-    dataset.anomalies.forEach(a => {
-      warnings.push(`${a.column}: ${a.description}`);
+  if (dataset.anomalies?.length) {
+    dataset.anomalies.slice(0, 4).forEach(a => {
+      warnings.push(
+        lang === 'ar'
+          ? `${a.column}: ${a.description} (${a.count} قيمة شاذة)`
+          : `${a.column}: ${a.description} (${a.count} outlier values)`,
+      );
     });
-  } else {
-    warnings.push('No clear anomalies detected.');
+  }
+  if (dataset.duplicates > 0) {
+    warnings.push(
+      lang === 'ar'
+        ? `${fmtN(dataset.duplicates)} صف مكرر قد يشوّه المجاميع والمتوسطات.`
+        : `${fmtN(dataset.duplicates)} duplicate rows may inflate aggregates and averages.`,
+    );
+  }
+  if (warnings.length === 0) {
+    warnings.push(
+      lang === 'ar' ? 'لم تُرصد مخاطر هيكلية حرجة في العينة الحالية.' : 'No critical structural risks detected in the current sample.',
+    );
   }
 
   const qualityIssues: string[] = [];
-  if (dataset.duplicates > 0) {
-    qualityIssues.push(`Found ${dataset.duplicates} duplicate records.`);
-  }
-  dataset.columns.forEach(c => {
-    if (c.nullCount > 0) {
-      const pct = ((c.nullCount / dataset.rows) * 100).toFixed(1);
-      qualityIssues.push(`Column "${c.name}" is missing ${c.nullCount} values (${pct}%).`);
-    }
+  const colsWithNulls = dataset.columns
+    .filter(c => (c.nullCount ?? 0) > 0)
+    .sort((a, b) => (b.nullCount ?? 0) - (a.nullCount ?? 0))
+    .slice(0, 5);
+  colsWithNulls.forEach(c => {
+    const pct = dataset.rows > 0 ? (((c.nullCount ?? 0) / dataset.rows) * 100).toFixed(1) : '0';
+    qualityIssues.push(
+      lang === 'ar'
+        ? `"${c.name}": ${c.nullCount} قيمة مفقودة (${pct}% من الصفوف).`
+        : `"${c.name}": ${c.nullCount} missing values (${pct}% of rows).`,
+    );
   });
-  if (qualityIssues.length === 0) qualityIssues.push('Data appears clean with no obvious issues.');
+  if (qualityIssues.length === 0) {
+    qualityIssues.push(
+      lang === 'ar' ? 'لا توجد قيم مفقودة — جودة إدخال ممتازة.' : 'No missing values detected — excellent input quality.',
+    );
+  }
 
-  // 5. Recommendations
   const recommendations: string[] = [];
-  if (dataset.duplicates > 0) recommendations.push('Remove duplicate records to improve analysis accuracy.');
-  if (dataset.totalNulls > 0) recommendations.push('Handle missing values (either delete or impute with mean).');
-  recommendations.push('Explore correlations between numeric variables.');
+  if (dataset.duplicates > 0) {
+    recommendations.push(
+      lang === 'ar'
+        ? 'تشغيل تنقية التكرارات قبل أي تقرير رسمي أو لوحة مؤشرات.'
+        : 'Run deduplication before any official reporting or dashboard refresh.',
+    );
+  }
+  if (dataset.totalNulls > 0) {
+    recommendations.push(
+      lang === 'ar'
+        ? 'معالجة القيم المفقودة (وسيط للأرقام، الأكثر تكراراً للنصوص) عبر أداة التنظيف.'
+        : 'Impute missing values (median for numbers, mode for text) using the Cleaning module.',
+    );
+  }
+  recommendations.push(
+    lang === 'ar'
+      ? 'مراجعة أقوى 3 شرائح في الأبعاد الفئوية ومقارنتها بمؤشر الأداء الرئيسي.'
+      : 'Review top 3 categorical segments against the primary performance metric.',
+  );
+  recommendations.push(
+    lang === 'ar'
+      ? 'تصدير نسخة Excel منقّاة وأرشفتها كمصدر موثّق للقرارات.'
+      : 'Export a cleaned Excel snapshot as the documented source of truth for decisions.',
+  );
 
-  // 6. Opportunities
-  const opportunities = ['Time series analysis if a date column exists.', 'Data clustering to discover hidden patterns.'];
+  const opportunities = [
+    lang === 'ar'
+      ? 'بناء لوحة Smart Dashboard لمتابعة الاتجاهات والشذوذ لحظياً.'
+      : 'Deploy Smart Dashboard for real-time trend and anomaly monitoring.',
+    lang === 'ar'
+      ? 'تحليل ارتباطات بين المؤشرات الرقمية لاكتشاف محركات الأداء.'
+      : 'Correlation analysis across numeric KPIs to identify performance drivers.',
+    lang === 'ar'
+      ? 'تقسيم العملاء/المنتجات حسب البُعد الفئوي الأعلى تنوعاً.'
+      : 'Segment entities by the highest-cardinality categorical dimension.',
+  ];
+
+  if (dataset.correlations?.length) {
+    const strong = dataset.correlations.filter(c => Math.abs(c.value) > 0.7).slice(0, 2);
+    strong.forEach(c => {
+      opportunities.push(
+        lang === 'ar'
+          ? `استغلال الارتباط بين "${c.col1}" و"${c.col2}" (${c.value.toFixed(2)}) في نماذج تنبؤية.`
+          : `Leverage correlation between "${c.col1}" and "${c.col2}" (r=${c.value.toFixed(2)}) in predictive models.`,
+      );
+    });
+  }
 
   return {
     isLocal: true,
@@ -217,7 +324,7 @@ function generateLocalSummary(dataset: DatasetInfo): import('../types').SummaryR
     warnings: warnings.slice(0, 5),
     qualityIssues: qualityIssues.slice(0, 5),
     recommendations,
-    opportunities
+    opportunities,
   };
 }
 

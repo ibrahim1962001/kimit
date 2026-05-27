@@ -10,6 +10,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { AuthModal } from './AuthModal';
 import type { DatasetInfo } from '../types';
+import './openrouter-chat.css';
 
 interface MessageContent {
   type: 'text' | 'image_url';
@@ -381,7 +382,13 @@ If the request requires complex JavaScript code, place the code inside \`\`\`jav
     }
   };
 
-  if (!authChecked) return <div className="or-chat-root flex items-center justify-center h-full"><Loader2 size={32} className="spin text-indigo-400" /></div>;
+  if (!authChecked) {
+    return (
+      <div className="or-chat-root" style={{ alignItems: 'center', justifyContent: 'center' }}>
+        <Loader2 size={32} className="spin" style={{ color: '#818cf8' }} />
+      </div>
+    );
+  }
 
   return (
     <div className="or-chat-root" dir="ltr">
@@ -416,7 +423,7 @@ If the request requires complex JavaScript code, place the code inside \`\`\`jav
       <div className="or-messages" ref={scrollRef}>
         {messages.length === 0 && (
           <div className="or-empty-state">
-            <Bot size={48} className="text-indigo-400 mb-4" />
+            <div className="or-empty-icon"><Bot size={36} /></div>
             <h2 className="or-empty-title">How can I help you?</h2>
             <div className="or-suggestions">
               {SUGGESTED_PROMPTS.map(p => <button key={p} className="or-suggestion-chip" onClick={() => setInput(p)}>{p}</button>)}
@@ -473,54 +480,6 @@ If the request requires complex JavaScript code, place the code inside \`\`\`jav
         <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={handleImageUpload} />
         <input type="file" ref={docInputRef} hidden accept=".csv,.xlsx,.xls,.json" onChange={handleDocUpload} />
       </div>
-
-      <style>{`
-        .or-chat-root { display: flex; flex-direction: column; height: 100%; background: #020617; position: relative; overflow: hidden; font-family: 'Inter', sans-serif; }
-        .or-ambient-glow { position: absolute; top: -150px; left: 50%; transform: translateX(-50%); width: 800px; height: 400px; background: radial-gradient(ellipse, rgba(99,102,241,0.15) 0%, transparent 70%); pointer-events: none; }
-        .or-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; background: rgba(15,23,42,0.8); border-bottom: 1px solid rgba(255,255,255,0.06); backdrop-filter: blur(20px); z-index: 10; }
-        .or-header-brand { display: flex; align-items: center; gap: 12px; }
-        .or-brand-icon { width: 36px; height: 36px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; }
-        .or-brand-title { font-size: 14px; font-weight: 700; color: #f1f5f9; margin: 0; }
-        .or-brand-sub { font-size: 10px; color: #64748b; margin: 0; }
-        .or-user-profile { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.03); padding: 4px 8px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05); }
-        .or-user-avatar { width: 28px; height: 28px; border-radius: 6px; }
-        .or-user-info { display: flex; flex-direction: column; }
-        .or-user-name { font-size: 11px; font-weight: 600; color: #e2e8f0; }
-        .or-user-status { font-size: 8px; color: #10b981; }
-        .or-messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
-        .or-msg-row { display: flex; gap: 12px; max-width: 85%; }
-        .or-msg-row.user { align-self: flex-start; flex-direction: row; }
-        .or-msg-row.assistant { align-self: flex-start; flex-direction: row; }
-        .or-avatar { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .or-avatar.user { background: rgba(99,102,241,0.1); color: #818cf8; }
-        .or-avatar.assistant { background: rgba(16,185,129,0.1); color: #34d399; }
-        .or-bubble { padding: 12px 16px; border-radius: 16px; font-size: 14px; line-height: 1.6; }
-        .or-bubble.user { background: #1e293b; color: #f1f5f9; border: 1px solid rgba(255,255,255,0.05); }
-        .or-bubble.assistant { background: rgba(15,23,42,0.5); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
-        .or-timestamp { font-size: 10px; color: #64748b; margin-top: 4px; display: block; padding: 0 4px; }
-        .or-input-area { padding: 20px; background: rgba(15,23,42,0.9); border-top: 1px solid rgba(255,255,255,0.06); backdrop-filter: blur(20px); }
-        .or-input-row { display: flex; gap: 12px; align-items: flex-end; max-width: 900px; margin: 0 auto; }
-        .or-textarea-wrap { flex: 1; background: #0f172a; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 10px; position: relative; transition: all 0.2s; }
-        .or-textarea-wrap:focus-within { border-color: #6366f1; box-shadow: 0 0 0 1px rgba(99,102,241,0.2); }
-        .or-textarea { width: 100%; background: transparent; border: none; color: #f1f5f9; font-size: 14px; resize: none; padding: 4px; outline: none; }
-        .or-attach-actions { display: flex; gap: 8px; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); pt-2; }
-        .or-img-btn { color: #64748b; padding: 6px; border-radius: 8px; transition: all 0.2s; cursor: pointer; }
-        .or-img-btn:hover { background: rgba(255,255,255,0.05); color: #f1f5f9; }
-        .or-send-btn { width: 44px; height: 44px; background: #6366f1; color: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; cursor: pointer; }
-        .or-send-btn:hover:not(:disabled) { background: #4f46e5; transform: translateY(-2px); }
-        .or-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .or-typing span { width: 4px; height: 4px; background: #34d399; border-radius: 50%; display: inline-block; animation: or-bounce 1s infinite; }
-        .or-typing span:nth-child(2) { animation-delay: 0.2s; }
-        .or-typing span:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes or-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
-        .or-empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #64748b; }
-        .or-empty-title { font-size: 20px; font-weight: 700; color: #f1f5f9; margin-bottom: 24px; }
-        .or-suggestions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 500px; }
-        .or-suggestion-chip { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); padding: 8px 16px; border-radius: 12px; font-size: 13px; color: #94a3b8; transition: all 0.2s; cursor: pointer; }
-        .or-suggestion-chip:hover { background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.2); color: #e2e8f0; }
-        .spin { animation: spin 1s linear infinite; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      `}</style>
     </div>
   );
 };

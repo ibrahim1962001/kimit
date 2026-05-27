@@ -2,7 +2,7 @@
    KIMIT AI STUDIO — DATAPATH ANALYZER THEME v4
    Dark theme for data analysts
    ============================================= */
-@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900&family=Noto+Sans+Arabic:wght@400;500;600;700;800;900&display=swap');
 
 /* ── 1. TOKENS ─────────────────────────────── */
 :root {
@@ -32,11 +32,11 @@
 
 /* ── 2. FONTS ──────────────────────────────── */
 html, body, #root, button, input, select, textarea {
-  font-family: 'Syne', 'Cairo', system-ui, sans-serif !important;
+  font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', system-ui, -apple-system, sans-serif !important;
 }
 .stat-val, .corr-val, .format-tag, .sev-badge, .col-type-badge,
 .chart-type-badge, .progress-text, .hero-badge, .or-ds-badge {
-  font-family: 'Space Mono', monospace !important;
+  font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', system-ui, -apple-system, sans-serif !important;
 }
 
 /* ── 3. GRID BACKGROUND ────────────────────── */
@@ -133,7 +133,7 @@ body::after {
 }
 
 .site-name {
-  font-family: 'Syne', sans-serif !important;
+  font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', system-ui, -apple-system, sans-serif !important;
   font-size: 17px !important;
   font-weight: 800 !important;
   background: linear-gradient(to right, #fff, #7a9ab8) !important;
@@ -241,7 +241,7 @@ body::after {
 }
 
 .section-title {
-  font-family: 'Space Mono', monospace !important;
+  font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', system-ui, -apple-system, sans-serif !important;
   font-size: 11px !important;
   font-weight: 700 !important;
   color: var(--muted) !important;
@@ -524,7 +524,7 @@ body::after {
   border-bottom: 1px solid rgba(0,229,255,0.15) !important;
   font-size: 11px !important; font-weight: 800 !important;
   letter-spacing: 0.1em !important; text-transform: uppercase !important;
-  font-family: 'Space Mono', monospace !important;
+  font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', system-ui, -apple-system, sans-serif !important;
 }
 .data-table tr:hover td { background: rgba(0,229,255,0.03) !important; }
 
@@ -594,7 +594,7 @@ input:focus, select:focus, textarea:focus {
 .how-to-section { background: rgba(255,255,255,0.025) !important; border: 1px solid rgba(255,255,255,0.06) !important; border-radius: 22px !important; }
 .how-to-step { background: rgba(255,255,255,0.02) !important; border: 1px solid rgba(255,255,255,0.04) !important; border-radius: 16px !important; transition: transform 0.3s, border-color 0.3s !important; }
 .how-to-step:hover { border-color: rgba(0,229,255,0.15) !important; }
-.how-to-step-number { background: linear-gradient(135deg, #00e5ff, #00b8d4) !important; color: #021a1e !important; font-weight: 900 !important; font-family: 'Space Mono', monospace !important; }
+.how-to-step-number { background: linear-gradient(135deg, #00e5ff, #00b8d4) !important; color: #021a1e !important; font-weight: 900 !important; font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', system-ui, -apple-system, sans-serif !important; }
 
 /* ── 22. NOTIFICATION DOT PULSE ────────────── */
 .sidebar-login-icon { position: relative; }
@@ -612,7 +612,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 /* ── 23. CHART BADGES ──────────────────────── */
-.chart-type-badge { background: rgba(255,255,255,0.05) !important; border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 99px !important; font-weight: 800 !important; font-family: 'Space Mono', monospace !important; }
+.chart-type-badge { background: rgba(255,255,255,0.05) !important; border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 99px !important; font-weight: 800 !important; font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', system-ui, -apple-system, sans-serif !important; }
 .chart-download-btn { background: rgba(255,255,255,0.04) !important; border: 1px solid rgba(255,255,255,0.06) !important; border-radius: 8px !important; }
 .chart-download-btn:hover { background: rgba(0,229,255,0.1) !important; border-color: rgba(0,229,255,0.25) !important; color: #00e5ff !important; }
 
@@ -645,7 +645,7 @@ input:focus, select:focus, textarea:focus {
   background: linear-gradient(135deg, #fff 20%, #00e5ff 100%) !important;
   -webkit-background-clip: text !important; background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
-  font-family: 'Syne', sans-serif !important;
+  font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', system-ui, -apple-system, sans-serif !important;
 }
 
 /* ── 26. ACTIVE ELEMENT GLOW ───────────────── */

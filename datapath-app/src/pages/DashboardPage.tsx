@@ -3,7 +3,7 @@ import { useKimitData } from '../hooks/useKimitData';
 import { useKimitEngine } from '../hooks/useKimitEngine';
 import { DataChart } from '../components/DataChart';
 import {
-  Plus, Trash2, FileText, Loader2, Sparkles, Database,
+  Plus, Trash2, Loader2, Sparkles, Database,
   Activity, AlertTriangle, TrendingUp, TrendingDown,
   Minus, GitBranch, Wand2, BookOpen, Plug, X, Filter,
 } from 'lucide-react';
@@ -18,10 +18,18 @@ import { PowerBIPanel } from '../components/Analysis/PowerBIPanel';
 import { PredictiveSuite } from '../components/Analysis/PredictiveSuite';
 import { SourceManager } from '../components/SourceManager';
 import { CreatorFooter } from '../components/CreatorFooter';
-import { exportBrandedPDF, exportToExcel } from '../lib/exportUtils';
+import { exportToExcel } from '../lib/exportUtils';
 import { convertBackendResultToDatasetInfo, type BackendResult } from '../lib/dataUtils';
 import { generateAInarrative } from '../lib/narrativeEngine';
 import { generateExecutiveReport } from '../lib/report-gen';
+import { generateExecutiveSummary } from '../lib/aiService';
+import {
+  buildReportMeta,
+  formatExecutiveNarrative,
+  getReportLang,
+  summaryToInsightCards,
+} from '../lib/executiveReportContent';
+import './dashboard-redesign.css';
 
 interface Props {}
 
@@ -63,9 +71,9 @@ function useCountUp(target: number, duration = 1200) {
 
 // ── Status Line ──────────────────────────────────────────────────
 const StatusLine: React.FC<{ color: string; label: string }> = ({ color, label }) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-    <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
-    <span style={{ fontSize: 12, color: '#94a3b8' }}>{label}</span>
+  <div className="dash2-status-line">
+    <div className="dash2-status-dot" style={{ background: color }} />
+    <span>{label}</span>
   </div>
 );
 
@@ -79,69 +87,31 @@ interface KpiCardProps {
 }
 const KpiCard: React.FC<KpiCardProps> = ({ label, value, borderColor, icon, delay }) => {
   const animated = useCountUp(value);
-  const [hovered, setHovered] = useState(false);
   return (
     <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      className="dash2-kpi-card"
       style={{
-        background: 'rgba(30, 41, 59, 0.7)',
-        backdropFilter: 'blur(12px)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        borderLeft: `4px solid ${borderColor}`,
-        borderRadius: 14,
-        padding: '18px 20px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-        animation: `slideUpFade 0.5s ease both`,
+        borderLeftColor: borderColor,
+        animation: `dash2-slideUp 0.5s ease both`,
         animationDelay: `${delay}ms`,
-        transform: hovered ? 'scale(1.02)' : 'scale(1)',
-        boxShadow: hovered ? `0 0 20px ${borderColor}33` : 'none',
-        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-        cursor: 'default',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: borderColor }}>
+      <div className="dash2-kpi-head" style={{ color: borderColor }}>
         {icon}
-        <span style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
+        <span className="dash2-kpi-label">{label}</span>
       </div>
-      <div style={{ fontSize: 32, fontWeight: 800, color: '#f8fafc', lineHeight: 1 }}>
-        {animated.toLocaleString()}
-      </div>
+      <div className="dash2-kpi-value">{animated.toLocaleString()}</div>
     </div>
   );
 };
 
 // ── Quick Action Button ──────────────────────────────────────────
-const QuickActionBtn: React.FC<{ label: string; color: string; icon: React.ReactNode; onClick: () => void }> = ({ label, color, icon, onClick }) => {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        padding: '10px 20px',
-        background: hovered ? `rgba(${color === '#10b981' ? '16,185,129' : color === '#3b82f6' ? '59,130,246' : color === '#f59e0b' ? '245,158,11' : '239,68,68'},0.08)` : 'rgba(255,255,255,0.04)',
-        border: `1px solid ${hovered ? color : 'rgba(255,255,255,0.08)'}`,
-        borderRadius: 10,
-        color: '#f8fafc',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        fontSize: 14,
-        fontWeight: 600,
-        transition: 'all 0.2s ease',
-        boxShadow: hovered ? `0 0 12px ${color}26` : 'none',
-      }}
-    >
-      <span style={{ color: hovered ? color : '#94a3b8', transition: 'color 0.2s' }}>{icon}</span>
-      {label}
-    </button>
-  );
-};
+const QuickActionBtn: React.FC<{ label: string; color: string; icon: React.ReactNode; onClick: () => void }> = ({ label, icon, onClick }) => (
+  <button type="button" className="dash2-quick-btn" onClick={onClick}>
+    {icon}
+    {label}
+  </button>
+);
 
 // ===== END LIVE DASHBOARD SECTION =====
 
@@ -180,8 +150,8 @@ export const DashboardPage: React.FC<Props> = ({}) => {
     outlierMap, allOutlierRowIndices, correlationMatrix, growthIndicators,
   } = useKimitEngine();
 
-  const [exporting, setExporting] = useState(false);
   const [reportGenerating, setReportGenerating] = useState(false);
+  const [reportToast, setReportToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
   const [cleaning, setCleaning] = useState(false);
   const [customCharts, setCustomCharts] = useState<ChartInfo[]>([]);
   const [builder, setBuilder] = useState<{ x: string; y: string; type: ChartInfo['type'] }>({ x: '', y: '', type: 'bar' });
@@ -292,43 +262,55 @@ export const DashboardPage: React.FC<Props> = ({}) => {
     }, ...prev]);
   }, [info, builder]);
 
-  const handleFullPDF = useCallback(async () => {
-    if (!info) return;
-    setExporting(true);
-    await exportBrandedPDF('dashboard-main-content', `Kimit_Report_${info.filename}.pdf`);
-    setExporting(false);
-  }, [info]);
-
-  // ── AI Executive Report (Task 1) ──────────────────────────────────────────
+  // ── AI Executive Report ───────────────────────────────────────────────────
   const handleExecutiveReport = useCallback(async () => {
     if (!info) return;
+    const lang = getReportLang();
     setReportGenerating(true);
+    setReportToast(null);
     try {
-      const { datasetsApi } = await import('../api/datasets.api');
-      let aiSummary = '';
-      try {
-        const prompt = `As a Senior Data Strategy Consultant, analyze this dataset summary: 
-Filename: ${info.filename}
-Rows: ${info.rows}, Columns: ${info.columns.length}
-Missing Values: ${info.totalNulls}, Duplicates: ${info.duplicates}
-
-Write a concise, highly professional executive narrative (about 150-200 words) summarizing the strategic value of this data, potential risks (if missing data/duplicates exist), and the top 3 recommended next steps for management. Use bold text (**like this**) for key terms.`;
-        
-        const res = await datasetsApi.chat(info.datasetId!, prompt, 'en', `report_${Date.now()}`);
-        aiSummary = res.answer;
-      } catch (err) {
-        console.warn('AI narrative generation failed, proceeding without it', err);
-      }
+      const apiKey =
+        import.meta.env.VITE_OPENROUTER_KEY || import.meta.env.VITE_GROQ_API_KEY;
+      const report = await generateExecutiveSummary(info, apiKey, lang);
+      const meta = buildReportMeta(info, lang);
+      const narrative = formatExecutiveNarrative(report, lang);
+      const cards = summaryToInsightCards(report);
 
       await generateExecutiveReport(info, health, {
-        title: `${info.filename} — Executive Report`,
-        subtitle: 'Kimit AI Studio — Advanced Analytics',
-        author: 'Kimit AI System',
-        aiSummary: aiSummary, // <== Pass the dynamic AI text here
-        insights: insights.map(ins => ({ title: ins.title, description: ins.description, type: ins.type })),
+        title: meta.title,
+        subtitle: meta.subtitle,
+        author: 'Kimit AI Studio',
+        aiSummary: narrative,
+        briefing: {
+          executiveSummary: report.executiveSummary,
+          insights: report.insights,
+          warnings: report.warnings,
+          qualityIssues: report.qualityIssues,
+          recommendations: report.recommendations,
+          opportunities: report.opportunities,
+          isLocal: report.isLocal,
+        },
+        insights: cards.length > 0 ? cards : insights.map(ins => ({
+          title: ins.title,
+          description: ins.description,
+          type: ins.type,
+        })),
       });
+
+      setReportToast({
+        msg: lang === 'ar'
+          ? '✅ تم تنزيل التقرير التنفيذي (PDF)'
+          : '✅ Executive report downloaded (PDF)',
+        type: 'ok',
+      });
+      setTimeout(() => setReportToast(null), 4000);
     } catch (error) {
-      console.error("Report generation failed:", error);
+      console.error('Report generation failed:', error);
+      setReportToast({
+        msg: lang === 'ar' ? '❌ فشل إنشاء التقرير' : '❌ Report generation failed',
+        type: 'err',
+      });
+      setTimeout(() => setReportToast(null), 4000);
     }
     setReportGenerating(false);
   }, [info, health, insights]);
@@ -409,7 +391,12 @@ Write a concise, highly professional executive narrative (about 150-200 words) s
   }
 
   return (
-    <div className="dash-layout-container">
+    <div className="dash-layout-container dash2">
+      {reportToast && (
+        <div className={`toast ${reportToast.type}`} style={{ zIndex: 9999 }}>
+          {reportToast.msg}
+        </div>
+      )}
 
       {/* ── Source Manager Modal (Task 3) ── */}
       <AnimatePresence>
@@ -486,7 +473,7 @@ Write a concise, highly professional executive narrative (about 150-200 words) s
             )}
           </p>
         </div>
-        <div className="actions-group" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+        <div className="actions-group">
           {/* Source Manager */}
           <button
             className="premium-button secondary"
@@ -494,23 +481,6 @@ Write a concise, highly professional executive narrative (about 150-200 words) s
             style={{ fontSize: '12px' }}
           >
             <Plug size={14} /> Sources
-          </button>
-          {/* 📥 Download Original */}
-          <button
-            className="premium-button secondary"
-            onClick={async () => {
-              if (info?.datasetId) {
-                try {
-                  const { datasetsApi } = await import('../api/datasets.api');
-                  await datasetsApi.downloadRaw(info.datasetId, info.filename);
-                } catch (err) {
-                  alert("Download failed: " + err);
-                }
-              }
-            }}
-            style={{ fontSize: '12px' }}
-          >
-            <FileText size={14} /> Download Original
           </button>
           {/* ✨ Magic Clean */}
           <motion.button
@@ -523,13 +493,6 @@ Write a concise, highly professional executive narrative (about 150-200 words) s
             {cleaning ? <Loader2 className="spin" size={16} /> : <Wand2 size={16} />}
             Magic Clean
           </motion.button>
-          <button className="premium-button secondary" onClick={() => exportToExcel(info.workData, `Kimit_Data_${info.filename}.xlsx`)}>
-            <Database size={16} /> Excel
-          </button>
-          <button className="premium-button" onClick={handleFullPDF} disabled={exporting}>
-            {exporting ? <Loader2 className="spin" size={16} /> : <FileText size={16} />}
-            {'Branded PDF'}
-          </button>
           {/* AI Executive Report (Task 1) */}
           <button
             className="premium-button"
@@ -613,18 +576,8 @@ Write a concise, highly professional executive narrative (about 150-200 words) s
             gap: 16,
             marginBottom: 16,
           }} className="live-quality-grid">
-            {/* Left: Quality Ring */}
-            <div style={{
-              background: 'rgba(30, 41, 59, 0.7)',
-              backdropFilter: 'blur(12px)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: 14,
-              padding: '24px 20px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', marginBottom: 16 }}>Data Quality</div>
+            <div className="dash2-card dash2-quality-ring">
+              <div className="dash2-card-title">Data Quality</div>
               <svg width="140" height="140" viewBox="0 0 140 140">
                 <circle cx="70" cy="70" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10"/>
                 <circle
@@ -641,25 +594,17 @@ Write a concise, highly professional executive narrative (about 150-200 words) s
                 <text x="70" y="65" textAnchor="middle" fill="#f8fafc" fontSize="28" fontWeight="bold">{qualityScore}</text>
                 <text x="70" y="85" textAnchor="middle" fill="#94a3b8" fontSize="13">%</text>
               </svg>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16, width: '100%' }}>
+              <div className="dash2-status-list">
                 <StatusLine color="#10b981" label={`Analyzed data: ${totalRows.toLocaleString()} rows`} />
                 <StatusLine color="#f59e0b" label={`Issues detected: ${totalMissing + totalDuplicates}`} />
                 <StatusLine color="#3b82f6" label={`Fixable: ${totalMissing + totalDuplicates > 0 ? 'Yes ✓' : 'None'}`} />
               </div>
             </div>
 
-            {/* Right: Column Health */}
-            <div style={{
-              background: 'rgba(30, 41, 59, 0.7)',
-              backdropFilter: 'blur(12px)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: 14,
-              padding: '20px',
-              overflow: 'hidden',
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', marginBottom: 12 }}>Column Health</div>
-              <div style={{ maxHeight: 280, overflowY: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <div className="dash2-card">
+              <div className="dash2-card-title">Column Health</div>
+              <div className="dash2-col-table-wrap">
+                <table className="dash2-col-table">
                   <thead>
                     <tr style={{ color: '#64748b', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                       <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 600 }}>Column Name</th>
@@ -672,22 +617,27 @@ Write a concise, highly professional executive narrative (about 150-200 words) s
                     {columnStats.map((cs, i) => (
                       <tr key={cs.col} style={{
                         background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.025)',
-                        animation: 'fadeIn 0.3s ease both',
+                        animation: 'dash2-fadeIn 0.3s ease both',
                         animationDelay: `${i * 20}ms`,
                       }}>
                         <td style={{ padding: '8px', color: '#e2e8f0', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cs.col}</td>
                         <td style={{ padding: '8px', textAlign: 'center' }}>
-                          <span style={{
-                            padding: '2px 8px', borderRadius: 99, fontSize: 11,
-                            background: `${cs.typeColor}22`, color: cs.typeColor,
-                            border: `1px solid ${cs.typeColor}44`,
-                          }}>{cs.type}</span>
+                          <span
+                            className="dash2-type-pill"
+                            style={{
+                              background: `${cs.typeColor}22`,
+                              color: cs.typeColor,
+                              border: `1px solid ${cs.typeColor}44`,
+                            }}
+                          >
+                            {cs.type}
+                          </span>
                         </td>
                         <td style={{ padding: '8px', textAlign: 'center', color: cs.missing > 0 ? '#f59e0b' : '#94a3b8' }}>{cs.missing}</td>
                         <td style={{ padding: '8px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)' }}>
-                              <div style={{ width: `${cs.health}%`, height: '100%', borderRadius: 3, background: cs.healthColor, transition: 'width 0.6s ease' }} />
+                            <div className="dash2-health-bar">
+                              <div className="dash2-health-fill" style={{ width: `${cs.health}%`, background: cs.healthColor }} />
                             </div>
                             <span style={{ fontSize: 10, color: cs.healthColor, minWidth: 28 }}>{cs.health}%</span>
                           </div>
@@ -701,13 +651,7 @@ Write a concise, highly professional executive narrative (about 150-200 words) s
           </div>
 
           {/* ── SECTION 3: Quick Actions Bar ── */}
-          <div style={{
-            display: 'flex', gap: 12, flexWrap: 'wrap',
-            padding: 16, marginBottom: 16,
-            background: 'rgba(30,41,59,0.5)',
-            borderRadius: 14,
-            border: '1px solid rgba(255,255,255,0.06)',
-          }}>
+          <div className="dash2-quick-bar">
             {([
               {
                 label: 'Clean',
@@ -809,13 +753,14 @@ Write a concise, highly professional executive narrative (about 150-200 words) s
           {/* Data Grid / Correlation tabs */}
           <div className="glass-panel" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
             {/* Tab bar */}
-            <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 16px' }}>
+            <div className="dash2-tab-bar">
               {(['grid', 'correlation'] as const).map(tab => (
-                <button key={tab} onClick={() => setActiveTab(tab)}
-                  style={{ padding: '12px 16px', fontSize: 12, fontWeight: 600, background: 'none', border: 'none',
-                    borderBottom: activeTab === tab ? '2px solid #d4af37' : '2px solid transparent',
-                    color: activeTab === tab ? '#d4af37' : '#64748b', cursor: 'pointer', display: 'flex',
-                    alignItems: 'center', gap: 6, transition: 'color 0.2s' }}>
+                <button
+                  key={tab}
+                  type="button"
+                  className={`dash2-tab${activeTab === tab ? ' active' : ''}`}
+                  onClick={() => setActiveTab(tab)}
+                >
                   {tab === 'grid' ? <Database size={13} /> : <GitBranch size={13} />}
                   {tab === 'grid' ? 'Data Grid' : t.correlation}
                 </button>
@@ -951,7 +896,7 @@ Write a concise, highly professional executive narrative (about 150-200 words) s
         <div className="sidebar-analytics" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
           {/* Health Gauge */}
-          <div className="glass-panel p-6" style={{ textAlign: 'center', background: 'linear-gradient(135deg, rgba(16,185,129,0.05), transparent)' }}>
+          <div className="glass-panel p-6 dash2-health-panel">
             <h4 style={{ fontSize: 14, opacity: 0.7, marginBottom: 15 }}>{t.healthTitle}</h4>
             <div style={{ position: 'relative', width: 120, height: 120, margin: '0 auto' }}>
               <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%' }}>
@@ -968,10 +913,10 @@ Write a concise, highly professional executive narrative (about 150-200 words) s
 
           {/* Growth Indicators Panel */}
           {growthIndicators.length > 0 && (
-            <div className="glass-panel p-6">
+            <div className="glass-panel p-6 dash2-growth-panel">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                 <TrendingUp size={16} style={{ color: '#d4af37' }} />
-                <h4 style={{ margin: 0, fontSize: 14, color: '#d4af37' }}>{t.growth}</h4>
+                <h4 style={{ margin: 0, fontSize: 14 }}>{t.growth}</h4>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {growthIndicators.slice(0, 5).map((g, i) => (
@@ -1022,55 +967,6 @@ Write a concise, highly professional executive narrative (about 150-200 words) s
 
       <CreatorFooter />
 
-      <style>{`
-        @keyframes slideUpFade {
-          from { opacity: 0; transform: translateY(20px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to   { opacity: 1; }
-        }
-        @keyframes shimmer {
-          0%   { background-position: -400px 0; }
-          100% { background-position:  400px 0; }
-        }
-        .skeleton {
-          background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
-          background-size: 400px 100%;
-          animation: shimmer 1.5s infinite;
-          border-radius: 8px;
-        }
-        @media (max-width: 768px) {
-          .live-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
-          .live-quality-grid { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
-      <style>{`
-        .kpi-card { padding: 14px 16px !important; cursor: default; display: flex; flex-direction: column; gap: 4px; transition: border-color 0.2s, background 0.2s; }
-        .kpi-card:hover { border-color: rgba(212,175,55,0.2) !important; }
-        .kpi-label { font-size: 10px; opacity: 0.55; text-transform: uppercase; letter-spacing: 0.06em; }
-        .kpi-value { font-size: 26px; font-weight: 800; line-height: 1.1; }
-        .kpi-sub { font-size: 10px; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .glass-panel { background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; backdrop-filter: blur(10px); }
-        .glass-card { background: rgba(30,41,59,0.5); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; }
-        .premium-button { display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--primary); color: #000; border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-weight: 700; transition: all 0.2s; }
-        .premium-button:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(16,185,129,0.3); }
-        .premium-button.secondary { background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.1); }
-        .kimit-select { background: #0f172a; border: 1px solid rgba(255,255,255,0.1); color: #f1f5f9; padding: 8px 12px; border-radius: 8px; font-size: 13px; outline: none; }
-        .action-row-btn { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 11px 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; color: #cbd5e1; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; }
-        .action-row-btn:hover { background: rgba(255,255,255,0.07); color: #fff; }
-        @media (max-width: 768px) {
-          .dash-layout-container { padding: 12px 10px !important; }
-          .dash-header-wrap { flex-direction: column !important; gap: 12px !important; }
-          .actions-group { flex-direction: column !important; width: 100% !important; }
-          .actions-group .premium-button { width: 100% !important; height: 48px !important; justify-content: center !important; }
-          .kpi-mini-row { grid-template-columns: 1fr 1fr !important; }
-          .dash-main-grid { grid-template-columns: 1fr !important; }
-          .charts-display-grid { grid-template-columns: 1fr !important; }
-          .builder-controls { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
       </div>
     </div>
   );

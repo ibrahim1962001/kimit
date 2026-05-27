@@ -1,342 +1,221 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { DropZone } from '../components/DropZone';
-import { BarChart2, Search, Zap, Brain, Globe, Lock, ArrowRight, Sparkles } from 'lucide-react';
+import { BarChart2, Search, Zap, Brain, Globe, Lock, Sparkles, LayoutDashboard } from 'lucide-react';
 import { AdSpace } from '../components/AdSpace';
 import { CreatorFooter } from '../components/CreatorFooter';
+import { CloudSyncToggle } from '../components/CloudSyncToggle';
+import { LangSwitch } from '../components/LangSwitch';
 import { AD_PROVIDERS } from '../config/adConfig';
+import { getAppLang } from '../lib/i18n';
 import logoImg from '../assets/logo.png';
+import './home-redesign.css';
 
-interface Props {  onFile: (f: File) => void; }
+interface Props {
+  onFile: (f: File) => void;
+  onTrySmartDashboard?: () => void;
+}
 
 const T = {
   en: {
-    badge: '✨ Fully browser-based',
-    title: 'Kimit\\nSmart Analytics',
-    sub: 'Kimit analyzes your data instantly, discovers patterns, and answers any question using the latest AI.',
+    badge: 'Local-first · AI-powered',
+    title1: 'Kimit',
+    title2: 'Smart Analytics',
+    sub: 'Upload Excel or CSV — get an interactive Smart Dashboard, cleaning tools, and AI insights in seconds. No install required.',
+    vp: [
+      'Smart Dashboard auto-builds up to 6 charts for your data type',
+      'Files under 10MB analyze in your browser (private by default)',
+      'One-click export: Excel workbook + interactive HTML dashboard',
+    ],
     featuresTitle: 'Everything You Need',
+    featuresSub: 'All core tools in one workspace.',
+    smartDashCta: 'See Smart Dashboard',
+    smartDashHint: 'Upload a file first, then open Smart Dashboard from the sidebar.',
     features: [
-      { icon: BarChart2, title: 'Interactive Charts', desc: 'Line, Bar, Area, Pie — instant visual analysis', color: '#10b981' },
-      { icon: Search,   title: 'Anomaly Detection',  desc: 'Z-Score algorithm finds abnormal data', color: '#3b82f6' },
-      { icon: Zap,      title: 'Smart Auto-Clean',   desc: 'Fill missing values and remove duplicates', color: '#f59e0b' },
-      { icon: Brain,    title: 'Real AI',            desc: 'Ask anything — about your data or any topic', color: '#8b5cf6' },
-      { icon: Globe,    title: 'English Interface',   desc: 'Clean, fast, fully English UI', color: '#06b6d4' },
-      { icon: Lock,     title: 'Full Privacy',       desc: 'Your data never leaves your browser', color: '#f43f5e' },
+      { icon: LayoutDashboard, title: 'Smart Dashboard', desc: 'Auto charts by data type — sales, HR, finance & more', color: '#10b981' },
+      { icon: BarChart2, title: 'Interactive Charts', desc: 'Line, bar, donut, heatmap — filter and explore live', color: '#3b82f6' },
+      { icon: Search, title: 'Anomaly Detection', desc: 'Z-Score finds outliers in numeric columns', color: '#06b6d4' },
+      { icon: Zap, title: 'Smart Auto-Clean', desc: 'Fill missing values and remove duplicates', color: '#f59e0b' },
+      { icon: Brain, title: 'AI Consultant', desc: 'Ask questions about your dataset in plain language', color: '#8b5cf6' },
+      { icon: Globe, title: 'Arabic & English', desc: 'Switch language anytime from the header', color: '#6366f1' },
+      { icon: Lock, title: 'Honest Privacy', desc: 'Local analysis by default; optional cloud backup only if you enable it', color: '#f43f5e' },
     ],
     howTo: {
       title: 'How It Works',
+      sub: 'Four steps from upload to export.',
       steps: [
-        { label: 'Upload', desc: 'Upload any data file (CSV or Excel) for instant automated analysis.' },
-        { label: 'Explore', desc: 'Explore the Dashboard packed with interactive charts and Data Health scoring.' },
-        { label: 'Ask AI', desc: 'Chat with the AI Consultant to extract deep insights or ask general questions.' },
-        { label: 'Export', desc: 'Use the automatic cleaning tools and export your final report (PDF).' },
+        { label: 'Upload', desc: 'Drop CSV or Excel (or connect Google Sheets).' },
+        { label: 'Explore', desc: 'Open Smart Dashboard — KPIs and charts generated automatically.' },
+        { label: 'Ask AI', desc: 'Chat with the AI consultant about patterns in your data.' },
+        { label: 'Export', desc: 'Download Excel + interactive HTML dashboard in one click.' },
       ],
     },
+    sponsored: 'Sponsored',
+  },
+  ar: {
+    badge: 'محلي أولاً · مدعوم بالذكاء الاصطناعي',
+    title1: 'Kimit',
+    title2: 'تحليلات ذكية',
+    sub: 'ارفع Excel أو CSV — واحصل على سمارت داشبورد تفاعلي، تنظيف بيانات، ورؤى AI خلال ثوانٍ. بدون تثبيت.',
+    vp: [
+      'السمارت داشبورد يبني حتى 6 شارتات تلقائياً حسب نوع بياناتك',
+      'الملفات أقل من 10MB تُحلَّل في المتصفح (خصوصية افتراضية)',
+      'تصدير بنقرة: ملف Excel + داشبورد HTML تفاعلي',
+    ],
+    featuresTitle: 'كل ما تحتاجه',
+    featuresSub: 'أدوات التحليل في مكان واحد.',
+    smartDashCta: 'عرض السمارت داشبورد',
+    smartDashHint: 'ارفع ملفاً أولاً، ثم افتح السمارت داشبورد من القائمة الجانبية.',
+    features: [
+      { icon: LayoutDashboard, title: 'سمارت داشبورد', desc: 'شارتات تلقائية حسب نوع البيانات', color: '#10b981' },
+      { icon: BarChart2, title: 'شارتات تفاعلية', desc: 'خط، أعمدة، دونات، خريطة حرارية', color: '#3b82f6' },
+      { icon: Search, title: 'كشف الشذوذ', desc: 'خوارزمية Z-Score للقيم غير الطبيعية', color: '#06b6d4' },
+      { icon: Zap, title: 'تنظيف ذكي', desc: 'ملء القيم الناقصة وإزالة التكرار', color: '#f59e0b' },
+      { icon: Brain, title: 'مستشار AI', desc: 'اسأل عن بياناتك بلغة طبيعية', color: '#8b5cf6' },
+      { icon: Globe, title: 'عربي وإنجليزي', desc: 'بدّل اللغة من أعلى الصفحة', color: '#6366f1' },
+      { icon: Lock, title: 'خصوصية واضحة', desc: 'تحليل محلي افتراضياً؛ نسخ سحابي اختياري فقط عند تفعيله', color: '#f43f5e' },
+    ],
+    howTo: {
+      title: 'كيف يعمل',
+      sub: 'أربع خطوات من الرفع إلى التصدير.',
+      steps: [
+        { label: 'رفع', desc: 'اسحب CSV أو Excel (أو Google Sheets).' },
+        { label: 'استكشاف', desc: 'افتح السمارت داشبورد — KPIs وشارتات تلقائية.' },
+        { label: 'اسأل AI', desc: 'تحدث مع المستشار الذكي عن أنماط بياناتك.' },
+        { label: 'تصدير', desc: 'حمّل Excel + داشبورد HTML تفاعلي بنقرة واحدة.' },
+      ],
+    },
+    sponsored: 'إعلان',
   },
 };
 
-const banner1 = AD_PROVIDERS.filter(p => p.id === 'adsterra_main');
-const banner2 = AD_PROVIDERS.filter(p => p.id === 'native_banner');
-const banner3 = AD_PROVIDERS.filter(p => p.id === 'social_banner');
+const railAds = AD_PROVIDERS.filter(p =>
+  ['adsterra_main', 'native_banner', 'social_banner'].includes(p.id),
+);
 
-/* ── Inline styles ── */
-const S = {
-  page: {
-    minHeight: '100vh',
-    fontFamily: "'Syne', 'Cairo', system-ui, sans-serif",
-    position: 'relative' as const,
-    overflow: 'hidden',
-  } as React.CSSProperties,
-  orb1: {
-    position: 'fixed' as const, top: '-20%', left: '-10%',
-    width: 600, height: 600, borderRadius: '50%',
-    background: 'radial-gradient(circle, rgba(16,185,129,0.12) 0%, transparent 70%)',
-    pointerEvents: 'none' as const, zIndex: 0,
-    animation: 'hp-orb1 14s ease-in-out infinite alternate',
-  },
-  orb2: {
-    position: 'fixed' as const, bottom: '-20%', right: '-10%',
-    width: 500, height: 500, borderRadius: '50%',
-    background: 'radial-gradient(circle, rgba(99,102,241,0.10) 0%, transparent 70%)',
-    pointerEvents: 'none' as const, zIndex: 0,
-    animation: 'hp-orb2 18s ease-in-out infinite alternate',
-  },
-  inner: {
-    position: 'relative' as const, zIndex: 1,
-    maxWidth: 900, margin: '0 auto', padding: '0 20px 60px',
-  },
-  hero: {
-    textAlign: 'center' as const,
-    padding: '60px 0 40px',
-    animation: 'hp-fade 0.7s cubic-bezier(0.16,1,0.3,1) both',
-  },
-  logoWrap: {
-    display: 'inline-flex', flexDirection: 'column' as const,
-    alignItems: 'center', gap: 10, marginBottom: 24,
-    animation: 'hp-pop 0.8s cubic-bezier(0.34,1.56,0.64,1) both',
-  },
-  logoImg: {
-    width: 92, height: 92, objectFit: 'contain' as const,
-    mixBlendMode: 'screen' as const,
-    filter: 'brightness(1.3) contrast(1.05) saturate(1.1)',
-    animation: 'hp-float 4s ease-in-out infinite',
-  },
-  siteName: {
-    fontSize: 15, fontWeight: 800, letterSpacing: 2,
-    textTransform: 'uppercase' as const,
-    background: 'linear-gradient(135deg, #fff 30%, #10b981 100%)',
-    WebkitBackgroundClip: 'text', backgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-  },
-  badge: {
-    display: 'inline-flex', alignItems: 'center', gap: 6,
-    padding: '6px 18px', borderRadius: 99,
-    background: 'rgba(16,185,129,0.08)',
-    border: '1px solid rgba(16,185,129,0.25)',
-    color: '#10b981', fontSize: 12, fontWeight: 700,
-    marginBottom: 20, letterSpacing: '0.06em',
-    animation: 'hp-badge 3s ease-in-out infinite',
-  },
-  title: {
-    fontSize: 'clamp(38px, 7vw, 72px)', fontWeight: 900, lineHeight: 1.1,
-    marginBottom: 20, letterSpacing: '-1.5px',
-    background: 'linear-gradient(135deg, #fff 0%, #86efcd 40%, #10b981 70%, #6366f1 100%)',
-    backgroundSize: '300% 300%',
-    WebkitBackgroundClip: 'text', backgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-    animation: 'hp-title-grad 6s ease-in-out infinite',
-  },
-  sub: {
-    fontSize: 'clamp(14px, 2vw, 17px)', color: '#94a3b8', lineHeight: 1.7,
-    maxWidth: 580, margin: '0 auto 36px',
-    animation: 'hp-fade 0.9s 0.2s cubic-bezier(0.16,1,0.3,1) both',
-  },
-  dropWrap: {
-    animation: 'hp-fade 1s 0.35s cubic-bezier(0.16,1,0.3,1) both',
-    marginBottom: 32,
-  },
-  adWrap: { margin: '16px 0' },
-  /* ── Section ── */
-  section: { marginTop: 64 },
-  sectionHeader: {
-    textAlign: 'center' as const, marginBottom: 36,
-    animation: 'hp-fade 0.7s cubic-bezier(0.16,1,0.3,1) both',
-  },
-  sectionLabel: {
-    display: 'inline-block', fontSize: 11, fontWeight: 800,
-    letterSpacing: '0.2em', textTransform: 'uppercase' as const,
-    color: '#10b981', marginBottom: 8,
-    background: 'rgba(16,185,129,0.08)', padding: '4px 14px',
-    borderRadius: 99, border: '1px solid rgba(16,185,129,0.2)',
-  },
-  sectionTitle: {
-    fontSize: 'clamp(22px,4vw,34px)', fontWeight: 900,
-    background: 'linear-gradient(135deg, #fff 0%, #94a3b8 100%)',
-    WebkitBackgroundClip: 'text', backgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-  },
-  /* ── Feature grid ── */
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-    gap: 16,
-  },
-  howGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: 16,
-  },
-  howCard: {
-    background: 'rgba(15,23,42,0.6)',
-    backdropFilter: 'blur(16px)',
-    border: '1px solid rgba(255,255,255,0.07)',
-    borderRadius: 20, padding: '24px 22px',
-    transition: 'all 0.35s cubic-bezier(0.34,1.56,0.64,1)',
-    cursor: 'default',
-  },
-};
-
-export const HomePage: React.FC<Props> = ({ onFile }) => {
-  const t = T.en;
-  const lines = t.title.split('\n');
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  /* tiny particle canvas */
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    const pts = Array.from({ length: 40 }, () => ({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      r: Math.random() * 1.5 + 0.5,
-      vx: (Math.random() - 0.5) * 0.3,
-      vy: (Math.random() - 0.5) * 0.3,
-      o: Math.random() * 0.4 + 0.1,
-    }));
-    let raf: number;
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      pts.forEach(p => {
-        p.x += p.vx; p.y += p.vy;
-        if (p.x < 0) p.x = canvas.width;
-        if (p.x > canvas.width) p.x = 0;
-        if (p.y < 0) p.y = canvas.height;
-        if (p.y > canvas.height) p.y = 0;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(16,185,129,${p.o})`;
-        ctx.fill();
-      });
-      raf = requestAnimationFrame(draw);
-    };
-    draw();
-    return () => cancelAnimationFrame(raf);
-  }, []);
+export const HomePage: React.FC<Props> = ({ onFile, onTrySmartDashboard }) => {
+  const lang = getAppLang();
+  const t = lang === 'ar' ? T.ar : T.en;
 
   return (
-    <div className="home-page" style={S.page}>
-      {/* CSS keyframes injected once */}
-      <style>{`
-        @keyframes hp-fade { from{opacity:0;transform:translateY(22px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes hp-pop  { from{opacity:0;transform:scale(0.7)} to{opacity:1;transform:scale(1)} }
-        @keyframes hp-float{ 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
-        @keyframes hp-badge{ 0%,100%{box-shadow:0 0 0 rgba(16,185,129,0)} 50%{box-shadow:0 0 18px rgba(16,185,129,0.2)} }
-        @keyframes hp-title-grad{ 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
-        @keyframes hp-orb1 { from{transform:translate(0,0) scale(1)} to{transform:translate(60px,40px) scale(1.15)} }
-        @keyframes hp-orb2 { from{transform:translate(0,0) scale(1)} to{transform:translate(-50px,-30px) scale(1.1)} }
-        @keyframes hp-card { from{opacity:0;transform:translateY(28px) scale(0.95)} to{opacity:1;transform:translateY(0) scale(1)} }
-        .hp-feat-card:hover { transform:translateY(-8px) scale(1.02) !important; }
-        .hp-feat-card:hover .hp-icon-ring { transform:scale(1.15) rotate(8deg) !important; }
-        .hp-how-card:hover { border-color:rgba(16,185,129,0.3) !important; transform:translateY(-5px) !important; box-shadow:0 16px 40px rgba(0,0,0,0.3) !important; }
-      `}</style>
-
-      {/* Ambient orbs */}
-      <div style={S.orb1} />
-      <div style={S.orb2} />
-
-      {/* Particle canvas */}
-      <canvas ref={canvasRef} style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, opacity: 0.6 }} />
-
-      <div style={S.inner}>
-        {/* ── Hero ── */}
-        <div style={S.hero}>
-          <div style={S.logoWrap}>
-            <img src={logoImg} alt="Kimit Logo" style={S.logoImg} />
-            <span style={S.siteName}>Kimit AI Studio</span>
-          </div>
-
-          <div style={S.badge}>
-            <Sparkles size={12} />
-            {t.badge}
-          </div>
-
-          <h1 style={S.title}>
-            {lines.map((l, i) => <span key={i}>{l}{i < lines.length - 1 && <br />}</span>)}
-          </h1>
-
-          <p style={S.sub}>{t.sub}</p>
-
-          <div style={S.dropWrap}>
-            <DropZone onFile={onFile} />
-          </div>
-
-          <div style={S.adWrap}><AdSpace type="responsive" providers={banner1} minHeight={100} /></div>
-          <div style={S.adWrap}><AdSpace type="responsive" providers={banner2} minHeight={100} /></div>
-          <div style={S.adWrap}><AdSpace type="responsive" providers={banner3} minHeight={100} /></div>
+    <div className="home-page">
+      <div className="home-calm">
+        <div className="home-calm-topbar">
+          <LangSwitch />
         </div>
 
-        {/* ── Feature Cards ── */}
-        <div style={S.section}>
-          <div style={S.sectionHeader}>
-            <div style={S.sectionLabel}>Features</div>
-            <div style={S.sectionTitle}>{t.featuresTitle}</div>
-          </div>
-          <div style={S.grid}>
-            {t.features.map((f, i) => (
-              <div
-                key={i}
-                className="hp-feat-card"
-                style={{
-                  background: 'rgba(15,23,42,0.6)',
-                  backdropFilter: 'blur(16px)',
-                  border: `1px solid ${f.color}18`,
-                  borderTop: `2px solid ${f.color}`,
-                  borderRadius: 20,
-                  padding: '26px 22px',
-                  display: 'flex', flexDirection: 'column', gap: 14,
-                  transition: 'all 0.4s cubic-bezier(0.34,1.56,0.64,1)',
-                  animation: `hp-card 0.6s ${i * 0.08}s cubic-bezier(0.16,1,0.3,1) both`,
-                  cursor: 'default',
-                }}
-              >
-                <div
-                  className="hp-icon-ring"
-                  style={{
-                    width: 48, height: 48, borderRadius: 14,
-                    background: `${f.color}14`,
-                    border: `1px solid ${f.color}30`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transition: 'all 0.35s cubic-bezier(0.34,1.56,0.64,1)',
-                    boxShadow: `0 0 16px ${f.color}20`,
-                  }}
-                >
-                  <f.icon size={22} color={f.color} />
+        <div className="home-calm-layout">
+          <div className="home-calm-main">
+            <section className="home-calm-hero">
+              <div className="home-calm-panel">
+                <div className="home-calm-brand">
+                  <img src={logoImg} alt="Kimit Logo" />
+                  <div className="home-calm-brand-copy">
+                    <div className="home-calm-brand-title">Kimit AI Studio</div>
+                    <div className="home-calm-brand-sub">
+                      {lang === 'ar' ? 'منصة تحليل بيانات ذكية' : 'Smart data intelligence platform'}
+                    </div>
+                  </div>
                 </div>
+
+                <div className="home-calm-kicker">
+                  <Sparkles size={12} />
+                  {t.badge}
+                </div>
+
+                <h1 className="home-calm-title">
+                  <span className="home-calm-title-accent">{t.title1}</span>
+                  <span className="home-calm-title-line">{t.title2}</span>
+                </h1>
+                <p className="home-calm-subtitle">{t.sub}</p>
+
+                <ul className="home-calm-vp">
+                  {t.vp.map((line, i) => (
+                    <li key={i}>{line}</li>
+                  ))}
+                </ul>
+
+                <CloudSyncToggle />
+
+                {onTrySmartDashboard && (
+                  <button type="button" className="home-smart-dash-cta" onClick={onTrySmartDashboard}>
+                    <LayoutDashboard size={16} />
+                    {t.smartDashCta}
+                  </button>
+                )}
+              </div>
+
+              <div className="home-calm-panel home-calm-uploader">
+                <div className="home-calm-upload-head">
+                  {lang === 'ar' ? 'ابدأ برفع ملفك' : 'Start with your dataset'}
+                </div>
+                <DropZone onFile={onFile} />
+              </div>
+            </section>
+
+            <section className="home-calm-section">
+              <div className="home-calm-section-head">
                 <div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#f8fafc', marginBottom: 6 }}>{f.title}</div>
-                  <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.6 }}>{f.desc}</div>
-                </div>
-                <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: 4, color: f.color, fontSize: 11, fontWeight: 700, opacity: 0.7 }}>
-                  <ArrowRight size={11} />
+                  <h2 className="home-calm-section-title">{t.featuresTitle}</h2>
+                  <p className="home-calm-section-sub">{t.featuresSub}</p>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
 
-        {/* ── How It Works ── */}
-        <div style={S.section}>
-          <div style={S.sectionHeader}>
-            <div style={S.sectionLabel}>How It Works 🚀</div>
-            <div style={S.sectionTitle}>{t.howTo.title}</div>
-          </div>
-          <div style={S.howGrid}>
-            {t.howTo.steps.map((step, i) => (
-              <div
-                key={i}
-                className="hp-how-card"
-                style={{
-                  ...S.howCard,
-                  animation: `hp-card 0.6s ${i * 0.1}s cubic-bezier(0.16,1,0.3,1) both`,
-                }}
-              >
-                {/* Step number */}
-                <div style={{
-                  width: 40, height: 40, borderRadius: 12,
-                  background: 'linear-gradient(135deg, #10b981, #059669)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontWeight: 900, fontSize: 16, color: '#fff',
-                  marginBottom: 16,
-                  boxShadow: '0 4px 16px rgba(16,185,129,0.3)',
-                }}>
-                  {i + 1}
+              <div className="home-calm-features">
+                {t.features.map((f, i) => {
+                  const Icon = f.icon;
+                  return (
+                    <article className="home-calm-feature" key={i}>
+                      <div className="home-calm-feature-icon" style={{ color: f.color }}>
+                        <Icon size={19} />
+                      </div>
+                      <h4>{f.title}</h4>
+                      <p>{f.desc}</p>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section className="home-calm-section">
+              <div className="home-calm-section-head">
+                <div>
+                  <h2 className="home-calm-section-title">{t.howTo.title}</h2>
+                  <p className="home-calm-section-sub">{t.howTo.sub}</p>
                 </div>
-                <div style={{ fontSize: 15, fontWeight: 800, color: '#f8fafc', marginBottom: 8 }}>{step.label}</div>
-                <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.65 }}>{step.desc}</div>
+              </div>
+              <div className="home-calm-steps">
+                {t.howTo.steps.map((step, i) => (
+                  <article className="home-calm-step" key={i}>
+                    <div className="home-calm-step-num">{i + 1}</div>
+                    <h5>{step.label}</h5>
+                    <p>{step.desc}</p>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <div className="home-calm-ad home-calm-ad--footer">
+              <span className="home-ad-label">{t.sponsored}</span>
+              <AdSpace type="responsive" providers={railAds.slice(0, 1)} minHeight={90} lazyLoad />
+            </div>
+
+            <CreatorFooter />
+          </div>
+
+          <aside className="home-calm-ad-rail" aria-label={t.sponsored}>
+            <span className="home-ad-label">{t.sponsored}</span>
+            {railAds.map((provider, i) => (
+              <div className="home-calm-ad-rail-slot" key={provider.id}>
+                <AdSpace
+                  type="responsive"
+                  providers={[provider]}
+                  minHeight={i === 0 ? 280 : 120}
+                  lazyLoad={i > 0}
+                />
               </div>
             ))}
-          </div>
+          </aside>
         </div>
-
-        {/* ── Bottom Ad ── */}
-        <div style={{ ...S.adWrap, marginTop: 40 }}>
-          <AdSpace type="responsive" providers={banner1} minHeight={100} lazyLoad />
-        </div>
-
-        <CreatorFooter />
       </div>
     </div>
   );

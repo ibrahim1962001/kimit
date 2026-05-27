@@ -9,5 +9,12 @@
     "python.analysis.typeCheckingMode": "basic",
     "python.analysis.diagnosticSeverityOverrides": {
         "reportMissingModuleSource": "none"
-    }
+    },
+    "cursorpyright.analysis.diagnosticSeverityOverrides": {
+        "reportMissingModuleSource": "none"
+    },
+    "cursorpyright.analysis.extraPaths": [
+        "${workspaceFolder}\\backend"
+    ],
+    "cursorpyright.analysis.typeCheckingMode": "basic"
 }

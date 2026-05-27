@@ -1,0 +1,230 @@
+.dz2-shell {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dz2-drop {
+  width: 100%;
+  padding: 30px 22px;
+  border-radius: 20px;
+  border: 2px dashed rgba(0, 229, 255, 0.32);
+  background: rgba(255, 255, 255, 0.02);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 18px 50px rgba(2, 6, 23, 0.28), 0 0 34px rgba(0, 229, 255, 0.08);
+}
+
+.dz2-drop:hover {
+  border-color: rgba(0, 229, 255, 0.66);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.dz2-drop.is-drag {
+  border-color: rgba(0, 229, 255, 0.86);
+  background: rgba(0, 229, 255, 0.12);
+  transform: scale(1.01);
+}
+
+.dz2-icon {
+  margin: 0 auto 12px;
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #dbeafe;
+  background: rgba(79, 124, 255, 0.14);
+  border: 1px solid rgba(0, 229, 255, 0.30);
+  box-shadow: 0 0 0 rgba(0,0,0,0);
+}
+
+.dz2-title {
+  margin: 0 0 6px;
+  color: #eef3ff;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.dz2-sub {
+  margin: 0;
+  color: #9db0d1;
+  font-size: 14px;
+}
+
+.dz2-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.dz2-badges {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+  align-items: center;
+}
+
+.dz2-badge {
+  font-size: 11px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.dz2-badge--local {
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.dz2-badge--cloud {
+  color: #fcd34d;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.dz2-error {
+  margin-top: 10px;
+  color: #f87171;
+  font-size: 12px;
+}
+
+.dz2-tags {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dz2-tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: #cdd8ee;
+  border-radius: 999px;
+  padding: 6px 10px;
+  border: 1px solid rgba(0, 229, 255, 0.22);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.dz2-badge {
+  margin-top: 10px;
+  color: rgba(147, 163, 184, 0.95);
+  font-size: 11px;
+}
+
+.dz2-error {
+  margin-top: 8px;
+  color: #fca5a5;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dz2-or {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  color: rgba(203, 213, 225, 0.6);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dz2-or::before,
+.dz2-or::after {
+  content: '';
+  height: 1px;
+  background: rgba(148, 163, 184, 0.2);
+}
+
+.dz2-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.gsp2-wrapper {
+  width: 100%;
+}
+
+.gsp2-btn,
+.dz2-sample {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 14px;
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  background: rgba(255, 255, 255, 0.02);
+  color: #e0f2fe;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 14px 34px rgba(2, 6, 23, 0.18), 0 0 22px rgba(0,229,255,0.06);
+}
+
+.gsp2-btn:hover:not(:disabled),
+.dz2-sample:hover {
+  border-color: rgba(0, 229, 255, 0.60);
+  background: rgba(0, 229, 255, 0.10);
+  transform: translateY(-1px);
+}
+
+.gsp2-btn:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+.gsp2-btn.success {
+  border-color: rgba(34, 197, 94, 0.46);
+  color: #a7f3d0;
+  background: rgba(34, 197, 94, 0.14);
+}
+
+.gsp2-btn.error {
+  border-color: rgba(239, 68, 68, 0.38);
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.gsp2-status {
+  margin-top: 8px;
+  font-size: 12px;
+  text-align: center;
+  color: #93a4c3;
+}
+
+.gsp2-status.success { color: #86efac; }
+.gsp2-status.error { color: #fca5a5; }
+
+.gsp2-spin {
+  animation: gsp2-spin 0.9s linear infinite;
+}
+
+@keyframes gsp2-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 700px) {
+  .dz2-drop {
+    padding: 24px 14px;
+  }
+  .dz2-title {
+    font-size: 17px;
+  }
+  .dz2-actions {
+    grid-template-columns: 1fr;
+  }
+}

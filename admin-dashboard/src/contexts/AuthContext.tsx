@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
 import { auth } from '../lib/firebase';
+import { fetchAdminMe } from '../api/admin.api';
 
 export type AdminRole = 'super_admin' | 'sub_admin';
 
@@ -21,13 +22,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// Super admin UIDs — comma-separated in env
 const SUPER_ADMIN_UIDS = (import.meta.env.VITE_SUPER_ADMIN_UID as string || '')
   .split(',')
   .map((s: string) => s.trim())
   .filter(Boolean);
 
-function resolveAdminInfo(uid: string): AdminInfo | null {
+function resolveAdminInfoFromEnv(uid: string): AdminInfo | null {
   if (SUPER_ADMIN_UIDS.includes(uid)) {
     return { role: 'super_admin', canApproveCharges: true };
   }
@@ -40,12 +40,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [adminInfo, setAdminInfo] = useState<AdminInfo | null>(null);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
-      if (u) {
-        setAdminInfo(resolveAdminInfo(u.uid));
-      } else {
+      if (!u) {
         setAdminInfo(null);
+        setLoading(false);
+        return;
+      }
+      try {
+        const me = await fetchAdminMe();
+        setAdminInfo({
+          role: me.role as AdminRole,
+          canApproveCharges: me.can_approve_charges,
+        });
+      } catch {
+        setAdminInfo(resolveAdminInfoFromEnv(u.uid));
       }
       setLoading(false);
     });

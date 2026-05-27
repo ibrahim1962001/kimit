@@ -5,7 +5,10 @@ import { getActiveAdProviders } from '../config/adConfig';
 import { type User as FirebaseUser, signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { useKimitData } from '../hooks/useKimitData';
+import { useUser } from '../contexts/UserContext';
 import { exportToExcel } from '../lib/exportUtils';
+import { getAppLang } from '../lib/i18n';
+import { LangSwitch } from './LangSwitch';
 
 type Tab = 'home' | 'dashboard' | 'cleaning' | 'chat' | 'export' | 'files' | 'about' | 'privacy' | 'faq' | 'guide' | 'compare' | 'smart-dashboard';
 
@@ -27,7 +30,7 @@ interface Props {
 const T = {
   en: {
     home: 'Home',
-    dashboard: 'Analytics',
+    dashboard: 'Data Analytics',
     cleaning: 'Cleaning',
     chat: 'AI Chat',
     export: 'Export',
@@ -39,6 +42,25 @@ const T = {
     faq: 'FAQ',
     guide: 'User Guide',
     compare: 'Compare Files',
+    smartDash: 'Smart Dashboard',
+    smartDashSub: 'Auto charts by data type',
+  },
+  ar: {
+    home: 'الرئيسية',
+    dashboard: 'تحليلات البيانات',
+    cleaning: 'تنظيف',
+    chat: 'محادثة AI',
+    export: 'تصدير',
+    files: 'ملفات محفوظة',
+    close: 'إغلاق الملف',
+    clearSession: 'مسح الجلسة',
+    about: 'من نحن',
+    privacy: 'الخصوصية',
+    faq: 'الأسئلة',
+    guide: 'دليل الاستخدام',
+    compare: 'مقارنة ملفات',
+    smartDash: 'سمارت داشبورد',
+    smartDashSub: 'شارتات تلقائية حسب البيانات',
   },
 };
 
@@ -92,8 +114,12 @@ const SmartDashBtn: React.FC<{ active: boolean; onClick: () => void }> = ({ acti
         <span style={{ fontSize: 16 }}>📊</span>
       </div>
       <div style={{ textAlign: 'left', flex: 1 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: active ? '#10b981' : '#e2e8f0', lineHeight: 1.2 }}>Smart Dashboard</div>
-        <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>Context-aware analytics</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: active ? '#10b981' : '#e2e8f0', lineHeight: 1.2 }}>
+          {getAppLang() === 'ar' ? T.ar.smartDash : T.en.smartDash}
+        </div>
+        <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>
+          {getAppLang() === 'ar' ? T.ar.smartDashSub : T.en.smartDashSub}
+        </div>
       </div>
       {active && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', flexShrink: 0, boxShadow: '0 0 6px #10b981' }} />}
     </button>
@@ -310,7 +336,8 @@ const QuickBtn: React.FC<{ label: string; color: string; onClick: () => void }> 
 
 // ── Main Sidebar ────────────────────────────────────────────────
 export const Sidebar: React.FC<Props> = ({ tab, hasData, onTab, onClose, onClearSession, onOpenEditor, isMobileOpen, onCloseMobile, currentUser, onLoginClick }) => {
-  const t = T.en;
+  const { creditBalance, plan } = useUser();
+  const t = getAppLang() === 'ar' ? T.ar : T.en;
 
   const renderBtn = (item: { tab: Tab; icon: React.ElementType; key: string }) => {
     const Icon = item.icon;
@@ -367,6 +394,9 @@ export const Sidebar: React.FC<Props> = ({ tab, hasData, onTab, onClose, onClear
             <div className="sidebar-user-info">
               <span className="sidebar-user-name" title={currentUser.displayName || currentUser.email || ''}>
                 {currentUser.displayName || (currentUser.email ? currentUser.email.split('@')[0] : 'User')}
+              </span>
+              <span className="sidebar-credits-badge" title="Credit balance">
+                {creditBalance.toFixed(1)} cr · {plan}
               </span>
               <button className="sidebar-logout-btn" onClick={() => signOut(auth)} title="Sign out">
                 <LogOut size={14} />
@@ -427,7 +457,11 @@ export const Sidebar: React.FC<Props> = ({ tab, hasData, onTab, onClose, onClear
         )}
 
 
+        <LangSwitch className="sidebar-lang-switch" />
         <div className="sidebar-ad">
+          <span className="home-ad-label" style={{ display: 'block', marginBottom: 6 }}>
+            {getAppLang() === 'ar' ? 'إعلان' : 'Sponsored'}
+          </span>
           <AdSpace type="responsive" providers={getActiveAdProviders()} minHeight={100} />
         </div>
       </div>

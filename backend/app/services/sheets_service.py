@@ -4,7 +4,9 @@ import numpy as np
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.dataset import Dataset
-from app.services.dataset_service import _generate_charts, _detect_anomalies, _get_correlations, _DATA_STORE
+from app.services.dataset_service import (
+    _generate_charts, _detect_anomalies, _get_correlations, _DATA_STORE, _persist_to_minio,
+)
 
 class SheetsService:
     def _extract_export_url(self, url: str) -> str:
@@ -54,10 +56,11 @@ class SheetsService:
             source="sheets",
         )
         db.add(dataset)
+        await db.flush()
+        dataset.storage_path = _persist_to_minio(user_id, dataset.id, "sheet_import.csv", df)
         await db.commit()
         await db.refresh(dataset)
-        
-        # Store in memory for immediate analysis
+
         _DATA_STORE[str(dataset.id)] = df
         
         return {

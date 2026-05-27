@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
+    "@fontsource/noto-sans-arabic": "^5.2.10",
     "@fontsource/plus-jakarta-sans": "^5.2.8",
     "@tanstack/react-query": "^5.100.6",
     "@tanstack/react-table": "^8.21.3",

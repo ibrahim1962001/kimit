@@ -16,6 +16,7 @@ class Dataset(Base):
     dtypes: Mapped[dict] = mapped_column(JSON, default=dict)
     null_counts: Mapped[dict] = mapped_column(JSON, default=dict)
     source: Mapped[str] = mapped_column(String(64), default="upload")  # upload | sheets | sql
+    storage_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

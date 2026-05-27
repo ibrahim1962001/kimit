@@ -74,7 +74,7 @@ export const CreatorFooter: React.FC<Props> = ({}) => {
         .developed-by {
           font-size: 13px;
           color: rgba(255,255,255,0.5);
-          font-family: 'Cairo', sans-serif;
+          font-family: 'Plus Jakarta Sans', 'Noto Sans Arabic', system-ui, -apple-system, sans-serif;
         }
 
         .creator-name {

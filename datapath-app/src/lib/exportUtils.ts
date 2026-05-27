@@ -43,6 +43,140 @@ export const exportToExcel = (data: DataRow[], filename = 'Kimit_Data.xlsx'): vo
   XLSX.writeFile(workbook, filename);
 };
 
+export interface SmartDashboardExcelPayload {
+  filename?: string;
+  datasetName: string;
+  data: DataRow[];
+  categoryColumn?: string | null;
+  metricColumn?: string | null;
+  dateColumn?: string | null;
+  kpis?: Array<{ title: string; value: string | number; sub?: string }>;
+  insights?: Array<{ title: string; desc: string }>;
+  topRows?: DataRow[];
+  quality?: {
+    score: number;
+    grade: string;
+    fillRate: number;
+    dupRate: number;
+    outlierPct: number;
+  };
+}
+
+const toNumber = (value: unknown): number => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : 0;
+};
+
+export const exportSmartDashboardExcel = (payload: SmartDashboardExcelPayload): void => {
+  const {
+    datasetName,
+    data,
+    categoryColumn,
+    metricColumn,
+    dateColumn,
+    kpis = [],
+    insights = [],
+    topRows = [],
+    quality,
+  } = payload;
+
+  const workbook = XLSX.utils.book_new();
+
+  const dashboardRows: (string | number)[][] = [
+    ['KIMIT Smart Dashboard Export'],
+    [`Dataset: ${datasetName}`],
+    [`Generated: ${new Date().toLocaleString()}`],
+    [],
+    ['KPIs'],
+    ['Metric', 'Value', 'Notes'],
+    ...kpis.map(k => [k.title, String(k.value), k.sub ?? '']),
+    [],
+    ['Quality Snapshot'],
+    ['Score', 'Grade', 'Fill Rate %', 'Duplicate Rate %', 'Outlier %'],
+    quality
+      ? [quality.score, quality.grade, quality.fillRate, quality.dupRate, quality.outlierPct]
+      : ['', '', '', '', ''],
+    [],
+    ['Insights'],
+    ['Title', 'Details'],
+    ...insights.map(i => [i.title, i.desc]),
+  ];
+  const dashboardSheet = XLSX.utils.aoa_to_sheet(dashboardRows);
+  dashboardSheet['!cols'] = [{ wch: 30 }, { wch: 28 }, { wch: 52 }, { wch: 18 }, { wch: 18 }];
+  XLSX.utils.book_append_sheet(workbook, dashboardSheet, 'Dashboard');
+
+  const dataSheet = XLSX.utils.json_to_sheet(data);
+  dataSheet['!autofilter'] = {
+    ref: XLSX.utils.encode_range({
+      s: { r: 0, c: 0 },
+      e: { r: Math.max(1, data.length), c: Math.max(0, Object.keys(data[0] ?? {}).length - 1) },
+    }),
+  };
+  XLSX.utils.book_append_sheet(workbook, dataSheet, 'Data');
+
+  if (categoryColumn) {
+    const countMap = new Map<string, number>();
+    const sumMap = new Map<string, number>();
+    for (const row of data) {
+      const key = String(row[categoryColumn] ?? 'Unknown');
+      countMap.set(key, (countMap.get(key) ?? 0) + 1);
+      if (metricColumn) {
+        sumMap.set(key, (sumMap.get(key) ?? 0) + toNumber(row[metricColumn]));
+      }
+    }
+    const categoryRows = [...countMap.entries()]
+      .map(([cat, count]) => ({
+        category: cat,
+        count,
+        metricTotal: metricColumn ? Math.round((sumMap.get(cat) ?? 0) * 100) / 100 : null,
+      }))
+      .sort((a, b) => b.count - a.count);
+    const catSheet = XLSX.utils.json_to_sheet(categoryRows);
+    XLSX.utils.book_append_sheet(workbook, catSheet, 'Category_Data');
+  }
+
+  if (dateColumn && metricColumn) {
+    const trendMap = new Map<string, number>();
+    for (const row of data) {
+      const key = String(row[dateColumn] ?? '').slice(0, 10);
+      if (!key) continue;
+      trendMap.set(key, (trendMap.get(key) ?? 0) + toNumber(row[metricColumn]));
+    }
+    const trendRows = [...trendMap.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, value]) => ({ date, [metricColumn]: Math.round(value * 100) / 100 }));
+    const trendSheet = XLSX.utils.json_to_sheet(trendRows);
+    XLSX.utils.book_append_sheet(workbook, trendSheet, 'Trend_Data');
+  }
+
+  if (topRows.length && categoryColumn && metricColumn) {
+    const topSheet = XLSX.utils.json_to_sheet(
+      topRows.map(row => ({
+        [categoryColumn]: row[categoryColumn],
+        [metricColumn]: row[metricColumn],
+      })),
+    );
+    XLSX.utils.book_append_sheet(workbook, topSheet, 'Top_Records');
+  }
+
+  const notesSheet = XLSX.utils.aoa_to_sheet([
+    ['KIMIT Smart Dashboard — How to use'],
+    [''],
+    ['1. Interactive charts (recommended)'],
+    ['   Open the .html file that downloaded with this Excel file (same name).'],
+    ['   It opens in Chrome/Edge with live, interactive charts — no Excel Add-in needed.'],
+    [''],
+    ['2. Excel data & pivots'],
+    ['   Edit raw data on the Data sheet.'],
+    ['   Build PivotCharts from Category_Data or Trend_Data if you need charts inside Excel.'],
+  ]);
+  notesSheet['!cols'] = [{ wch: 88 }];
+  XLSX.utils.book_append_sheet(workbook, notesSheet, 'How_To_Use');
+
+  XLSX.writeFile(workbook, payload.filename ?? `Smart_Dashboard_${datasetName}.xlsx`);
+};
+
+
 // ─────────────────────────────────────────────
 //  Power BI — Optimised CSV Export
 //  Adds a header row with proper BOM so Power BI detects UTF-8

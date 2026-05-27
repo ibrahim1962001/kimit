@@ -23,13 +23,34 @@ import { get, set, del } from 'idb-keyval';
 import { LoginPopup } from './components/LoginPopup';
 import './App.css';
 import './premium-theme.css';
+import './gamma-web-theme.css';
 import { useKimitData } from './hooks/useKimitData';
+import { WorkflowStepper } from './components/WorkflowStepper';
+import {
+  type AppTab,
+  navigateToTab,
+  readInitialTab,
+  tabFromPathname,
+} from './lib/appNavigation';
+import { isCloudSyncEnabled } from './lib/cloudSyncPreference';
+import { getAppLang, setAppLang, isArabic } from './lib/i18n';
 
+type Tab = AppTab;
 
-type Tab = 'home' | 'dashboard' | 'cleaning' | 'chat' | 'export' | 'files' | 'about' | 'privacy' | 'faq' | 'guide' | 'compare' | 'smart-dashboard';
+interface ExcelBridgeMessage {
+  type: string;
+  payload?: {
+    rows?: Array<Record<string, unknown>>;
+    filename?: string;
+  };
+}
 
 function App() {
-    const [tab, setTab] = useState<Tab>('home');
+  const [tab, setTabState] = useState<Tab>(() => readInitialTab());
+  const setTab = useCallback((next: Tab) => {
+    setTabState(next);
+    navigateToTab(next);
+  }, []);
   const { info: dataset, setDataset } = useKimitData();
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -42,8 +63,13 @@ function App() {
   const [loginPopupOpen, setLoginPopupOpen] = useState(false);
 
   useEffect(() => {
-    
-    document.documentElement.dir = 'ltr';
+    setAppLang(getAppLang());
+    const onPop = () => setTabState(tabFromPathname(window.location.pathname));
+    window.addEventListener('popstate', onPop);
+    if (!window.history.state?.tab) {
+      navigateToTab(readInitialTab(), true);
+    }
+    return () => window.removeEventListener('popstate', onPop);
   }, []);
 
   useEffect(() => {
@@ -55,7 +81,8 @@ function App() {
     get('kimit_session_dataset').then((savedDataset) => {
       if (savedDataset) {
         setDataset(savedDataset);
-        setTab('dashboard');
+        setTabState('dashboard');
+        navigateToTab('dashboard', true);
         // Toast is not shown here directly to avoid UI blocking early, but we could.
       }
     });
@@ -67,7 +94,10 @@ function App() {
   useEffect(() => {
     const handler = (e: Event) => {
       const navTab = (e as CustomEvent<string>).detail as Tab;
-      if (navTab) setTab(navTab);
+      if (navTab) {
+        setTabState(navTab);
+        navigateToTab(navTab);
+      }
     };
     window.addEventListener('kimit:navigate', handler);
     return () => window.removeEventListener('kimit:navigate', handler);
@@ -80,6 +110,55 @@ function App() {
       del('kimit_session_dataset').catch(console.error);
     }
   }, [dataset]);
+
+  // Excel Add-in bridge: import/export dataset via postMessage
+  useEffect(() => {
+    const postToParent = (type: string, payload?: unknown) => {
+      if (typeof window === 'undefined' || !window.parent) return;
+      window.parent.postMessage({ type, payload }, '*');
+    };
+
+    const buildDatasetFromRows = (rows: Array<Record<string, unknown>>, filename?: string) => {
+      const cleanRows = rows
+        .filter(r => r && typeof r === 'object')
+        .map(r => Object.fromEntries(Object.entries(r)) as Record<string, string | number | null>);
+      if (cleanRows.length === 0) return null;
+      const fileName = filename?.trim() || 'Excel_Workbook_Data.xlsx';
+      const dummyFile = new File([''], fileName);
+      return analyzeDataset(dummyFile, cleanRows);
+    };
+
+    const handler = (event: MessageEvent<ExcelBridgeMessage>) => {
+      const msg = event.data;
+      if (!msg || typeof msg !== 'object' || typeof msg.type !== 'string') return;
+
+      if (msg.type === 'KIMIT_EXCEL_IMPORT_ROWS') {
+        const rows = msg.payload?.rows ?? [];
+        const imported = buildDatasetFromRows(rows, msg.payload?.filename);
+        if (!imported) {
+          postToParent('KIMIT_APP_ERROR', { message: 'No valid rows received from Excel.' });
+          return;
+        }
+        setDataset(imported);
+        setTab('dashboard');
+        postToParent('KIMIT_APP_IMPORTED', { rows: imported.rows, filename: imported.filename });
+        return;
+      }
+
+      if (msg.type === 'KIMIT_EXCEL_REQUEST_ROWS') {
+        const rows = dataset?.workData ?? [];
+        postToParent('KIMIT_APP_ROWS', {
+          rows,
+          filename: dataset?.filename ?? 'Kimit_Export.xlsx',
+          columns: dataset?.columns.map(c => c.name) ?? [],
+        });
+      }
+    };
+
+    window.addEventListener('message', handler);
+    postToParent('KIMIT_APP_READY', { hasDataset: !!dataset });
+    return () => window.removeEventListener('message', handler);
+  }, [dataset, setDataset]);
 
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
     setToast({ msg, type });
@@ -121,7 +200,11 @@ function App() {
           const info = convertBackendResultToDatasetInfo(statusRes as any);
           setDataset(info);
           setProgress(100);
-          showToast(`✅ Processed ${info.rows.toLocaleString()} records`);
+          showToast(
+            isArabic()
+              ? `✅ تمت المعالجة على السيرفر — ${info.rows.toLocaleString()} صف`
+              : `✅ Processed on server — ${info.rows.toLocaleString()} rows`,
+          );
         } catch (_backendErr) {
           // Backend unavailable → fallback to browser parsing
           console.warn('Backend unavailable, falling back to browser parsing:', _backendErr);
@@ -142,19 +225,26 @@ function App() {
         const info = analyzeDataset(file, rows);
         setDataset(info);
         setProgress(100);
-        showToast(`✅ Loaded ${info.rows.toLocaleString()} records`);
+        showToast(
+          isArabic()
+            ? `✅ تم التحميل محلياً — ${info.rows.toLocaleString()} صف`
+            : `✅ Loaded locally — ${info.rows.toLocaleString()} rows`,
+        );
 
-        // Send file to backend for MinIO persistence ONLY (non-blocking)
-        datasetsApi.storeFileOnly(file)
-          .then(res => {
-            if (res.saved_to_storage) {
-              showToast('☁️ File saved to cloud storage');
-            }
-          })
-          .catch(err => console.error("Cloud save failed:", err));
+        if (isCloudSyncEnabled()) {
+          datasetsApi.storeFileOnly(file)
+            .then(res => {
+              if (res.saved_to_storage) {
+                showToast(
+                  isArabic() ? '☁️ تم النسخ الاحتياطي السحابي (اختياري)' : '☁️ Optional cloud backup saved',
+                );
+              }
+            })
+            .catch(err => console.error('Cloud save failed:', err));
+        }
       }
 
-      setTimeout(() => setTab('dashboard'), 500);
+      setTimeout(() => setTab('smart-dashboard'), 500);
     } catch (e: unknown) {
       const errorMessage = e instanceof Error ? e.message : String(e);
       const msg = errorMessage === 'exceeds 50MB'
@@ -215,7 +305,9 @@ function App() {
         setProgress(100);
         showToast(`✅ Attached ${info.rows.toLocaleString()} records`);
         
-        datasetsApi.storeFileOnly(file).catch(err => console.error("Cloud save failed:", err));
+        if (isCloudSyncEnabled()) {
+          datasetsApi.storeFileOnly(file).catch(err => console.error('Cloud save failed:', err));
+        }
       }
     } catch (e: unknown) {
       const errorMessage = e instanceof Error ? e.message : String(e);
@@ -252,8 +344,17 @@ function App() {
   // No forced login wall — app is available to everyone
   // Login button is in the sidebar and opens the small LoginPopup
 
+  const lang = getAppLang();
+  const showWorkflow =
+    !!dataset &&
+    (tab === 'dashboard' ||
+      tab === 'cleaning' ||
+      tab === 'chat' ||
+      tab === 'export' ||
+      tab === 'smart-dashboard');
+
   return (
-    <div className={`app ${'rtl'} flex flex-col min-h-screen relative`}>
+    <div className={`app ${lang === 'ar' ? 'rtl' : 'ltr'} flex flex-col min-h-screen relative`}>
       {/* Mobile Top Bar */}
       <div className="mobile-top-bar">
         <div className="mobile-logo-small">
@@ -310,18 +411,35 @@ function App() {
         {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
 
         <div className="flex-1 animate-fade-in">
-          {tab === 'home' && <HomePage onFile={handleFile} />}
+          {showWorkflow && (
+            <WorkflowStepper current={tab} onStep={setTab} />
+          )}
+          {tab === 'home' && (
+            <HomePage
+              onFile={handleFile}
+              onTrySmartDashboard={() => {
+                if (dataset) setTab('smart-dashboard');
+                else showToast(isArabic() ? 'ارفع ملفاً أولاً' : 'Upload a file first', 'err');
+              }}
+            />
+          )}
           {tab === 'dashboard' && dataset && <DashboardPage />}
           {tab === 'cleaning' && dataset && <CleaningPage info={dataset} onClean={handleClean} onUpdate={setDataset} />}
           {tab === 'chat' && <OpenRouterChat dataset={dataset} onFileUpload={handleChatFile} onUpdate={setDataset} />}
-          {tab === 'export' && dataset && <ExportPage info={dataset} />}
+          {tab === 'export' && dataset && (
+            <ExportPage info={dataset} onOpenSmartDashboard={() => setTab('smart-dashboard')} />
+          )}
           {tab === 'files' && <SavedFilesPage />}
           {tab === 'about' && <AboutUsPage />}
           {tab === 'privacy' && <PrivacyPage />}
           {tab === 'faq' && <FAQPage />}
           {tab === 'guide' && <GuidePage />}
           {tab === 'compare' && <ComparisonPage />}
-          {tab === 'smart-dashboard' && dataset && <SmartDashboardPage onBack={() => setTab('dashboard')} />}
+          {tab === 'smart-dashboard' && (
+            <SmartDashboardPage
+              onBack={() => setTab(dataset ? 'dashboard' : 'home')}
+            />
+          )}
         </div>
 
         {dataset && (

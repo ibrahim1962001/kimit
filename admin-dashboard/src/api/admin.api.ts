@@ -16,6 +16,19 @@ async function authHeaders() {
 
 const api = axios.create({ baseURL: BASE });
 
+// ── Admin session ─────────────────────────────────────────────────────────
+export async function fetchAdminMe() {
+  const headers = await authHeaders();
+  const { data } = await api.get('/admin/me', { headers });
+  return data as {
+    firebase_uid: string;
+    email: string;
+    role: 'super_admin' | 'sub_admin';
+    can_approve_charges: boolean;
+    is_active: boolean;
+  };
+}
+
 // ── Stats ──────────────────────────────────────────────────────────────────
 export async function fetchStats() {
   const headers = await authHeaders();

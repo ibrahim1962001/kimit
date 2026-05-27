@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
+from app.db.session import get_sync_db
 from app.models import ChargeRequest, User
 
 router = APIRouter(prefix="/api/charge-requests", tags=["charge-requests"])
@@ -31,7 +31,7 @@ async def submit_charge_request(
     notes: str | None = Form(default=None),
     screenshot: UploadFile | None = File(default=None),
     authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
 ) -> Any:
     """User submits a manual top-up request with optional screenshot."""
     if not authorization or not authorization.startswith("Bearer "):
@@ -79,7 +79,7 @@ async def submit_charge_request(
 @router.get("/my")
 def get_my_requests(
     authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
 ) -> Any:
     """Authenticated user gets their own charge request history."""
     if not authorization or not authorization.startswith("Bearer "):

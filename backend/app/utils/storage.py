@@ -47,6 +47,12 @@ class StorageManager:
             logger.error(f"MinIO Upload Failed for {file_name}: {str(e)}")
             raise e
 
+    async def upload_bytes(
+        self, file_content: bytes, file_name: str, content_type: str = "application/octet-stream"
+    ) -> str:
+        """Async-compatible alias used by charge_router."""
+        return self.upload_file(file_content, file_name, content_type)
+
     def download_file(self, file_name: str) -> bytes:
         """Downloads a file from MinIO."""
         response = self.s3.get_object(Bucket=self.bucket, Key=file_name)
