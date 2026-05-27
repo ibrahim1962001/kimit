@@ -4,6 +4,7 @@ import type { DatasetInfo } from '../types';
 import { exportCSV, exportJSON } from '../lib/dataUtils';
 import { getAppLang } from '../lib/i18n';
 import * as XLSX from 'xlsx';
+import { AdSpace } from '../components/AdSpace';
 
 interface Props {
   info: DatasetInfo;
@@ -48,6 +49,9 @@ export const ExportPage: React.FC<Props> = ({ info, onOpenSmartDashboard }) => {
 
   return (
     <div className="page">
+      <div style={{ marginBottom: 10 }}>
+        <AdSpace type="horizontal" slotId="export-top" minHeight={90} lazyLoad />
+      </div>
       <div className="page-header">
         <div>
           <h2 className="page-title">{t.title}</h2>

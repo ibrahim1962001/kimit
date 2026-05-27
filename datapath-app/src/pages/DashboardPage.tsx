@@ -18,6 +18,7 @@ import { PowerBIPanel } from '../components/Analysis/PowerBIPanel';
 import { PredictiveSuite } from '../components/Analysis/PredictiveSuite';
 import { SourceManager } from '../components/SourceManager';
 import { CreatorFooter } from '../components/CreatorFooter';
+import { AdSpace } from '../components/AdSpace';
 import { exportToExcel } from '../lib/exportUtils';
 import { convertBackendResultToDatasetInfo, type BackendResult } from '../lib/dataUtils';
 import { generateAInarrative } from '../lib/narrativeEngine';
@@ -397,6 +398,10 @@ export const DashboardPage: React.FC<Props> = ({}) => {
           {reportToast.msg}
         </div>
       )}
+
+      <div style={{ margin: '6px 0 12px' }}>
+        <AdSpace type="horizontal" slotId="dashboard-top" minHeight={90} lazyLoad />
+      </div>
 
       {/* ── Source Manager Modal (Task 3) ── */}
       <AnimatePresence>

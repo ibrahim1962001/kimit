@@ -1,19 +1,8 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { Menu, Bot, Loader2 } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
 import { HomePage } from './pages/HomePage';
-import { DashboardPage } from './pages/DashboardPage';
-import { SmartDashboardPage } from './pages/SmartDashboardPage';
-import { CleaningPage } from './pages/CleaningPage';
-import { OpenRouterChat } from './components/OpenRouterChat';
-import { ExportPage } from './pages/ExportPage';
 import { EditorSidebar } from './components/EditorSidebar';
-import { AboutUsPage } from './pages/AboutUsPage';
-import { PrivacyPage } from './pages/PrivacyPage';
-import { FAQPage } from './pages/FAQPage';
-import { GuidePage } from './pages/GuidePage';
-import { ComparisonPage } from './pages/ComparisonPage';
-import { SavedFilesPage } from './pages/SavedFilesPage';
 import { parseFile, analyzeDataset, cleanDataset } from './lib/dataUtils';
 import { datasetsApi } from './api/datasets.api';
 import { auth } from './lib/firebase';
@@ -34,6 +23,42 @@ import {
 } from './lib/appNavigation';
 import { isCloudSyncEnabled } from './lib/cloudSyncPreference';
 import { getAppLang, setAppLang, isArabic } from './lib/i18n';
+
+const DashboardPage = lazy(() =>
+  import('./pages/DashboardPage').then(m => ({ default: m.DashboardPage })),
+);
+const SmartDashboardPage = lazy(() =>
+  import('./pages/SmartDashboardPage').then(m => ({ default: m.SmartDashboardPage })),
+);
+const CleaningPage = lazy(() =>
+  import('./pages/CleaningPage').then(m => ({ default: m.CleaningPage })),
+);
+const OpenRouterChat = lazy(() =>
+  import('./components/OpenRouterChat').then(m => ({ default: m.OpenRouterChat })),
+);
+const ExportPage = lazy(() =>
+  import('./pages/ExportPage').then(m => ({ default: m.ExportPage })),
+);
+const AboutUsPage = lazy(() =>
+  import('./pages/AboutUsPage').then(m => ({ default: m.AboutUsPage })),
+);
+const PrivacyPage = lazy(() =>
+  import('./pages/PrivacyPage').then(m => ({ default: m.PrivacyPage })),
+);
+const FAQPage = lazy(() => import('./pages/FAQPage').then(m => ({ default: m.FAQPage })));
+const GuidePage = lazy(() => import('./pages/GuidePage').then(m => ({ default: m.GuidePage })));
+const ComparisonPage = lazy(() =>
+  import('./pages/ComparisonPage').then(m => ({ default: m.ComparisonPage })),
+);
+const SavedFilesPage = lazy(() =>
+  import('./pages/SavedFilesPage').then(m => ({ default: m.SavedFilesPage })),
+);
+
+const PageFallback = () => (
+  <div className="loading-overlay" style={{ position: 'relative', minHeight: 200 }}>
+    <Loader2 size={32} className="analyzing-spinner" />
+  </div>
+);
 
 type Tab = AppTab;
 
@@ -81,8 +106,8 @@ function App() {
     get('kimit_session_dataset').then((savedDataset) => {
       if (savedDataset) {
         setDataset(savedDataset);
-        setTabState('dashboard');
-        navigateToTab('dashboard', true);
+        setTabState('smart-dashboard');
+        navigateToTab('smart-dashboard', true);
         // Toast is not shown here directly to avoid UI blocking early, but we could.
       }
     });
@@ -420,32 +445,36 @@ function App() {
           {showWorkflow && (
             <WorkflowStepper current={tab} onStep={setTab} />
           )}
-          {tab === 'home' && (
-            <HomePage
-              onFile={handleFile}
-              onTrySmartDashboard={() => {
-                if (dataset) setTab('smart-dashboard');
-                else showToast(isArabic() ? 'ارفع ملفاً أولاً' : 'Upload a file first', 'err');
-              }}
-            />
-          )}
-          {tab === 'dashboard' && dataset && <DashboardPage />}
-          {tab === 'cleaning' && dataset && <CleaningPage info={dataset} onClean={handleClean} onUpdate={setDataset} />}
-          {tab === 'chat' && <OpenRouterChat dataset={dataset} onFileUpload={handleChatFile} onUpdate={setDataset} />}
-          {tab === 'export' && dataset && (
-            <ExportPage info={dataset} onOpenSmartDashboard={() => setTab('smart-dashboard')} />
-          )}
-          {tab === 'files' && <SavedFilesPage />}
-          {tab === 'about' && <AboutUsPage />}
-          {tab === 'privacy' && <PrivacyPage />}
-          {tab === 'faq' && <FAQPage />}
-          {tab === 'guide' && <GuidePage />}
-          {tab === 'compare' && <ComparisonPage />}
-          {tab === 'smart-dashboard' && (
-            <SmartDashboardPage
-              onBack={() => setTab(dataset ? 'dashboard' : 'home')}
-            />
-          )}
+          <Suspense fallback={<PageFallback />}>
+            {tab === 'home' && (
+              <HomePage
+                onFile={handleFile}
+                onTrySmartDashboard={() => {
+                  if (dataset) setTab('smart-dashboard');
+                  else showToast(isArabic() ? 'ارفع ملفاً أولاً' : 'Upload a file first', 'err');
+                }}
+              />
+            )}
+            {tab === 'dashboard' && dataset && <DashboardPage />}
+            {tab === 'cleaning' && dataset && (
+              <CleaningPage info={dataset} onClean={handleClean} onUpdate={setDataset} />
+            )}
+            {tab === 'chat' && (
+              <OpenRouterChat dataset={dataset} onFileUpload={handleChatFile} onUpdate={setDataset} />
+            )}
+            {tab === 'export' && dataset && (
+              <ExportPage info={dataset} onOpenSmartDashboard={() => setTab('smart-dashboard')} />
+            )}
+            {tab === 'files' && <SavedFilesPage />}
+            {tab === 'about' && <AboutUsPage />}
+            {tab === 'privacy' && <PrivacyPage />}
+            {tab === 'faq' && <FAQPage />}
+            {tab === 'guide' && <GuidePage />}
+            {tab === 'compare' && <ComparisonPage />}
+            {tab === 'smart-dashboard' && (
+              <SmartDashboardPage onBack={() => setTab(dataset ? 'dashboard' : 'home')} />
+            )}
+          </Suspense>
         </div>
 
         {dataset && (
@@ -459,6 +488,7 @@ function App() {
         onClose={() => setLoginPopupOpen(false)}
         onSuccess={() => setLoginPopupOpen(false)}
       />
+
     </div>
   );
 }

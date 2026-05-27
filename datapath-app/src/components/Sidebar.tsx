@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { LayoutDashboard, Shield, MessageCircle, Download, Home,   X, Table, HelpCircle, Info, ShieldCheck, BookOpen, ArrowRightLeft, User, LogOut, Trash2, ChevronDown, ChevronRight, Rows3, Columns3, AlertTriangle, Copy, TrendingUp } from 'lucide-react';
 import { AdSpace } from './AdSpace';
-import { getActiveAdProviders } from '../config/adConfig';
 import { type User as FirebaseUser, signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { useKimitData } from '../hooks/useKimitData';
@@ -462,7 +461,7 @@ export const Sidebar: React.FC<Props> = ({ tab, hasData, onTab, onClose, onClear
           <span className="home-ad-label" style={{ display: 'block', marginBottom: 6 }}>
             {getAppLang() === 'ar' ? 'إعلان' : 'Sponsored'}
           </span>
-          <AdSpace type="responsive" providers={getActiveAdProviders()} minHeight={100} />
+          <AdSpace type="responsive" slotId="sidebar" minHeight={100} lazyLoad />
         </div>
       </div>
     </aside>

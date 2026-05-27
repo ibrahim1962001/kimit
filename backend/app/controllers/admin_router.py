@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_sync_db
 from app.models import User, Dataset, UserCredit, CreditTransaction, ChargeRequest, AdminRole
+from app.config import settings
 
 # Optional: verify Firebase ID token server-side
 try:
@@ -38,7 +39,7 @@ def _verify_admin(authorization: str | None, db: Session, require_super: bool = 
 
     token = authorization.split(" ", 1)[1]
 
-    # Verify with Firebase Admin SDK if available, else trust token as UID (dev mode)
+    # Verify with Firebase Admin SDK if available, else optional dev fallback
     if fb_auth:
         try:
             decoded = fb_auth.verify_id_token(token)
@@ -46,10 +47,15 @@ def _verify_admin(authorization: str | None, db: Session, require_super: bool = 
         except Exception:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     else:
-        uid = token  # Dev fallback
+        if not settings.ALLOW_DEV_ADMIN_FALLBACK:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Admin authentication is not configured.",
+            )
+        uid = token  # Dev fallback (explicitly enabled only)
 
     # Auto-allow the super admin UID
-    if uid == "kEx3N7shT2Zzo50i3grmeht2wiU2":
+    if settings.SUPER_ADMIN_UID and uid == settings.SUPER_ADMIN_UID:
         return AdminRole(firebase_uid=uid, email="ebrahimsabrey2001@gmail.com", role="super_admin", can_approve_charges=True)
 
     admin = db.scalar(select(AdminRole).where(AdminRole.firebase_uid == uid, AdminRole.is_active == True))

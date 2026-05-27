@@ -196,7 +196,7 @@ export const HomePage: React.FC<Props> = ({ onFile, onTrySmartDashboard }) => {
 
             <div className="home-calm-ad home-calm-ad--footer">
               <span className="home-ad-label">{t.sponsored}</span>
-              <AdSpace type="responsive" providers={railAds.slice(0, 1)} minHeight={90} lazyLoad />
+              <AdSpace type="horizontal" slotId="home-footer" minHeight={90} />
             </div>
 
             <CreatorFooter />
@@ -208,7 +208,7 @@ export const HomePage: React.FC<Props> = ({ onFile, onTrySmartDashboard }) => {
               <div className="home-calm-ad-rail-slot" key={provider.id}>
                 <AdSpace
                   type="responsive"
-                  providers={[provider]}
+                  slotId={`home-rail-${provider.id}`}
                   minHeight={i === 0 ? 280 : 120}
                   lazyLoad={i > 0}
                 />

@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import ReactECharts from 'echarts-for-react';
+import { AdSpace } from '../components/AdSpace';
 import { useKimitData } from '../hooks/useKimitData';
 import { useUser } from '../contexts/UserContext';
 import { exportSmartDashboardBundle } from '../lib/smartDashboardHtmlExport';
@@ -1796,6 +1797,10 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
           </div>
         </div>
 
+        <div className="sd2-card sd2-ad-footer">
+          <span className="home-ad-label">{isAr ? 'إعلان' : 'Sponsored'}</span>
+          <AdSpace type="horizontal" slotId="smart-dashboard-footer" minHeight={90} lazyLoad />
+        </div>
         <div className="sd2-footer-bar" />
       </div>
     </div>

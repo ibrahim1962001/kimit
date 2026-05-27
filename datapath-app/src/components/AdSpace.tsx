@@ -12,60 +12,57 @@ interface AdSpaceProps {
   type: 'horizontal' | 'vertical' | 'square' | 'responsive';
   className?: string;
   providers?: AdProvider[];
+  slotId?: string;
   minHeight?: number;
-  onLoad?: () => void;
-  onError?: () => void;
   lazyLoad?: boolean;
   rootMargin?: string;
 }
 
-
-
 export const AdSpace: React.FC<AdSpaceProps> = ({
   type,
   className = '',
+  slotId = 'default',
   minHeight,
-  lazyLoad = false,
-  rootMargin = '300px',
+  lazyLoad = true,
+  rootMargin = '200px',
 }) => {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(!lazyLoad);
 
-
   const defaultHeight = () => {
     switch (type) {
-      case 'horizontal': return 100;
-      case 'vertical':   return 400;
-      case 'square':     return 280;
-      default:           return 120;
+      case 'horizontal': return 90;
+      case 'vertical': return 400;
+      case 'square': return 280;
+      default: return 120;
     }
   };
 
   const height = minHeight ?? defaultHeight();
 
-  // Lazy load via IntersectionObserver
   useEffect(() => {
     if (!lazyLoad || isVisible) return;
     const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
+      entries => {
+        if (entries[0]?.isIntersecting) {
           setIsVisible(true);
           observer.disconnect();
         }
       },
-      { rootMargin }
+      { rootMargin },
     );
     if (wrapperRef.current) observer.observe(wrapperRef.current);
     return () => observer.disconnect();
   }, [lazyLoad, isVisible, rootMargin]);
 
+  const showAd = isVisible;
 
-  // Ensure the container doesn't block the code and ad has space
   return (
     <div
       ref={wrapperRef}
       className={`ad-space ${className}`}
       data-ad-type={type}
+      data-ad-slot={slotId}
       style={{
         width: '100%',
         minHeight: height,
@@ -74,38 +71,26 @@ export const AdSpace: React.FC<AdSpaceProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 50 // Ensure no overlap
       }}
     >
-      {isVisible ? (
+      {showAd && (
         <iframe
-          src="/ad.html"
+          src={`/ad.html?slot=${encodeURIComponent(slotId)}`}
           sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-top-navigation-by-user-activation"
           style={{
             width: '100%',
             minHeight: `${height}px`,
             border: 'none',
             display: 'block',
-            pointerEvents: 'auto',
           }}
           title="Advertisement"
           loading="lazy"
           scrolling="no"
         />
-      ) : (
-        <div style={{
-          display: 'flex', flexDirection: 'column',
-          alignItems: 'center', gap: 8,
-          color: 'rgba(255,255,255,0.07)', fontSize: 10,
-          letterSpacing: '1px', textTransform: 'uppercase',
-        }}>
-          <div style={{
-            width: 28, height: 28,
-            border: '2px solid rgba(255,255,255,0.06)',
-            borderTopColor: 'rgba(16,185,129,0.35)',
-            borderRadius: '50%', animation: 'spin 1s linear infinite',
-          }} />
-          <span>Ad</span>
+      )}
+      {!isVisible && (
+        <div className="ad-space-placeholder ad-space-placeholder--loading">
+          Loading...
         </div>
       )}
     </div>

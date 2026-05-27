@@ -38,6 +38,11 @@ export const PrivacyPage: React.FC<Props> = () => {
           title: 'الذكاء الاصطناعي',
           desc: 'عند استخدام AI Chat، تُرسل مقتطفات من بياناتك إلى مزود AI (Groq) لإنتاج الإجابات. لا ترفع بيانات حساسة إذا لم تكن موافقاً على ذلك.',
         },
+        {
+          icon: Cloud,
+          title: 'الإعلانات والكوكيز',
+          desc: 'نعرض الإعلانات فقط بعد موافقتك على الكوكيز. يمكنك رفض الإعلانات وسيستمر التحليل المحلي بدون تعطيل.',
+        },
       ]
     : [
         {
@@ -66,6 +71,11 @@ export const PrivacyPage: React.FC<Props> = () => {
           icon: Lock,
           title: 'AI features',
           desc: 'When you use AI Chat, excerpts of your data are sent to our AI provider (Groq) to generate answers. Avoid highly sensitive data if you do not consent.',
+        },
+        {
+          icon: Cloud,
+          title: 'Ads & cookies',
+          desc: 'Ads are shown only after your cookie consent. You can reject ads and continue local analysis without interruption.',
         },
       ];
 

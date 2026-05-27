@@ -18,8 +18,8 @@ class Settings(BaseSettings):
     # Groq AI
     GROQ_API_KEY: str = ""
 
-    # Fernet encryption key (generate once: Fernet.generate_key())
-    FERNET_KEY: str = "vE7f-JzR1m_3k8Lp9zW2xY4vQ6sT8uN0mK9iH7gD5eA="
+    # Fernet encryption key (must be set in env for production)
+    FERNET_KEY: str = ""
 
     # Firebase Admin SDK (path to service account JSON)
     FIREBASE_CREDENTIALS_PATH: str = "firebase-adminsdk.json"
@@ -44,10 +44,14 @@ class Settings(BaseSettings):
 
     # MinIO / S3
     MINIO_ENDPOINT: str = "minio:9000"
-    MINIO_ACCESS_KEY: str = "kimit_admin"
-    MINIO_SECRET_KEY: str = "kimit_storage_secret"
+    MINIO_ACCESS_KEY: str = ""
+    MINIO_SECRET_KEY: str = ""
     MINIO_SECURE: bool = False
     MINIO_BUCKET_NAME: str = "datasets"
+
+    # Security hardening
+    ALLOW_DEV_ADMIN_FALLBACK: bool = False
+    SUPER_ADMIN_UID: str = ""
 
     # Power BI (Service Principal)
     POWERBI_ENABLED: bool = False
