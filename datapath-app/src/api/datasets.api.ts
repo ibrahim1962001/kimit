@@ -99,4 +99,9 @@ export const datasetsApi = {
     const { data } = await apiClient.post("/api/powerbi/publish", payload);
     return data;
   },
+
+  powerBIStatus: async (): Promise<{ enabled: boolean; configured: boolean; needsTemplate: boolean }> => {
+    const { data } = await apiClient.get("/api/powerbi/status");
+    return data;
+  },
 };

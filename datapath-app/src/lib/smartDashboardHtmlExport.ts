@@ -10,6 +10,13 @@ export interface SmartDashboardBundlePayload extends SmartDashboardExcelPayload 
   charts: SmartDashboardExportChart[];
   theme?: 'light' | 'dark';
   isAr?: boolean;
+  sheetTypeLabel?: string;
+  brandLogoDataUrl?: string;
+  user?: {
+    name?: string;
+    email?: string;
+    photoURL?: string;
+  };
 }
 
 function escapeHtml(s: string): string {
@@ -24,16 +31,40 @@ export function buildStandaloneDashboardHtml(payload: SmartDashboardBundlePayloa
   const isAr = payload.isAr ?? false;
   const theme = payload.theme ?? 'light';
   const dark = theme === 'dark';
-  const baseName = (payload.filename ?? `Smart_Dashboard_${payload.datasetName}`).replace(/\.xlsx$/i, '');
+  const createdAt = new Date();
   const embed = JSON.stringify({
     datasetName: payload.datasetName,
-    generated: new Date().toISOString(),
+    generated: createdAt.toISOString(),
     theme,
     kpis: payload.kpis ?? [],
     insights: payload.insights ?? [],
     quality: payload.quality ?? null,
     charts: payload.charts,
+    sheetTypeLabel: payload.sheetTypeLabel ?? null,
+    brandLogoDataUrl: payload.brandLogoDataUrl ?? null,
+    user: payload.user ?? null,
   });
+  const brandLogo = payload.brandLogoDataUrl?.trim() || '';
+
+  const userName = payload.user?.name?.trim() || (isAr ? 'مستخدم' : 'User');
+  const userEmail = payload.user?.email?.trim() || (isAr ? 'زائر' : 'Guest');
+  const userPhoto = payload.user?.photoURL?.trim() || '';
+  const userInitial = (userName[0] || 'U').toUpperCase();
+  const userCard = `
+    <div class="hero-user" title="${escapeHtml(userEmail)}">
+      <div class="hero-user-avatar-wrap">
+        ${
+          userPhoto
+            ? `<img src="${escapeHtml(userPhoto)}" alt="${escapeHtml(userName)}" class="hero-user-avatar" referrerpolicy="no-referrer" />`
+            : `<span class="hero-user-fallback">${escapeHtml(userInitial)}</span>`
+        }
+        <span class="hero-user-status" aria-hidden="true"></span>
+      </div>
+      <div class="hero-user-meta">
+        <div class="hero-user-name">${escapeHtml(userName)}</div>
+        <div class="hero-user-email">${escapeHtml(userEmail)}</div>
+      </div>
+    </div>`;
 
   const kpiHtml = (payload.kpis ?? [])
     .map(
@@ -80,8 +111,84 @@ export function buildStandaloneDashboardHtml(payload: SmartDashboardBundlePayloa
       padding: 22px 24px;
       margin-bottom: 20px;
     }
-    .hero h1 { margin: 0 0 6px; font-size: 1.35rem; }
-    .hero p { margin: 0; opacity: 0.9; font-size: 0.9rem; }
+    .hero-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .hero-user {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.14);
+      border: 1px solid rgba(255,255,255,0.28);
+      min-width: 170px;
+      max-width: 100%;
+    }
+    .hero-user-avatar-wrap {
+      position: relative;
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.4);
+      background: rgba(255,255,255,0.2);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .hero-user-avatar {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .hero-user-fallback {
+      font-size: 13px;
+      font-weight: 800;
+      color: #fff;
+    }
+    .hero-user-status {
+      position: absolute;
+      bottom: -2px;
+      right: -2px;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #22c55e;
+      border: 2px solid rgba(13,148,136,0.9);
+    }
+    .hero-user-meta {
+      min-width: 0;
+    }
+    .hero-user-name, .hero-user-email {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 180px;
+      line-height: 1.2;
+    }
+    .hero-user-name {
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .hero-user-email {
+      font-size: 11px;
+      opacity: 0.85;
+    }
+    .hero-brand {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      object-fit: contain;
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.35);
+      padding: 4px;
+      margin-bottom: 8px;
+    }
     .badge {
       display: inline-block;
       margin-top: 10px;
@@ -121,32 +228,45 @@ export function buildStandaloneDashboardHtml(payload: SmartDashboardBundlePayloa
     .chart-card h3 { margin: 0 0 4px; font-size: 0.95rem; }
     .chart-sub { margin: 0 0 8px; font-size: 0.78rem; color: ${dark ? '#94a3b8' : '#64748b'}; }
     .chart-host { width: 100%; height: 280px; }
-    .note {
+    .footer-site {
       margin-top: 20px;
-      padding: 12px 14px;
-      border-radius: 10px;
-      background: ${dark ? '#172554' : '#eff6ff'};
-      border: 1px solid ${dark ? '#1e40af' : '#bfdbfe'};
-      font-size: 0.82rem;
-      line-height: 1.5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      font-size: 11px;
+      color: ${dark ? '#94a3b8' : '#64748b'};
+      opacity: 0.9;
+    }
+    .footer-created-label {
+      opacity: 0.85;
+    }
+    .footer-created-value {
+      color: ${dark ? '#cbd5e1' : '#334155'};
+      font-weight: 600;
     }
   </style>
 </head>
 <body>
   <div class="wrap">
     <header class="hero">
-      <h1>${isAr ? 'داشبورد KIMIT التفاعلي' : 'KIMIT Interactive Dashboard'}</h1>
-      <p>${escapeHtml(payload.datasetName)} · ${escapeHtml(baseName)}.xlsx</p>
-      <span class="badge">${isAr ? 'يعمل بدون إنترنت بعد التحميل الأول لـ ECharts' : 'Works offline after first ECharts load'}</span>
+      <div class="hero-head">
+        <div>
+          ${brandLogo ? `<img src="${escapeHtml(brandLogo)}" alt="Brand Logo" class="hero-brand" />` : ''}
+        </div>
+        ${userCard}
+      </div>
+      <span class="badge">${escapeHtml(payload.sheetTypeLabel || (isAr ? 'عام' : 'General'))}</span>
     </header>
     ${kpiHtml ? `<div class="kpi-grid">${kpiHtml}</div>` : ''}
     <div class="charts">${chartCards}</div>
-    <p class="note">
-      ${
-        isAr
-          ? 'تم إنشاء هذا الملف مع تصدير Excel. افتح ملف .xlsx لتعديل البيانات، واستخدم هذا الملف للعرض التفاعلي للشارتات.'
-          : 'Generated with your Excel export. Use the .xlsx file to edit data; use this file for interactive charts.'
-      }
+    <p class="footer-site">
+      <span>KIMIT.CLOUD</span>
+      <span>
+        <span class="footer-created-label">${isAr ? 'تاريخ الإنشاء' : 'Created on'}</span>
+        <span class="footer-created-value"> ${createdAt.toLocaleDateString(isAr ? 'ar-EG' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+      </span>
     </p>
   </div>
   <script type="application/json" id="kimit-payload">${embed.replace(/</g, '\\u003c')}<\/script>

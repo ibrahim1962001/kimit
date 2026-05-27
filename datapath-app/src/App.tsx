@@ -104,6 +104,12 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const openLogin = () => setLoginPopupOpen(true);
+    window.addEventListener('kimit:open-login', openLogin);
+    return () => window.removeEventListener('kimit:open-login', openLogin);
+  }, []);
+
+  useEffect(() => {
     if (dataset) {
       set('kimit_session_dataset', dataset).catch(console.error);
     } else {

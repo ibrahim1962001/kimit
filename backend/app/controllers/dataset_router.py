@@ -200,3 +200,21 @@ async def publish_to_powerbi(
         "reportId": result.report_id,
         "reportUrl": result.report_url,
     }
+
+
+@router.get("/powerbi/status")
+async def powerbi_status():
+    enabled = bool(settings.POWERBI_ENABLED)
+    configured = all(
+        [
+            settings.POWERBI_TENANT_ID.strip(),
+            settings.POWERBI_CLIENT_ID.strip(),
+            settings.POWERBI_CLIENT_SECRET.strip(),
+            settings.POWERBI_WORKSPACE_ID.strip(),
+        ]
+    )
+    return {
+        "enabled": enabled,
+        "configured": bool(enabled and configured),
+        "needsTemplate": not bool(settings.POWERBI_REPORT_TEMPLATE_ID.strip()),
+    }

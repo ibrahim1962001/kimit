@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { useKimitData } from '../hooks/useKimitData';
+import { useUser } from '../contexts/UserContext';
 import { exportSmartDashboardBundle } from '../lib/smartDashboardHtmlExport';
 import { datasetsApi } from '../api/datasets.api';
 import {
@@ -89,9 +90,19 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
     isCrossFiltered,
     clearCrossFilters,
     clearFilters,
+    setFilter,
+    setCrossFilter,
   } = useKimitData();
+  const { user } = useUser();
   const [refreshKey, setRefreshKey] = useState(0);
   const [pbiExporting, setPbiExporting] = useState(false);
+  const [pbiHint, setPbiHint] = useState<string | null>(null);
+  const [pbiModalOpen, setPbiModalOpen] = useState(false);
+  const [pbiStep, setPbiStep] = useState<'idle' | 'checking' | 'publishing' | 'opening' | 'done' | 'error'>('idle');
+  const [brandLogoDataUrl, setBrandLogoDataUrl] = useState<string>(() => {
+    if (typeof localStorage === 'undefined') return '';
+    return localStorage.getItem('kimit_brand_logo') || '';
+  });
   const [chartTheme, setChartTheme] = useState<ChartThemeMode>(() => {
     if (typeof localStorage === 'undefined') return 'light';
     return localStorage.getItem('kimit_sd_theme') === 'dark' ? 'dark' : 'light';
@@ -107,6 +118,121 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
 
   const lang = (typeof localStorage !== 'undefined' ? localStorage.getItem('kimit_lang') : null) || 'en';
   const isAr = lang === 'ar';
+  const userDisplayName =
+    user?.displayName?.trim() ||
+    user?.email?.split('@')[0] ||
+    (isAr ? 'مستخدم' : 'User');
+  const userEmail = user?.email || (isAr ? 'زائر' : 'Guest');
+  const userInitial = (userDisplayName[0] || 'U').toUpperCase();
+  const [manualMap, setManualMap] = useState<{
+    country: string;
+    name: string;
+    followers: string;
+    age: string;
+    gender: string;
+  }>(() => {
+    if (typeof localStorage === 'undefined') return { country: '', name: '', followers: '', age: '', gender: '' };
+    try {
+      const raw = localStorage.getItem('kimit_dashboard_manual_map');
+      if (!raw) return { country: '', name: '', followers: '', age: '', gender: '' };
+      const parsed = JSON.parse(raw) as Partial<{ country: string; name: string; followers: string; age: string; gender: string }>;
+      return {
+        country: parsed.country ?? '',
+        name: parsed.name ?? '',
+        followers: parsed.followers ?? '',
+        age: parsed.age ?? '',
+        gender: parsed.gender ?? '',
+      };
+    } catch {
+      return { country: '', name: '', followers: '', age: '', gender: '' };
+    }
+  });
+  const [drillPath, setDrillPath] = useState<string[]>([]);
+  const [whatIfPct, setWhatIfPct] = useState(0);
+  const [goalTarget, setGoalTarget] = useState(100);
+  const [selectedPreset, setSelectedPreset] = useState('');
+  const [presetBootstrapped, setPresetBootstrapped] = useState(false);
+  const [savedViews, setSavedViews] = useState<Array<{ id: string; name: string; data: unknown }>>(() => {
+    if (typeof localStorage === 'undefined') return [];
+    try {
+      return JSON.parse(localStorage.getItem('kimit_saved_views') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  const handleBrandLogoUpload: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result || '');
+      setBrandLogoDataUrl(dataUrl);
+      if (typeof localStorage !== 'undefined') localStorage.setItem('kimit_brand_logo', dataUrl);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const clearBrandLogo = () => {
+    setBrandLogoDataUrl('');
+    if (typeof localStorage !== 'undefined') localStorage.removeItem('kimit_brand_logo');
+  };
+
+  useEffect(() => {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem('kimit_saved_views', JSON.stringify(savedViews));
+  }, [savedViews]);
+
+  const publishToPowerBI = async () => {
+    if (!info) return;
+    setPbiExporting(true);
+    setPbiHint(null);
+    setPbiStep('checking');
+    try {
+      const st = await datasetsApi.powerBIStatus();
+      if (!st.enabled || !st.configured) {
+        setPbiStep('error');
+        setPbiHint(
+          isAr
+            ? 'Power BI غير مفعّل على السيرفر. تواصل مع الإدارة لتفعيل الربط.'
+            : 'Power BI is not configured on the server yet. Ask admin to enable integration.',
+        );
+        return;
+      }
+      setPbiStep('publishing');
+      const res = await datasetsApi.publishPowerBI({
+        datasetName: info.filename.replace(/\.[^.]+$/, '') || info.filename,
+        rows: rawData.map(r => ({ ...r })),
+        columns: info.columns.map(c => ({ name: c.name, type: c.type })),
+      });
+      setPbiStep('opening');
+      setPbiHint(
+        st.needsTemplate
+          ? (isAr
+              ? 'تم النشر. افتح الرابط وأنشئ التقرير مرة واحدة، وبعدها أضف Template للتجهيز التلقائي.'
+              : 'Published successfully. Create your report once, then set a template ID for auto-ready reports.')
+          : (isAr ? 'تم النشر وفتح التقرير التفاعلي.' : 'Published and opened interactive report.'),
+      );
+      window.open(res.reportUrl, '_blank', 'noopener,noreferrer');
+      setPbiStep('done');
+      window.setTimeout(() => setPbiModalOpen(false), 900);
+    } catch (e: unknown) {
+      console.error(e);
+      setPbiStep('error');
+      const message = e instanceof Error ? e.message : String(e);
+      if (message.toLowerCase().includes('401') || message.toLowerCase().includes('not synced')) {
+        setPbiHint(isAr ? 'سجّل دخولك أولًا ثم جرّب Publish مرة أخرى.' : 'Please sign in first, then try Publish again.');
+      } else {
+        setPbiHint(
+          isAr
+            ? `فشل النشر: ${message}`
+            : `Publish failed: ${message}`,
+        );
+      }
+    } finally {
+      setPbiExporting(false);
+    }
+  };
 
   const rawData = useMemo(() => {
     if (!info) return [];
@@ -115,6 +241,7 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
 
   const data = useMemo(() => sampleRowsForCharts(rawData), [rawData]);
   const isSampled = rawData.length > data.length;
+  const allCols = useMemo(() => (info?.columns ?? []).map(c => c.name), [info]);
 
   const numCols = useMemo(
     () => (info?.columns ?? []).filter(c => c.type === 'numeric').map(c => c.name),
@@ -152,6 +279,10 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
   );
   const meta = SMART_CAT_META[cat];
   const dashLayout: SmartDashboardLayout = useMemo(() => getSmartDashboardLayout(cat), [cat]);
+  const columnByName = useMemo(
+    () => new Map((info?.columns ?? []).map(c => [c.name, c])),
+    [info],
+  );
 
   const palette = useMemo(() => CHART.palette, []);
 
@@ -263,6 +394,246 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
     const sorted = [...data].sort((a, b) => (Number(b[col]) || 0) - (Number(a[col]) || 0));
     return { top: sorted.slice(0, 5), bottom: [...sorted.slice(-5)].reverse() };
   }, [data, orderedNumCols]);
+
+  const audienceCards = useMemo(() => {
+    const cols = info?.columns ?? [];
+    const autoName =
+      cols.find(c => /name|influencer|customer|client|user|person|اسم/i.test(c.name))?.name ?? catCols[0] ?? null;
+    const autoFollowers =
+      cols.find(c => c.type === 'numeric' && /follower|fan|audience|reach|sales|amount|value/i.test(c.name))?.name
+      ?? orderedNumCols[0]
+      ?? null;
+    const autoCountry = cols.find(c => /country|region|nation|state|city|بلد|دولة/i.test(c.name))?.name ?? null;
+    const autoAge = cols.find(c => c.type === 'numeric' && /age|عمر/i.test(c.name))?.name ?? null;
+    const autoGender = cols.find(c => /gender|sex|نوع/i.test(c.name))?.name ?? null;
+
+    const pick = (manual: string, fallback: string | null): string | null =>
+      manual && cols.some(c => c.name === manual) ? manual : fallback;
+
+    const nameCol = pick(manualMap.name, autoName);
+    const followersCol = pick(manualMap.followers, autoFollowers);
+    const countryCol = pick(manualMap.country, autoCountry);
+    const ageCol = pick(manualMap.age, autoAge);
+    const genderCol = pick(manualMap.gender, autoGender);
+
+    const reachTop = countryCol ? groupByCount(data, countryCol, 5) : [];
+    const influencerRows = nameCol && followersCol
+      ? [...data]
+          .map(r => ({
+            name: String(r[nameCol] ?? '—'),
+            followers: Number(r[followersCol]) || 0,
+          }))
+          .filter(r => r.name && r.name !== '—')
+          .sort((a, b) => b.followers - a.followers)
+          .slice(0, 6)
+      : [];
+
+    let ageGenderOpt: object | null = null;
+    if (ageCol && genderCol) {
+      const bins = ['15-24', '25-34', '35-44', '45-54', '55+'];
+      const male = new Array(bins.length).fill(0);
+      const female = new Array(bins.length).fill(0);
+      const idx = (age: number) => (age < 25 ? 0 : age < 35 ? 1 : age < 45 ? 2 : age < 55 ? 3 : 4);
+      for (const row of data) {
+        const age = Number(row[ageCol]);
+        if (!Number.isFinite(age)) continue;
+        const g = String(row[genderCol] ?? '').toLowerCase();
+        const i = idx(age);
+        if (g.includes('f')) female[i] += 1;
+        else male[i] += 1;
+      }
+      ageGenderOpt = {
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        legend: { top: 0, textStyle: { color: '#94a3b8', fontSize: 11 } },
+        grid: { left: 28, right: 18, top: 30, bottom: 20, containLabel: true },
+        xAxis: { type: 'value', axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: '#334155' } } },
+        yAxis: { type: 'category', data: bins, axisLabel: { color: '#94a3b8' } },
+        series: [
+          { name: isAr ? 'ذكور' : 'Male', type: 'bar', stack: 'g', data: male.map(v => -v), itemStyle: { color: '#3b82f6' } },
+          { name: isAr ? 'إناث' : 'Female', type: 'bar', stack: 'g', data: female, itemStyle: { color: '#10b981' } },
+        ],
+      };
+    }
+
+    let interestOpt: object | null = null;
+    const interestCols = orderedNumCols.slice(0, 6);
+    if (interestCols.length >= 3 && catCols[0]) {
+      const topCats = groupByCount(data, catCols[0], 3).map(g => g.l);
+      if (topCats.length) {
+        const indicators = interestCols.map(col => ({
+          name: col.length > 10 ? `${col.slice(0, 9)}…` : col,
+          max: Math.max(1, ...data.map(r => Number(r[col]) || 0)),
+        }));
+        const series = topCats.map((catName) => {
+          const rows = data.filter(r => String(r[catCols[0]]) === catName);
+          return {
+            value: interestCols.map(col => Math.round(rows.reduce((s, r) => s + (Number(r[col]) || 0), 0) / (rows.length || 1))),
+            name: catName.length > 12 ? `${catName.slice(0, 11)}…` : catName,
+            lineStyle: { width: 2 },
+          };
+        });
+        interestOpt = {
+          tooltip: {},
+          legend: { bottom: 0, textStyle: { color: '#94a3b8', fontSize: 10 } },
+          radar: {
+            indicator: indicators,
+            splitLine: { lineStyle: { color: '#334155' } },
+            splitArea: { areaStyle: { color: ['rgba(148,163,184,0.03)'] } },
+            axisName: { color: '#94a3b8', fontSize: 10 },
+          },
+          series: [{ type: 'radar', data: series }],
+        };
+      }
+    }
+
+    return { reachTop, countryCol, followersCol, influencerRows, ageGenderOpt, interestOpt };
+  }, [info, data, catCols, orderedNumCols, isAr, manualMap]);
+
+  const mappingWarnings = useMemo(() => {
+    const warnings: string[] = [];
+    const typeOf = (name: string) => columnByName.get(name)?.type;
+    if (manualMap.age && typeOf(manualMap.age) !== 'numeric') {
+      warnings.push(isAr ? 'عمود Age يجب أن يكون رقمي.' : 'Age column should be numeric.');
+    }
+    if (manualMap.followers && typeOf(manualMap.followers) !== 'numeric') {
+      warnings.push(isAr ? 'عمود Followers/Metric يجب أن يكون رقمي.' : 'Followers/Metric column should be numeric.');
+    }
+    if (manualMap.gender && typeOf(manualMap.gender) === 'numeric') {
+      warnings.push(isAr ? 'عمود Gender لا يُفضل أن يكون رقمي.' : 'Gender column should usually be text.');
+    }
+    if (manualMap.country && typeOf(manualMap.country) === 'numeric') {
+      warnings.push(isAr ? 'عمود Country/Region لا يُفضل أن يكون رقمي.' : 'Country/Region column should usually be text.');
+    }
+    return warnings;
+  }, [manualMap, columnByName, isAr]);
+
+  const drillLevels = useMemo(() => catCols.slice(0, 3), [catCols]);
+  const drillData = useMemo(() => {
+    if (!drillLevels.length) return data;
+    return data.filter(row =>
+      drillPath.every((val, i) => String(row[drillLevels[i]] ?? '') === val),
+    );
+  }, [data, drillLevels, drillPath]);
+  const drillOptions = useMemo(() => {
+    const nextCol = drillLevels[drillPath.length];
+    if (!nextCol) return [];
+    return groupByCount(drillData, nextCol, 12);
+  }, [drillLevels, drillPath, drillData]);
+
+  const primaryMetric = orderedNumCols[0] ?? null;
+  const actualTotal = useMemo(
+    () => (primaryMetric ? rawData.reduce((s, r) => s + (Number(r[primaryMetric]) || 0), 0) : 0),
+    [rawData, primaryMetric],
+  );
+  const scenarioTotal = Math.round(actualTotal * (1 + whatIfPct / 100));
+  const varianceToGoal = scenarioTotal - goalTarget;
+  const goalProgress = goalTarget > 0 ? Math.max(0, Math.min(140, Math.round((scenarioTotal / goalTarget) * 100))) : 0;
+
+  const compareStats = useMemo(() => {
+    if (!dateCol || !primaryMetric) return null;
+    const rows = [...rawData]
+      .map(r => ({ d: String(r[dateCol] ?? '').slice(0, 10), v: Number(r[primaryMetric]) || 0 }))
+      .filter(r => !!r.d)
+      .sort((a, b) => a.d.localeCompare(b.d));
+    if (rows.length < 4) return null;
+    const split = Math.floor(rows.length / 2);
+    const prev = rows.slice(0, split).reduce((s, r) => s + r.v, 0);
+    const curr = rows.slice(split).reduce((s, r) => s + r.v, 0);
+    const deltaPct = prev ? Math.round(((curr - prev) / prev) * 1000) / 10 : 0;
+    return { prev, curr, deltaPct };
+  }, [rawData, dateCol, primaryMetric]);
+
+  const forecastOpt = useMemo(() => {
+    if (!dateCol || !primaryMetric) return null;
+    const points = [...rawData]
+      .map(r => ({ x: String(r[dateCol] ?? '').slice(0, 10), y: Number(r[primaryMetric]) || 0 }))
+      .filter(p => p.x)
+      .sort((a, b) => a.x.localeCompare(b.x))
+      .slice(-24);
+    if (points.length < 6) return null;
+    const y = points.map(p => p.y);
+    const x = y.map((_, i) => i + 1);
+    const n = x.length;
+    const sx = x.reduce((a, b) => a + b, 0);
+    const sy = y.reduce((a, b) => a + b, 0);
+    const sxy = x.reduce((a, v, i) => a + v * y[i], 0);
+    const sx2 = x.reduce((a, v) => a + v * v, 0);
+    const slope = (n * sxy - sx * sy) / Math.max(1, n * sx2 - sx * sx);
+    const intercept = sy / n - slope * (sx / n);
+    const resid = y.map((v, i) => v - (intercept + slope * (i + 1)));
+    const std = Math.sqrt(resid.reduce((a, v) => a + v * v, 0) / Math.max(1, resid.length));
+    const forecast = Array.from({ length: 6 }, (_, i) => {
+      const idx = n + i + 1;
+      const pred = intercept + slope * idx;
+      return { m: `+${i + 1}m`, p: Math.round(pred), low: Math.round(pred - 1.28 * std), high: Math.round(pred + 1.28 * std) };
+    });
+    return {
+      tooltip: { trigger: 'axis' },
+      legend: { textStyle: { color: '#94a3b8', fontSize: 10 } },
+      xAxis: { type: 'category', data: [...points.slice(-6).map(p => p.x), ...forecast.map(f => f.m)], axisLabel: { color: '#94a3b8' } },
+      yAxis: { type: 'value', axisLabel: { color: '#94a3b8' } },
+      series: [
+        { name: isAr ? 'Actual' : 'Actual', type: 'line', data: [...points.slice(-6).map(p => Math.round(p.y)), ...Array(6).fill(null)], smooth: true },
+        { name: isAr ? 'Forecast' : 'Forecast', type: 'line', data: [...Array(6).fill(null), ...forecast.map(f => f.p)], smooth: true, lineStyle: { type: 'dashed' } },
+        { name: 'Low', type: 'line', data: [...Array(6).fill(null), ...forecast.map(f => f.low)], lineStyle: { opacity: 0 }, stack: 'ci', areaStyle: { color: 'rgba(59,130,246,0.08)' } },
+        { name: 'High', type: 'line', data: [...Array(6).fill(null), ...forecast.map(f => f.high - f.low)], lineStyle: { opacity: 0 }, stack: 'ci', areaStyle: { color: 'rgba(59,130,246,0.12)' } },
+      ],
+    };
+  }, [rawData, dateCol, primaryMetric, isAr]);
+
+  const smartAlerts = useMemo(() => {
+    const alerts: Array<{ level: 'warn' | 'ok'; text: string }> = [];
+    if (compareStats && compareStats.deltaPct < -12) alerts.push({ level: 'warn', text: isAr ? `انخفاض ${Math.abs(compareStats.deltaPct)}% مقارنة بالفترة السابقة` : `Drop of ${Math.abs(compareStats.deltaPct)}% vs previous period` });
+    if (compareStats && compareStats.deltaPct > 20) alerts.push({ level: 'warn', text: isAr ? `Spike مرتفع +${compareStats.deltaPct}%` : `High spike +${compareStats.deltaPct}%` });
+    if (goalProgress < 85) alerts.push({ level: 'warn', text: isAr ? 'أقل من الهدف الحالي' : 'Below current goal target' });
+    if (alerts.length === 0) alerts.push({ level: 'ok', text: isAr ? 'لا توجد تنبيهات حرجة' : 'No critical alerts detected' });
+    return alerts.slice(0, 3);
+  }, [compareStats, goalProgress, isAr]);
+
+  const topDrivers = useMemo(() => {
+    if (!primaryMetric) return [];
+    const y = data.map(r => Number(r[primaryMetric]) || 0);
+    const corr = (a: number[], b: number[]) => {
+      const n = a.length || 1;
+      const ma = a.reduce((s, v) => s + v, 0) / n;
+      const mb = b.reduce((s, v) => s + v, 0) / n;
+      const num = a.reduce((s, v, i) => s + (v - ma) * (b[i] - mb), 0);
+      const da = Math.sqrt(a.reduce((s, v) => s + (v - ma) ** 2, 0));
+      const db = Math.sqrt(b.reduce((s, v) => s + (v - mb) ** 2, 0));
+      return da && db ? num / (da * db) : 0;
+    };
+    return numCols
+      .filter(c => c !== primaryMetric)
+      .map(c => ({ col: c, score: Math.abs(corr(data.map(r => Number(r[c]) || 0), y)) }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+  }, [data, numCols, primaryMetric]);
+
+  const segmentMatrix = useMemo(() => {
+    if (!catCols[0] || !catCols[1] || !primaryMetric) return null;
+    const rVals = [...new Set(data.map(r => String(r[catCols[0]] ?? '—')))].slice(0, 6);
+    const cVals = [...new Set(data.map(r => String(r[catCols[1]] ?? '—')))].slice(0, 6);
+    const grid = rVals.map(rn =>
+      cVals.map(cn =>
+        Math.round(
+          data
+            .filter(r => String(r[catCols[0]] ?? '—') === rn && String(r[catCols[1]] ?? '—') === cn)
+            .reduce((s, r) => s + (Number(r[primaryMetric]) || 0), 0),
+        ),
+      ),
+    );
+    return { rows: rVals, cols: cVals, grid };
+  }, [data, catCols, primaryMetric]);
+
+  const autoNarrative = useMemo(() => {
+    const bullets: string[] = [];
+    if (compareStats) bullets.push(compareStats.deltaPct >= 0 ? `${isAr ? 'نمو' : 'Growth'} +${compareStats.deltaPct}%` : `${isAr ? 'انخفاض' : 'Decline'} ${compareStats.deltaPct}%`);
+    if (topDrivers[0]) bullets.push(`${isAr ? 'أقوى مؤثر' : 'Top driver'}: ${topDrivers[0].col} (${Math.round(topDrivers[0].score * 100)}%)`);
+    if (audienceCards.reachTop[0]) bullets.push(`${isAr ? 'أعلى منطقة' : 'Top region'}: ${audienceCards.reachTop[0].l}`);
+    if (goalProgress) bullets.push(`${isAr ? 'تقدم الهدف' : 'Goal progress'}: ${goalProgress}%`);
+    if (smartAlerts[0]) bullets.push(smartAlerts[0].text);
+    return bullets.slice(0, 5);
+  }, [compareStats, topDrivers, audienceCards.reachTop, goalProgress, smartAlerts, isAr]);
 
   // Missing data per column
   const missingCols = useMemo(() =>
@@ -523,6 +894,90 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
     orderedNumCols, catCols, isAr,
   ]);
 
+  const saveCurrentView = () => {
+    const name = (typeof window !== 'undefined' ? window.prompt(isAr ? 'اسم الـ Preset' : 'Preset name') : null) || '';
+    if (!name.trim()) return;
+    const payload = {
+      activeFilters,
+      crossFilters,
+      manualMap,
+      drillPath,
+      whatIfPct,
+      goalTarget,
+    };
+    const id = `${Date.now()}`;
+    setSavedViews(prev => [{ id, name: name.trim(), data: payload }, ...prev].slice(0, 12));
+    setSelectedPreset(id);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('kimit_last_view_id', id);
+    }
+  };
+
+  const applySavedView = (id: string) => {
+    const found = savedViews.find(v => v.id === id);
+    if (!found) return;
+    const payload = found.data as {
+      activeFilters?: Record<string, string>;
+      crossFilters?: Record<string, string>;
+      manualMap?: typeof manualMap;
+      drillPath?: string[];
+      whatIfPct?: number;
+      goalTarget?: number;
+    };
+    Object.entries(payload.activeFilters || {}).forEach(([k, v]) => setFilter(k, v));
+    Object.entries(payload.crossFilters || {}).forEach(([k, v]) => setCrossFilter(k, v));
+    if (payload.manualMap) setManualMap(payload.manualMap);
+    setDrillPath(payload.drillPath || []);
+    setWhatIfPct(payload.whatIfPct || 0);
+    setGoalTarget(payload.goalTarget || 100);
+    setSelectedPreset(id);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('kimit_last_view_id', id);
+    }
+  };
+
+  const deleteSavedView = () => {
+    if (!selectedPreset) return;
+    setSavedViews(prev => prev.filter(v => v.id !== selectedPreset));
+    if (typeof localStorage !== 'undefined') {
+      const lastId = localStorage.getItem('kimit_last_view_id');
+      if (lastId === selectedPreset) {
+        localStorage.removeItem('kimit_last_view_id');
+      }
+    }
+    setSelectedPreset('');
+  };
+
+  useEffect(() => {
+    if (presetBootstrapped) return;
+    setPresetBootstrapped(true);
+    if (typeof localStorage === 'undefined') return;
+    const lastId = localStorage.getItem('kimit_last_view_id');
+    if (lastId && savedViews.some(v => v.id === lastId)) {
+      applySavedView(lastId);
+    }
+  }, [savedViews, presetBootstrapped]);
+
+  const handleChartDrill = (params: { name?: string; value?: unknown }) => {
+    const nextCol = drillLevels[drillPath.length];
+    if (!nextCol || drillPath.length >= drillLevels.length) return;
+    const byName = typeof params?.name === 'string' ? params.name.trim() : '';
+    const byValueArray = Array.isArray(params?.value) ? String(params.value[0] ?? '').trim() : '';
+    const byValue = typeof params?.value === 'string' || typeof params?.value === 'number' ? String(params.value).trim() : '';
+    const nextValue = byName || byValueArray || byValue;
+    if (!nextValue) return;
+    const exists = drillData.some(r => String(r[nextCol] ?? '') === nextValue);
+    if (!exists) return;
+    setDrillPath(prev => [...prev, nextValue]);
+  };
+
+  const chartEvents = useMemo(
+    () => ({
+      click: (params: { name?: string; value?: unknown }) => handleChartDrill(params),
+    }),
+    [drillLevels, drillPath, drillData],
+  );
+
   if (!info || rawData.length === 0) {
     return (
       <div className="sd2-page sd2-empty" data-cat="general">
@@ -565,6 +1020,20 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
           </div>
         </div>
         <div className="sd2-header-actions">
+          <div className="sd2-user-card" title={user?.email ?? userDisplayName}>
+            <div className="sd2-user-avatar-wrap">
+              {user?.photoURL ? (
+                <img src={user.photoURL} alt={userDisplayName} className="sd2-user-avatar" referrerPolicy="no-referrer" />
+              ) : (
+                <span className="sd2-user-fallback">{userInitial}</span>
+              )}
+              <span className="sd2-user-status-dot" />
+            </div>
+            <div className="sd2-user-meta">
+              <div className="sd2-user-name">{userDisplayName}</div>
+              <div className="sd2-user-email">{userEmail}</div>
+            </div>
+          </div>
           <button
             type="button"
             className="sd2-icon-btn sd2-theme-btn"
@@ -578,6 +1047,15 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
           <button type="button" className="sd2-icon-btn" onClick={() => setRefreshKey(k => k + 1)} aria-label="Refresh">
             <RefreshCw size={14} />
           </button>
+          <label className="sd2-icon-btn sd2-brand-upload-btn" title={isAr ? 'رفع شعار البراند' : 'Upload brand logo'}>
+            {isAr ? 'شعار البراند' : 'Brand Logo'}
+            <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={handleBrandLogoUpload} hidden />
+          </label>
+          {brandLogoDataUrl && (
+            <button type="button" className="sd2-icon-btn" onClick={clearBrandLogo}>
+              {isAr ? 'حذف الشعار' : 'Remove Logo'}
+            </button>
+          )}
           <button
             type="button"
             className="sd2-export-btn sd2-export-btn--pbi"
@@ -587,21 +1065,10 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
                 ? 'نشر مباشر إلى Power BI مع تقرير تفاعلي'
                 : 'Direct publish to Power BI with interactive report'
             }
-            onClick={async () => {
-              setPbiExporting(true);
-              try {
-                const res = await datasetsApi.publishPowerBI({
-                  datasetName: info.filename.replace(/\.[^.]+$/, '') || info.filename,
-                  rows: rawData.map(r => ({ ...r })),
-                  columns: info.columns.map(c => ({ name: c.name, type: c.type })),
-                });
-                window.open(res.reportUrl, '_blank', 'noopener,noreferrer');
-              } catch (e) {
-                console.error(e);
-                alert(isAr ? 'فشل النشر إلى Power BI. تأكد من تسجيل الدخول وإعداد مفاتيح السيرفر.' : 'Power BI publish failed. Ensure login and backend Power BI env settings.');
-              } finally {
-                setPbiExporting(false);
-              }
+            onClick={() => {
+              setPbiStep('idle');
+              setPbiHint(null);
+              setPbiModalOpen(true);
             }}
           >
             <BarChart2 size={14} />
@@ -613,6 +1080,7 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
                 ? 'نشر إلى Power BI'
                 : 'Publish to Power BI'}
           </button>
+          {pbiHint && <div className="sd2-pbi-hint">{pbiHint}</div>}
           <button
             type="button"
             className="sd2-export-btn"
@@ -642,6 +1110,13 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
                 })),
                 theme: chartTheme,
                 isAr,
+                sheetTypeLabel: isAr ? meta.labelAr : meta.label,
+                brandLogoDataUrl,
+                user: {
+                  name: userDisplayName,
+                  email: user?.email ?? '',
+                  photoURL: user?.photoURL ?? '',
+                },
               })
             }
           >
@@ -649,6 +1124,79 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
           </button>
         </div>
       </header>
+
+      {pbiModalOpen && (
+        <div className="sd2-pbi-modal-backdrop" onClick={() => !pbiExporting && setPbiModalOpen(false)}>
+          <div className="sd2-pbi-modal" onClick={e => e.stopPropagation()}>
+            <div className="sd2-pbi-modal-head">
+              <h3>{isAr ? 'نشر إلى Power BI' : 'Publish to Power BI'}</h3>
+              <button
+                type="button"
+                className="sd2-pbi-close"
+                onClick={() => !pbiExporting && setPbiModalOpen(false)}
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="sd2-pbi-steps">
+              <span className={pbiStep === 'checking' || pbiStep === 'publishing' || pbiStep === 'opening' || pbiStep === 'done' ? 'on' : ''}>1. {isAr ? 'Checking' : 'Checking'}</span>
+              <span className={pbiStep === 'publishing' || pbiStep === 'opening' || pbiStep === 'done' ? 'on' : ''}>2. {isAr ? 'Publishing' : 'Publishing'}</span>
+              <span className={pbiStep === 'opening' || pbiStep === 'done' ? 'on' : ''}>3. {isAr ? 'Opening report' : 'Opening report'}</span>
+            </div>
+
+            <div className="sd2-pbi-progress">
+              <div
+                className="sd2-pbi-progress-bar"
+                style={{
+                  width:
+                    pbiStep === 'idle' ? '0%' :
+                      pbiStep === 'checking' ? '24%' :
+                        pbiStep === 'publishing' ? '66%' :
+                          pbiStep === 'opening' ? '90%' : '100%',
+                }}
+              />
+            </div>
+
+            {!user && (
+              <div className="sd2-pbi-login-note">
+                {isAr ? 'يجب تسجيل الدخول أولًا قبل النشر إلى Power BI.' : 'You need to sign in before publishing to Power BI.'}
+              </div>
+            )}
+
+            {pbiHint && <div className="sd2-pbi-hint sd2-pbi-hint--modal">{pbiHint}</div>}
+
+            <div className="sd2-pbi-modal-actions">
+              {!user ? (
+                <button
+                  type="button"
+                  className="sd2-export-btn sd2-export-btn--pbi"
+                  onClick={() => window.dispatchEvent(new CustomEvent('kimit:open-login'))}
+                >
+                  {isAr ? 'Sign in' : 'Sign in'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="sd2-export-btn sd2-export-btn--pbi"
+                  disabled={pbiExporting}
+                  onClick={publishToPowerBI}
+                >
+                  {pbiExporting ? (isAr ? 'جاري النشر…' : 'Publishing…') : (isAr ? 'Publish now' : 'Publish now')}
+                </button>
+              )}
+              <button
+                type="button"
+                className="sd2-icon-btn"
+                onClick={() => !pbiExporting && setPbiModalOpen(false)}
+              >
+                {isAr ? 'إغلاق' : 'Close'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="sd2-body">
 
@@ -691,6 +1239,254 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
           ))}
         </div>
 
+        <div className="sd2-card sd2-mapping-card">
+          <div className="sd2-card-head">
+            <div className="sd2-card-title">{isAr ? 'تخصيص مطابقة الأعمدة' : 'Manual Column Mapping'}</div>
+            <div className="sd2-card-sub">
+              {isAr ? 'اختر الأعمدة يدويًا بدل الاكتشاف التلقائي.' : 'Pick columns manually instead of auto-detection.'}
+            </div>
+          </div>
+          <div className="sd2-mapping-grid">
+            {[
+              { key: 'country', label: isAr ? 'Country/Region' : 'Country/Region' },
+              { key: 'name', label: isAr ? 'Name' : 'Name' },
+              { key: 'followers', label: isAr ? 'Followers/Metric' : 'Followers/Metric' },
+              { key: 'age', label: isAr ? 'Age' : 'Age' },
+              { key: 'gender', label: isAr ? 'Gender' : 'Gender' },
+            ].map(item => (
+              <label key={item.key} className="sd2-mapping-field">
+                <span>{item.label}</span>
+                <select
+                  value={manualMap[item.key as keyof typeof manualMap]}
+                  onChange={e => {
+                    const next = { ...manualMap, [item.key]: e.target.value };
+                    setManualMap(next);
+                    if (typeof localStorage !== 'undefined') {
+                      localStorage.setItem('kimit_dashboard_manual_map', JSON.stringify(next));
+                    }
+                  }}
+                >
+                  <option value="">{isAr ? 'Auto' : 'Auto'}</option>
+                  {allCols.map(col => (
+                    <option key={col} value={col}>{col}</option>
+                  ))}
+                </select>
+              </label>
+            ))}
+            <button
+              type="button"
+              className="sd2-icon-btn"
+              onClick={() => {
+                const cleared = { country: '', name: '', followers: '', age: '', gender: '' };
+                setManualMap(cleared);
+                if (typeof localStorage !== 'undefined') {
+                  localStorage.setItem('kimit_dashboard_manual_map', JSON.stringify(cleared));
+                }
+              }}
+            >
+              {isAr ? 'إعادة للوضع التلقائي' : 'Reset to Auto'}
+            </button>
+          </div>
+          {mappingWarnings.length > 0 && (
+            <div className="sd2-mapping-warnings">
+              {mappingWarnings.map((w, i) => (
+                <div key={i} className="sd2-mapping-warning">⚠ {w}</div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="sd2-advanced-grid">
+          <div className="sd2-card">
+            <div className="sd2-card-head">
+              <div className="sd2-card-title">Drill-down hierarchy</div>
+              <div className="sd2-card-sub">{drillLevels.join(' → ') || (isAr ? 'لا توجد أعمدة فئات كافية' : 'No enough category columns')}</div>
+            </div>
+            <div className="sd2-breadcrumbs">
+              {drillPath.map((p, i) => (
+                <button key={`${p}-${i}`} type="button" className="sd2-chip" onClick={() => setDrillPath(drillPath.slice(0, i + 1))}>{p}</button>
+              ))}
+              {drillPath.length > 0 && <button type="button" className="sd2-chip" onClick={() => setDrillPath([])}>{isAr ? 'إعادة' : 'Reset'}</button>}
+            </div>
+            <div className="sd2-mini-list">
+              {drillOptions.map((row, idx) => (
+                <button
+                  key={`${row.l}-${idx}`}
+                  type="button"
+                  className="sd2-mini-row sd2-mini-row-btn"
+                  onClick={() => drillPath.length < drillLevels.length - 1 && setDrillPath([...drillPath, row.l])}
+                >
+                  <span>{row.l}</span><strong>{fmt(row.v)}</strong>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="sd2-card">
+            <div className="sd2-card-head">
+              <div className="sd2-card-title">What-if slider</div>
+              <div className="sd2-card-sub">{isAr ? 'تأثير السعر/الخصم/الميزانية' : 'Price/discount/budget impact'}</div>
+            </div>
+            <input type="range" min={-30} max={30} value={whatIfPct} onChange={e => setWhatIfPct(Number(e.target.value))} />
+            <div className="sd2-kv"><span>{isAr ? 'التغيير' : 'Change'}</span><strong>{whatIfPct > 0 ? '+' : ''}{whatIfPct}%</strong></div>
+            <div className="sd2-kv"><span>{isAr ? 'الحالي' : 'Current'}</span><strong>{fmt(actualTotal)}</strong></div>
+            <div className="sd2-kv"><span>{isAr ? 'السيناريو' : 'Scenario'}</span><strong>{fmt(scenarioTotal)}</strong></div>
+          </div>
+
+          <div className="sd2-card">
+            <div className="sd2-card-head">
+              <div className="sd2-card-title">Goal tracking cards</div>
+            </div>
+            <div className="sd2-kv"><span>Target</span><input type="number" value={goalTarget} onChange={e => setGoalTarget(Number(e.target.value) || 0)} /></div>
+            <div className="sd2-kv"><span>Actual</span><strong>{fmt(scenarioTotal)}</strong></div>
+            <div className="sd2-kv"><span>Variance</span><strong>{varianceToGoal >= 0 ? '+' : ''}{fmt(varianceToGoal)}</strong></div>
+            <div className="sd2-progress"><div style={{ width: `${Math.min(100, goalProgress)}%` }} /></div>
+          </div>
+
+          <div className="sd2-card">
+            <div className="sd2-card-head">
+              <div className="sd2-card-title">Compare mode</div>
+            </div>
+            {compareStats ? (
+              <>
+                <div className="sd2-kv"><span>This period</span><strong>{fmt(compareStats.curr)}</strong></div>
+                <div className="sd2-kv"><span>Previous</span><strong>{fmt(compareStats.prev)}</strong></div>
+                <div className="sd2-kv"><span>Delta</span><strong>{compareStats.deltaPct > 0 ? '+' : ''}{compareStats.deltaPct}%</strong></div>
+              </>
+            ) : <div className="sd2-empty-mini">{isAr ? 'يتطلب عمود تاريخ + KPI' : 'Needs date + KPI column'}</div>}
+          </div>
+        </div>
+
+        <div className="sd2-advanced-grid">
+          <div className="sd2-card">
+            <div className="sd2-card-head"><div className="sd2-card-title">Forecast panel (3-6M)</div></div>
+            {forecastOpt ? <ReactECharts option={forecastOpt} style={{ height: 250 }} /> : <div className="sd2-empty-mini">{isAr ? 'بيانات التاريخ غير كافية للتوقع' : 'Not enough time series data'}</div>}
+          </div>
+
+          <div className="sd2-card">
+            <div className="sd2-card-head"><div className="sd2-card-title">Smart alerts</div></div>
+            <div className="sd2-mini-list">
+              {smartAlerts.map((a, i) => <div key={i} className={`sd2-alert ${a.level}`}>{a.text}</div>)}
+            </div>
+          </div>
+
+          <div className="sd2-card">
+            <div className="sd2-card-head"><div className="sd2-card-title">Top drivers (Explain KPI)</div></div>
+            <div className="sd2-mini-list">
+              {topDrivers.map((d, i) => (
+                <div key={`${d.col}-${i}`} className="sd2-mini-row"><span>{d.col}</span><strong>{Math.round(d.score * 100)}%</strong></div>
+              ))}
+            </div>
+          </div>
+
+          <div className="sd2-card">
+            <div className="sd2-card-head"><div className="sd2-card-title">Saved views</div></div>
+            <div className="sd2-kv">
+              <select value={selectedPreset} onChange={e => applySavedView(e.target.value)}>
+                <option value="">{isAr ? 'اختر Preset' : 'Pick preset'}</option>
+                {savedViews.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+              <button type="button" className="sd2-icon-btn" onClick={saveCurrentView}>{isAr ? 'حفظ' : 'Save'}</button>
+              <button type="button" className="sd2-icon-btn" onClick={deleteSavedView} disabled={!selectedPreset}>
+                {isAr ? 'حذف' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="sd2-advanced-grid">
+          <div className="sd2-card">
+            <div className="sd2-card-head"><div className="sd2-card-title">Segment matrix</div></div>
+            {segmentMatrix ? (
+              <div className="sd2-segment-grid">
+                <div className="sd2-segment-row sd2-segment-head">
+                  <span />
+                  {segmentMatrix.cols.map(c => <span key={c}>{c}</span>)}
+                </div>
+                {segmentMatrix.rows.map((r, ri) => (
+                  <div key={r} className="sd2-segment-row">
+                    <span>{r}</span>
+                    {segmentMatrix.grid[ri].map((v, ci) => (
+                      <span key={`${ri}-${ci}`} style={{ background: `rgba(59,130,246,${Math.min(0.9, Math.max(0.08, v / Math.max(1, scenarioTotal)))})` }}>{fmt(v)}</span>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            ) : <div className="sd2-empty-mini">{isAr ? 'يتطلب عمودين فئات + KPI' : 'Needs 2 category cols + KPI'}</div>}
+          </div>
+
+          <div className="sd2-card">
+            <div className="sd2-card-head"><div className="sd2-card-title">Auto narrative</div></div>
+            <ul className="sd2-narrative">
+              {autoNarrative.map((n, i) => <li key={i}>{n}</li>)}
+            </ul>
+          </div>
+        </div>
+
+        <div className="sd2-showcase-grid">
+          <div className="sd2-card">
+            <div className="sd2-card-head">
+              <div className="sd2-card-title">{isAr ? 'Campaign Reach' : 'Campaign Reach'}</div>
+              <div className="sd2-card-sub">
+                {audienceCards.countryCol
+                  ? `${audienceCards.reachTop.length} ${isAr ? 'مناطق' : 'regions'}`
+                  : (isAr ? 'غير متاح' : 'Not available')}
+              </div>
+            </div>
+            {audienceCards.reachTop.length > 0 ? (
+              <div className="sd2-mini-list">
+                {audienceCards.reachTop.map((r, i) => (
+                  <div key={`${r.l}-${i}`} className="sd2-mini-row">
+                    <span>{r.l}</span>
+                    <strong>{r.v.toLocaleString()}</strong>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="sd2-empty-mini">{isAr ? 'أضف عمود بلد/منطقة لعرض Reach' : 'Add a country/region column to show reach.'}</div>
+            )}
+          </div>
+
+          <div className="sd2-card sd2-table-card">
+            <div className="sd2-card-head-row">
+              <div className="sd2-card-title">{isAr ? 'Influencer' : 'Influencer'}</div>
+            </div>
+            {audienceCards.influencerRows.length > 0 ? (
+              <table className="sd2-rank-table">
+                <thead>
+                  <tr>
+                    <th>{isAr ? 'الاسم' : 'Name'}</th>
+                    <th className="sd2-rank-val">{audienceCards.followersCol ?? (isAr ? 'المتابعون' : 'Followers')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {audienceCards.influencerRows.map((r, i) => (
+                    <tr key={`${r.name}-${i}`}>
+                      <td>{r.name}</td>
+                      <td className="sd2-rank-val">{fmt(r.followers)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="sd2-empty-mini">{isAr ? 'لا توجد بيانات أسماء/متابعين كافية' : 'No enough name/follower fields detected.'}</div>
+            )}
+          </div>
+
+          <div className="sd2-card">
+            <div className="sd2-card-head">
+              <div className="sd2-card-title">{isAr ? 'Audience Age & Gender' : 'Audience Age & Gender'}</div>
+            </div>
+            {audienceCards.ageGenderOpt ? (
+              <ReactECharts option={audienceCards.ageGenderOpt} style={{ height: 250 }} />
+            ) : audienceCards.interestOpt ? (
+              <ReactECharts option={audienceCards.interestOpt} style={{ height: 250 }} />
+            ) : (
+              <div className="sd2-empty-mini">{isAr ? 'بيانات العمر/النوع غير متاحة' : 'Age/Gender data is not available.'}</div>
+            )}
+          </div>
+        </div>
+
         {coreCharts.length > 0 && (
           <div className="sd2-charts-grid">
             {coreCharts.map(slot => (
@@ -703,6 +1499,7 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
                 <ReactECharts
                   key={`${slot.id}-${refreshKey}-${chartTheme}`}
                   option={slot.option}
+                  onEvents={chartEvents}
                   style={{ height: slot.tall ? 300 : 260 }}
                 />
               </ChartCard>
