@@ -15,6 +15,7 @@ from app.services.chat_service import chat_service
 from app.services.user_service import user_service
 from app.services.sheets_service import sheets_service
 from app.services.credit_service import credit_service
+from app.services.powerbi_service import powerbi_service
 
 router = APIRouter(prefix="/api", tags=["Datasets"])
 
@@ -169,3 +170,33 @@ async def export_data(
             headers={"Content-Disposition": f"attachment; filename={name}_cleaned.json"},
         )
     raise HTTPException(status_code=400, detail="Unsupported format. Use 'csv' or 'json'.")
+
+
+@router.post("/powerbi/publish")
+async def publish_to_powerbi(
+    request: dict,
+    claims: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _ = await _resolve_user(claims, db)
+    dataset_name = (request.get("datasetName") or "Kimit Dataset").strip()
+    rows = request.get("rows") or []
+    columns = request.get("columns") or []
+
+    if not rows:
+        raise HTTPException(status_code=400, detail="No rows provided.")
+    if not columns:
+        # Best-effort fallback
+        columns = [{"name": k, "type": "text"} for k in rows[0].keys()]
+
+    result = await powerbi_service.publish_rows(
+        dataset_name=dataset_name,
+        columns=columns,
+        rows=rows,
+    )
+    return {
+        "ok": True,
+        "datasetId": result.dataset_id,
+        "reportId": result.report_id,
+        "reportUrl": result.report_url,
+    }

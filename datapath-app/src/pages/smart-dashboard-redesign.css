@@ -186,6 +186,25 @@
   filter: brightness(1.05);
 }
 
+.sd2-export-btn--pbi {
+  background: linear-gradient(135deg, #f2c811, #d4af37);
+  color: #1a1a1a;
+  box-shadow: 0 4px 14px rgba(242, 200, 17, 0.35);
+}
+
+.sd2-export-btn--pbi:disabled {
+  opacity: 0.65;
+  cursor: wait;
+  transform: none;
+}
+
+.sd2-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .sd2-body {
   padding: 24px 28px 0;
   max-width: 1320px;

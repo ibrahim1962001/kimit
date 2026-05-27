@@ -49,6 +49,14 @@ class Settings(BaseSettings):
     MINIO_SECURE: bool = False
     MINIO_BUCKET_NAME: str = "datasets"
 
+    # Power BI (Service Principal)
+    POWERBI_ENABLED: bool = False
+    POWERBI_TENANT_ID: str = ""
+    POWERBI_CLIENT_ID: str = ""
+    POWERBI_CLIENT_SECRET: str = ""
+    POWERBI_WORKSPACE_ID: str = ""
+    POWERBI_REPORT_TEMPLATE_ID: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

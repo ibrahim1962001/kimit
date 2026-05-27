@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { useKimitData } from '../hooks/useKimitData';
 import { exportSmartDashboardBundle } from '../lib/smartDashboardHtmlExport';
+import { datasetsApi } from '../api/datasets.api';
 import {
   barOpt,
   CHART,
@@ -29,7 +30,7 @@ import {
   SMART_CAT_META,
   type SmartDashboardLayout,
 } from '../lib/smartDashboardUtils';
-import { ArrowLeft, Download, RefreshCw, LayoutDashboard, Filter, X, Sun, Moon } from 'lucide-react';
+import { ArrowLeft, Download, RefreshCw, LayoutDashboard, Filter, X, Sun, Moon, BarChart2 } from 'lucide-react';
 import './smart-dashboard-redesign.css';
 
 interface Props { onBack: () => void; }
@@ -90,6 +91,7 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
     clearFilters,
   } = useKimitData();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [pbiExporting, setPbiExporting] = useState(false);
   const [chartTheme, setChartTheme] = useState<ChartThemeMode>(() => {
     if (typeof localStorage === 'undefined') return 'light';
     return localStorage.getItem('kimit_sd_theme') === 'dark' ? 'dark' : 'light';
@@ -575,6 +577,41 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
           </button>
           <button type="button" className="sd2-icon-btn" onClick={() => setRefreshKey(k => k + 1)} aria-label="Refresh">
             <RefreshCw size={14} />
+          </button>
+          <button
+            type="button"
+            className="sd2-export-btn sd2-export-btn--pbi"
+            disabled={pbiExporting}
+            title={
+              isAr
+                ? 'نشر مباشر إلى Power BI مع تقرير تفاعلي'
+                : 'Direct publish to Power BI with interactive report'
+            }
+            onClick={async () => {
+              setPbiExporting(true);
+              try {
+                const res = await datasetsApi.publishPowerBI({
+                  datasetName: info.filename.replace(/\.[^.]+$/, '') || info.filename,
+                  rows: rawData.map(r => ({ ...r })),
+                  columns: info.columns.map(c => ({ name: c.name, type: c.type })),
+                });
+                window.open(res.reportUrl, '_blank', 'noopener,noreferrer');
+              } catch (e) {
+                console.error(e);
+                alert(isAr ? 'فشل النشر إلى Power BI. تأكد من تسجيل الدخول وإعداد مفاتيح السيرفر.' : 'Power BI publish failed. Ensure login and backend Power BI env settings.');
+              } finally {
+                setPbiExporting(false);
+              }
+            }}
+          >
+            <BarChart2 size={14} />
+            {pbiExporting
+              ? isAr
+                ? 'جاري النشر…'
+                : 'Publishing…'
+              : isAr
+                ? 'نشر إلى Power BI'
+                : 'Publish to Power BI'}
           </button>
           <button
             type="button"

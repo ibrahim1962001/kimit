@@ -90,4 +90,13 @@ export const datasetsApi = {
     link.click();
     link.remove();
   },
+
+  publishPowerBI: async (payload: {
+    datasetName: string;
+    rows: Array<Record<string, unknown>>;
+    columns: Array<{ name: string; type?: string }>;
+  }): Promise<{ ok: boolean; datasetId: string; reportId?: string; reportUrl: string }> => {
+    const { data } = await apiClient.post("/api/powerbi/publish", payload);
+    return data;
+  },
 };
