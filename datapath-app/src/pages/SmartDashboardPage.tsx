@@ -895,6 +895,116 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
     orderedNumCols, catCols, isAr,
   ]);
 
+  const extraCharts = useMemo(() => {
+    type Slot = { id: string; title: string; subtitle: string; option: object; tall?: boolean };
+    const slots: Slot[] = [];
+    const push = (id: string, title: string, subtitle: string, option: object | null, tall = false) => {
+      if (!option || slots.length >= 6) return;
+      slots.push({ id, title, subtitle, option, tall });
+    };
+
+    const c0 = catCols[0];
+    const c1 = catCols[1];
+    const n0 = numCols[0];
+    const n1 = numCols[1];
+    const n2 = numCols[2];
+
+    // 1) Scatter: first two numeric columns
+    const scatterOpt = n0 && n1 ? {
+      tooltip: { trigger: 'item' },
+      xAxis: { type: 'value', axisLabel: { color: '#94a3b8' } },
+      yAxis: { type: 'value', axisLabel: { color: '#94a3b8' } },
+      series: [{
+        type: 'scatter',
+        symbolSize: 9,
+        data: data.slice(0, 300).map(r => [Number(r[n0]) || 0, Number(r[n1]) || 0]),
+      }],
+    } : null;
+    push('scatter', `🟣 ${isAr ? 'علاقة' : 'Relationship'} ${n0 ?? ''} × ${n1 ?? ''}`, isAr ? 'نقاط الارتباط' : 'Correlation scatter', scatterOpt);
+
+    // 2) Stacked bars by two categories
+    const stackedOpt = c0 && c1 ? (() => {
+      const rows = data.slice(0, 1200);
+      const x = [...new Set(rows.map(r => String(r[c0] ?? '—')))].slice(0, 8);
+      const legends = [...new Set(rows.map(r => String(r[c1] ?? '—')))].slice(0, 4);
+      const series = legends.map(g => ({
+        name: g,
+        type: 'bar',
+        stack: 'total',
+        data: x.map(xx => rows.filter(r => String(r[c0] ?? '—') === xx && String(r[c1] ?? '—') === g).length),
+      }));
+      return {
+        tooltip: { trigger: 'axis' },
+        legend: { textStyle: { color: '#94a3b8', fontSize: 10 } },
+        xAxis: { type: 'category', data: x, axisLabel: { color: '#94a3b8' } },
+        yAxis: { type: 'value', axisLabel: { color: '#94a3b8' } },
+        series,
+      };
+    })() : null;
+    push('stacked', `📚 ${isAr ? 'تقسيم تراكمي' : 'Stacked Segments'}`, isAr ? 'حسب فئتين' : 'By two categories', stackedOpt);
+
+    // 3) Moving average line (simple smoothing)
+    const movingAvgOpt = n0 ? (() => {
+      const vals = data.map(r => Number(r[n0]) || 0);
+      const ma = vals.map((_, i) => {
+        const s = vals.slice(Math.max(0, i - 4), i + 1);
+        return Math.round(s.reduce((a, b) => a + b, 0) / (s.length || 1));
+      });
+      return {
+        tooltip: { trigger: 'axis' },
+        xAxis: { type: 'category', data: vals.map((_, i) => i + 1), axisLabel: { color: '#94a3b8' } },
+        yAxis: { type: 'value', axisLabel: { color: '#94a3b8' } },
+        series: [
+          { name: isAr ? 'القيمة' : 'Value', type: 'line', data: vals.slice(0, 220), smooth: true, lineStyle: { opacity: 0.35 } },
+          { name: isAr ? 'المتوسط المتحرك' : 'Moving Avg', type: 'line', data: ma.slice(0, 220), smooth: true },
+        ],
+      };
+    })() : null;
+    push('moving-average', `〰️ ${isAr ? 'المتوسط المتحرك' : 'Moving Average'}`, n0 ?? '', movingAvgOpt);
+
+    // 4) Waterfall-style variation using top categories
+    const waterfallOpt = c0 && n0 ? (() => {
+      const rows = groupBySum(data, c0, n0, 8);
+      const vals = rows.map(r => Math.round(r.v));
+      return {
+        tooltip: { trigger: 'axis' },
+        xAxis: { type: 'category', data: rows.map(r => r.l), axisLabel: { color: '#94a3b8' } },
+        yAxis: { type: 'value', axisLabel: { color: '#94a3b8' } },
+        series: [{ type: 'bar', data: vals }],
+      };
+    })() : null;
+    push('waterfall-like', `🧱 ${isAr ? 'تباين الفئات' : 'Category Variance'}`, isAr ? 'أفضل 8 فئات' : 'Top 8 categories', waterfallOpt);
+
+    // 5) Multi-line trend of first 3 numeric metrics
+    const multiLineOpt = (n0 && n1) ? {
+      tooltip: { trigger: 'axis' },
+      legend: { textStyle: { color: '#94a3b8', fontSize: 10 } },
+      xAxis: { type: 'category', data: data.slice(0, 140).map((_, i) => i + 1), axisLabel: { color: '#94a3b8' } },
+      yAxis: { type: 'value', axisLabel: { color: '#94a3b8' } },
+      series: [n0, n1, n2].filter(Boolean).map(col => ({
+        name: col,
+        type: 'line',
+        smooth: true,
+        data: data.slice(0, 140).map(r => Number(r[col as string]) || 0),
+      })),
+    } : null;
+    push('multi-line', `📉 ${isAr ? 'اتجاهات متعددة' : 'Multi Trends'}`, isAr ? 'حتى 3 مقاييس' : 'Up to 3 metrics', multiLineOpt);
+
+    // 6) Category frequency bars
+    const frequencyOpt = c0 ? (() => {
+      const rows = groupByCount(data, c0, 12);
+      return {
+        tooltip: { trigger: 'axis' },
+        xAxis: { type: 'category', data: rows.map(r => r.l), axisLabel: { color: '#94a3b8', rotate: 20 } },
+        yAxis: { type: 'value', axisLabel: { color: '#94a3b8' } },
+        series: [{ type: 'bar', data: rows.map(r => r.v) }],
+      };
+    })() : null;
+    push('frequency', `📊 ${isAr ? 'تكرار الفئات' : 'Category Frequency'}`, c0 ?? '', frequencyOpt);
+
+    return slots;
+  }, [data, catCols, numCols, isAr]);
+
   const saveCurrentView = () => {
     const name = (typeof window !== 'undefined' ? window.prompt(isAr ? 'اسم الـ Preset' : 'Preset name') : null) || '';
     if (!name.trim()) return;
@@ -1491,6 +1601,26 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
         {coreCharts.length > 0 && (
           <div className="sd2-charts-grid">
             {coreCharts.map(slot => (
+              <ChartCard
+                key={slot.id}
+                title={slot.title}
+                subtitle={slot.subtitle}
+                className={slot.tall ? 'sd2-chart-card--tall' : ''}
+              >
+                <ReactECharts
+                  key={`${slot.id}-${refreshKey}-${chartTheme}`}
+                  option={slot.option}
+                  onEvents={chartEvents}
+                  style={{ height: slot.tall ? 300 : 260 }}
+                />
+              </ChartCard>
+            ))}
+          </div>
+        )}
+
+        {extraCharts.length > 0 && (
+          <div className="sd2-charts-grid">
+            {extraCharts.map(slot => (
               <ChartCard
                 key={slot.id}
                 title={slot.title}
