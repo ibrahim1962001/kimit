@@ -1214,7 +1214,7 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
                   dupRate: qualityGrade.dupRate,
                   outlierPct: qualityGrade.outlierPct,
                 },
-                charts: coreCharts.map(c => ({
+                charts: [...coreCharts, ...extraCharts].map(c => ({
                   title: c.title,
                   subtitle: c.subtitle,
                   option: c.option,
