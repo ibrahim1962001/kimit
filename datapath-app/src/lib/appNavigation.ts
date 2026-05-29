@@ -48,7 +48,12 @@ export function pathForTab(tab: AppTab): string {
 }
 
 export function navigateToTab(tab: AppTab, replace = false): void {
-  const path = pathForTab(tab);
+  let path = pathForTab(tab);
+  // Preserve the query string for the public shared route so the ?id= survives
+  // the initial route normalization on load.
+  if (tab === 'shared' && window.location.search) {
+    path += window.location.search;
+  }
   if (replace) {
     window.history.replaceState({ tab }, '', path);
   } else {
