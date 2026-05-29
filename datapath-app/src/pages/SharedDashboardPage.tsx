@@ -12,21 +12,26 @@ function readShareId(): string | null {
 export const SharedDashboardPage: React.FC = () => {
   const [doc, setDoc] = useState<SharedDashboardDoc | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'notfound' | 'error'>('loading');
+  const [errDetail, setErrDetail] = useState<string>('');
+  const shareId = readShareId();
 
   useEffect(() => {
-    const id = readShareId();
-    if (!id) { setStatus('notfound'); return; }
+    if (!shareId) { setStatus('notfound'); return; }
     let cancelled = false;
-    getSharedDashboard(id)
+    getSharedDashboard(shareId)
       .then(d => {
         if (cancelled) return;
         if (!d) { setStatus('notfound'); return; }
         setDoc(d);
         setStatus('ready');
       })
-      .catch(() => { if (!cancelled) setStatus('error'); });
+      .catch((e) => {
+        if (cancelled) return;
+        setErrDetail(e instanceof Error ? e.message : String(e));
+        setStatus('error');
+      });
     return () => { cancelled = true; };
-  }, []);
+  }, [shareId]);
 
   const isAr = doc?.isAr ?? false;
   const dark = doc?.theme === 'dark';
@@ -37,31 +42,63 @@ export const SharedDashboardPage: React.FC = () => {
     return { owner, initial };
   }, [doc, isAr]);
 
+  const fullScreen: React.CSSProperties = {
+    minHeight: '100vh',
+    width: '100%',
+    background: '#f1f5f9',
+    color: '#0f172a',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    textAlign: 'center',
+    padding: '24px',
+    gap: '12px',
+  };
+
   if (status === 'loading') {
     return (
-      <div className="exp-dash-overlay" style={{ position: 'static' }}>
-        <div className="exp-dash--overlay-panel" style={{ textAlign: 'center', paddingTop: 80 }}>
-          <Loader2 size={34} className="analyzing-spinner" />
-          <p style={{ marginTop: 14 }}>{isAr ? 'جاري تحميل اللوحة…' : 'Loading dashboard…'}</p>
-        </div>
+      <div style={fullScreen}>
+        <Loader2 size={34} className="analyzing-spinner" color="#0d9488" />
+        <p style={{ fontSize: 15 }}>{isAr ? 'جاري تحميل اللوحة…' : 'Loading dashboard…'}</p>
       </div>
     );
   }
 
   if (status === 'notfound' || status === 'error') {
+    const noId = !shareId;
     return (
-      <div className="exp-dash-overlay" style={{ position: 'static' }}>
-        <div className="exp-dash--overlay-panel" style={{ textAlign: 'center', paddingTop: 80 }}>
-          <AlertTriangle size={40} color="#f59e0b" />
-          <h2 style={{ marginTop: 12 }}>
-            {status === 'notfound'
+      <div style={fullScreen}>
+        <AlertTriangle size={44} color="#f59e0b" />
+        <h2 style={{ margin: 0, fontSize: '1.25rem' }}>
+          {noId
+            ? (isAr ? 'لا يوجد رابط لوحة' : 'No dashboard link')
+            : status === 'notfound'
               ? (isAr ? 'الرابط غير موجود أو منتهي' : 'Dashboard link not found')
               : (isAr ? 'تعذّر تحميل اللوحة' : 'Could not load dashboard')}
-          </h2>
-          <a href="/" className="exp-dash-dl" style={{ marginTop: 16, display: 'inline-flex', textDecoration: 'none' }}>
-            <ArrowLeft size={15} /> {isAr ? 'الذهاب إلى Kimit' : 'Go to Kimit'}
-          </a>
-        </div>
+        </h2>
+        <p style={{ margin: 0, maxWidth: 460, fontSize: 13, color: '#64748b', lineHeight: 1.6 }}>
+          {noId
+            ? (isAr
+                ? 'هذا الرابط لا يحتوي على معرّف لوحة. افتح الرابط الكامل الذي يبدأ بـ /shared?id=…'
+                : 'This link has no dashboard id. Open the full link that starts with /shared?id=…')
+            : status === 'notfound'
+              ? (isAr ? 'تأكد من نسخ الرابط كاملاً.' : 'Make sure the full link was copied.')
+              : (isAr ? 'حدث خطأ أثناء التحميل.' : 'An error occurred while loading.')}
+        </p>
+        {status === 'error' && errDetail && (
+          <code style={{ fontSize: 11, color: '#b91c1c', wordBreak: 'break-all', maxWidth: 460 }}>{errDetail}</code>
+        )}
+        <a
+          href="/"
+          style={{
+            marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6,
+            background: 'linear-gradient(135deg, #0d9488, #2563eb)', color: '#fff',
+            padding: '10px 18px', borderRadius: 10, textDecoration: 'none', fontWeight: 700, fontSize: 13,
+          }}
+        >
+          <ArrowLeft size={15} /> {isAr ? 'الذهاب إلى Kimit' : 'Go to Kimit'}
+        </a>
       </div>
     );
   }
