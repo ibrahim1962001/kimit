@@ -1212,12 +1212,33 @@
 /* Fluid chart grid that adapts to any width (phone, tablet, desktop). */
 .exp-dash-charts.sd2-charts-grid {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
-  gap: 16px;
+  gap: 18px;
   margin-bottom: 20px;
 }
+/* Each chart sits in its own clearly bordered card. */
 .exp-dash-chart-card {
   min-height: 280px;
   min-width: 0;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 16px 16px 10px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+.exp-dash-overlay--dark .exp-dash-chart-card {
+  background: #1e293b;
+  border-color: #334155;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+.exp-dash-chart-card h3 {
+  margin: 0 0 4px;
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+.exp-dash-chart-card .sd2-chart-sub {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  opacity: 0.7;
 }
 .exp-dash-chart-card .echarts-for-react { width: 100% !important; }
 .exp-dash-footer { text-align: center; font-size: 11px; opacity: 0.65; margin-top: 8px; }
