@@ -1018,3 +1018,167 @@
   .sd2-insights { grid-template-columns: 1fr; }
   .sd2-pair { grid-template-columns: 1fr; }
 }
+
+/* ── Exported dashboard full-screen overlay (same chunk as Smart Dashboard) ── */
+.exp-dash-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: #f1f5f9;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.exp-dash-overlay--dark {
+  background: #0f172a;
+  color: #e2e8f0;
+}
+.exp-dash--overlay-panel {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 12px 16px 40px;
+}
+.exp-dash-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 8px 0;
+  background: inherit;
+}
+.exp-dash-toolbar-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.exp-dash-back,
+.exp-dash-dl,
+.exp-dash-icon-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--sd-border, #e2e8f0);
+  background: var(--sd-surface, #fff);
+  color: inherit;
+}
+.exp-dash-dl {
+  background: linear-gradient(135deg, #0d9488, #2563eb);
+  color: #fff;
+  border: none;
+}
+.exp-dash-dl:disabled { opacity: 0.65; cursor: wait; }
+.exp-dash-icon-close {
+  padding: 8px;
+  min-width: 40px;
+  justify-content: center;
+}
+.exp-dash-hint { margin: 0 0 12px; font-size: 13px; color: #0d9488; }
+.exp-dash-hero {
+  background: linear-gradient(135deg, #0d9488, #2563eb);
+  color: #fff;
+  border-radius: 16px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+.exp-dash-hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.exp-dash-hero h1 { margin: 8px 0 6px; font-size: 1.25rem; }
+.exp-dash-brand {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.2);
+}
+.exp-dash-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  font-size: 12px;
+  font-weight: 600;
+}
+.exp-dash-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+}
+.exp-dash-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.25);
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.exp-dash-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.exp-dash-user-name,
+.exp-dash-user-email {
+  font-size: 12px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.exp-dash-user-email { opacity: 0.85; }
+.exp-dash-live { margin: 12px 0 0; font-size: 12px; opacity: 0.9; }
+.exp-dash-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.exp-dash-kpi {
+  background: var(--sd-surface, #fff);
+  border: 1px solid var(--sd-border, #e2e8f0);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.exp-dash-overlay--dark .exp-dash-kpi {
+  background: #1e293b;
+  border-color: #334155;
+}
+.exp-dash-kpi-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+.exp-dash-kpi-value { font-size: 1.2rem; font-weight: 700; margin-top: 4px; }
+.exp-dash-kpi-sub { font-size: 12px; opacity: 0.7; margin-top: 4px; }
+.exp-dash-charts { margin-bottom: 20px; }
+.exp-dash-chart-card { min-height: 280px; }
+.exp-dash-footer { text-align: center; font-size: 11px; opacity: 0.65; margin-top: 8px; }
+
+@media (max-width: 640px) {
+  .exp-dash--overlay-panel { padding: 8px 12px 32px; }
+  .exp-dash-toolbar { flex-direction: column; align-items: stretch; }
+  .exp-dash-toolbar-actions { width: 100%; }
+  .exp-dash-back,
+  .exp-dash-dl,
+  .exp-dash-icon-close { justify-content: center; flex: 1; }
+  .exp-dash-charts.sd2-charts-grid { grid-template-columns: 1fr; }
+  .exp-dash-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

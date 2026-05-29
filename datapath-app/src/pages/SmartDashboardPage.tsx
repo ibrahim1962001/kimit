@@ -4,7 +4,13 @@ import { AdSpace } from '../components/AdSpace';
 import { useKimitData } from '../hooks/useKimitData';
 import { useUser } from '../contexts/UserContext';
 import { exportSmartDashboardBundle } from '../lib/smartDashboardHtmlExport';
-import { openExportedDashboardPreview } from '../lib/smartDashboardExportPreview';
+import {
+  openExportedDashboardPreview,
+  readExportedDashboardPreview,
+} from '../lib/smartDashboardExportPreview';
+import { ExportedDashboardOverlay } from '../components/ExportedDashboardOverlay';
+import { navigateToTab } from '../lib/appNavigation';
+import type { SmartDashboardBundlePayload } from '../lib/smartDashboardHtmlExport';
 import { datasetsApi } from '../api/datasets.api';
 import {
   barOpt,
@@ -101,6 +107,7 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
   const [pbiHint, setPbiHint] = useState<string | null>(null);
   const [exportHint, setExportHint] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [exportPreview, setExportPreview] = useState<SmartDashboardBundlePayload | null>(null);
   const [pbiModalOpen, setPbiModalOpen] = useState(false);
   const [pbiStep, setPbiStep] = useState<'idle' | 'checking' | 'publishing' | 'opening' | 'done' | 'error'>('idle');
   const [brandLogoDataUrl, setBrandLogoDataUrl] = useState<string>(() => {
@@ -186,6 +193,19 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
     if (typeof localStorage === 'undefined') return;
     localStorage.setItem('kimit_saved_views', JSON.stringify(savedViews));
   }, [savedViews]);
+
+  useEffect(() => {
+    const openFromStorage = () => {
+      const p = readExportedDashboardPreview();
+      if (p) setExportPreview(p);
+    };
+    if (window.location.pathname.replace(/\/+$/, '') === '/dashboard-preview') {
+      openFromStorage();
+      navigateToTab('smart-dashboard', true);
+    }
+    window.addEventListener('kimit:open-export-preview', openFromStorage);
+    return () => window.removeEventListener('kimit:open-export-preview', openFromStorage);
+  }, []);
 
   const publishToPowerBI = async () => {
     if (!info) return;
@@ -1973,6 +1993,13 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
         </div>
         <div className="sd2-footer-bar" />
       </div>
+
+      {exportPreview && (
+        <ExportedDashboardOverlay
+          payload={exportPreview}
+          onClose={() => setExportPreview(null)}
+        />
+      )}
     </div>
   );
 };

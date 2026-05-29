@@ -30,9 +30,6 @@ const DashboardPage = lazy(() =>
 const SmartDashboardPage = lazy(() =>
   import('./pages/SmartDashboardPage').then(m => ({ default: m.SmartDashboardPage })),
 );
-const ExportedDashboardPage = lazy(() =>
-  import('./pages/ExportedDashboardPage').then(m => ({ default: m.ExportedDashboardPage })),
-);
 const CleaningPage = lazy(() =>
   import('./pages/CleaningPage').then(m => ({ default: m.CleaningPage })),
 );
@@ -129,12 +126,6 @@ function App() {
     };
     window.addEventListener('kimit:navigate', handler);
     return () => window.removeEventListener('kimit:navigate', handler);
-  }, []);
-
-  useEffect(() => {
-    const onPreview = () => setTabState('dashboard-preview');
-    window.addEventListener('kimit:open-export-preview', onPreview);
-    return () => window.removeEventListener('kimit:open-export-preview', onPreview);
   }, []);
 
   useEffect(() => {
@@ -482,9 +473,6 @@ function App() {
             {tab === 'compare' && <ComparisonPage />}
             {tab === 'smart-dashboard' && (
               <SmartDashboardPage onBack={() => setTab(dataset ? 'dashboard' : 'home')} />
-            )}
-            {tab === 'dashboard-preview' && (
-              <ExportedDashboardPage onBack={() => setTab('smart-dashboard')} />
             )}
           </Suspense>
         </div>

@@ -27,7 +27,7 @@ export function openExportedDashboardPreview(payload: SmartDashboardBundlePayloa
       /* charts still available from inMemoryPreview */
     }
   }
-  navigateToTab('dashboard-preview');
+  navigateToTab('smart-dashboard');
   window.dispatchEvent(new CustomEvent('kimit:open-export-preview'));
 }
 

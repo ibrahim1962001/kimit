@@ -35,6 +35,7 @@ const PATH_TO_TAB: Record<string, AppTab> = Object.fromEntries(
 
 export function tabFromPathname(pathname: string): AppTab {
   const normalized = pathname.replace(/\/+$/, '') || '/';
+  if (normalized === '/dashboard-preview') return 'smart-dashboard';
   return PATH_TO_TAB[normalized] ?? 'home';
 }
 
