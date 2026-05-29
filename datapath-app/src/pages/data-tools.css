@@ -1,0 +1,222 @@
+.dtools {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px 18px 48px;
+  color: var(--text, #0f172a);
+}
+
+.dtools-head {
+  margin-bottom: 16px;
+}
+
+.dtools-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  color: #0d9488;
+}
+.dtools-title h1 { margin: 0; font-size: 1.3rem; color: var(--text, #0f172a); }
+.dtools-title p { margin: 2px 0 0; font-size: 12px; color: #64748b; }
+
+.dtools-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.dtools-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border, #e2e8f0);
+  background: var(--surface, #fff);
+  color: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.dtools-tab:hover { border-color: #0d9488; }
+.dtools-tab.is-active {
+  background: linear-gradient(135deg, #0d9488, #2563eb);
+  color: #fff;
+  border-color: transparent;
+}
+
+.dtools-flash {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.dtool-panel {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 14px;
+  padding: 18px;
+}
+
+.dtool-hint { margin: 0 0 14px; font-size: 13px; color: #64748b; line-height: 1.5; }
+.dtool-note { font-size: 12px; color: #64748b; margin: 8px 0 0; }
+
+.dtool-row { margin-bottom: 14px; display: flex; flex-direction: column; gap: 6px; }
+.dtool-row--inline { flex-direction: row; align-items: center; gap: 12px; }
+.dtool-row--inline input { width: 90px; }
+.dtool-row label { font-size: 12px; font-weight: 700; color: #475569; }
+.dtool-row input, .dtool-row select, .dtool-row textarea {
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 9px;
+  padding: 9px 11px;
+  font-size: 13px;
+  background: var(--bg, #fff);
+  color: inherit;
+  font-family: inherit;
+}
+.dtool-row textarea { resize: vertical; }
+
+.dtool-grid4 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.dtool-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.dtool-chip {
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #e2e8f0);
+  background: var(--bg, #f8fafc);
+  font-size: 12px;
+  cursor: pointer;
+  color: inherit;
+}
+.dtool-chip:hover { border-color: #0d9488; }
+.dtool-chip.is-on { background: #0d9488; color: #fff; border-color: #0d9488; }
+
+.dtool-funcs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.dtool-fn {
+  padding: 4px 9px;
+  border-radius: 7px;
+  border: 1px solid var(--border, #e2e8f0);
+  background: var(--bg, #f1f5f9);
+  font-family: monospace;
+  font-size: 12px;
+  cursor: pointer;
+  color: inherit;
+}
+.dtool-fn:hover { border-color: #2563eb; }
+
+.dtool-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-size: 13px;
+  margin: 12px 0;
+}
+
+.dtool-preview {
+  margin: 12px 0;
+  font-size: 13px;
+}
+.dtool-preview-vals { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.dtool-preview-vals span {
+  padding: 4px 10px;
+  border-radius: 7px;
+  background: var(--bg, #f1f5f9);
+  border: 1px solid var(--border, #e2e8f0);
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.dtool-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+.dtool-btn-primary, .dtool-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+}
+.dtool-btn-primary { background: linear-gradient(135deg, #0d9488, #2563eb); color: #fff; }
+.dtool-btn-ghost { background: var(--bg, #f1f5f9); color: inherit; border: 1px solid var(--border, #e2e8f0); }
+.dtool-btn-primary:disabled { opacity: 0.6; cursor: wait; }
+
+.dtool-upload {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1.5px dashed var(--border, #cbd5e1);
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 14px;
+}
+.dtool-upload:hover { border-color: #0d9488; color: #0d9488; }
+
+.dtool-pivot-wrap { overflow: auto; max-height: 460px; border: 1px solid var(--border, #e2e8f0); border-radius: 10px; margin-top: 6px; }
+.dtool-pivot { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+.dtool-pivot th, .dtool-pivot td {
+  border: 1px solid var(--border, #e2e8f0);
+  padding: 7px 10px;
+  text-align: end;
+  white-space: nowrap;
+}
+.dtool-pivot thead th {
+  position: sticky;
+  top: 0;
+  background: #0d9488;
+  color: #fff;
+  z-index: 1;
+}
+.dtool-pivot-rk { text-align: start !important; font-weight: 600; background: var(--bg, #f8fafc); }
+.dtool-pivot-total { font-weight: 700; background: rgba(13, 148, 136, 0.08); }
+.dtool-pivot tfoot td { font-weight: 700; background: rgba(37, 99, 235, 0.08); }
+
+.dtool-result { margin-top: 18px; }
+.dtool-metrics { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.dtool-metric {
+  background: var(--bg, #f1f5f9);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  padding: 8px 14px;
+  text-align: center;
+  min-width: 80px;
+}
+.dtool-metric span { display: block; font-size: 11px; color: #64748b; }
+.dtool-metric b { font-size: 1.05rem; }
+
+.dtool-coef { border-collapse: collapse; width: 100%; font-size: 12.5px; margin-bottom: 14px; }
+.dtool-coef th, .dtool-coef td {
+  border: 1px solid var(--border, #e2e8f0);
+  padding: 7px 10px;
+  text-align: end;
+}
+.dtool-coef th { background: var(--bg, #f8fafc); }
+.dtool-coef td:first-child, .dtool-coef th:first-child { text-align: start; }
+
+@media (max-width: 640px) {
+  .dtools { padding: 12px 12px 32px; }
+  .dtools-tab { flex: 1 1 auto; justify-content: center; }
+  .dtool-grid4 { grid-template-columns: 1fr; }
+}

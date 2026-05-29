@@ -50,6 +50,9 @@ const GuidePage = lazy(() => import('./pages/GuidePage').then(m => ({ default: m
 const ComparisonPage = lazy(() =>
   import('./pages/ComparisonPage').then(m => ({ default: m.ComparisonPage })),
 );
+const DataToolsPage = lazy(() =>
+  import('./pages/DataToolsPage').then(m => ({ default: m.DataToolsPage })),
+);
 const SavedFilesPage = lazy(() =>
   import('./pages/SavedFilesPage').then(m => ({ default: m.SavedFilesPage })),
 );
@@ -382,6 +385,7 @@ function App() {
       tab === 'cleaning' ||
       tab === 'chat' ||
       tab === 'export' ||
+      tab === 'tools' ||
       tab === 'smart-dashboard');
 
   return (
@@ -471,6 +475,7 @@ function App() {
             {tab === 'faq' && <FAQPage />}
             {tab === 'guide' && <GuidePage />}
             {tab === 'compare' && <ComparisonPage />}
+            {tab === 'tools' && dataset && <DataToolsPage />}
             {tab === 'smart-dashboard' && (
               <SmartDashboardPage onBack={() => setTab(dataset ? 'dashboard' : 'home')} />
             )}

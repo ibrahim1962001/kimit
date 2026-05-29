@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { LayoutDashboard, Shield, MessageCircle, Download, Home,   X, Table, HelpCircle, Info, ShieldCheck, BookOpen, ArrowRightLeft, User, LogOut, Trash2, ChevronDown, ChevronRight, Rows3, Columns3, AlertTriangle, Copy, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, Shield, MessageCircle, Download, Home,   X, Table, HelpCircle, Info, ShieldCheck, BookOpen, ArrowRightLeft, User, LogOut, Trash2, ChevronDown, ChevronRight, Rows3, Columns3, AlertTriangle, Copy, TrendingUp, Wrench } from 'lucide-react';
 import { AdSpace } from './AdSpace';
 import { type User as FirebaseUser, signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
@@ -40,6 +40,7 @@ const T = {
     faq: 'FAQ',
     guide: 'User Guide',
     compare: 'Compare Files',
+    tools: 'Data Tools',
     smartDash: 'Smart Dashboard',
     smartDashSub: 'Auto charts by data type',
   },
@@ -57,6 +58,7 @@ const T = {
     faq: 'الأسئلة',
     guide: 'دليل الاستخدام',
     compare: 'مقارنة ملفات',
+    tools: 'أدوات البيانات',
     smartDash: 'سمارت داشبورد',
     smartDashSub: 'شارتات تلقائية حسب البيانات',
   },
@@ -68,6 +70,7 @@ const mainItems: { tab: AppTab; icon: React.ElementType; key: string }[] = [
   { tab: 'cleaning', icon: Shield, key: 'cleaning' },
   { tab: 'chat', icon: MessageCircle, key: 'chat' },
   { tab: 'compare', icon: ArrowRightLeft, key: 'compare' },
+  { tab: 'tools', icon: Wrench, key: 'tools' },
   { tab: 'export', icon: Download, key: 'export' },
 ];
 
@@ -340,7 +343,7 @@ export const Sidebar: React.FC<Props> = ({ tab, hasData, onTab, onClose, onClear
   const renderBtn = (item: { tab: AppTab; icon: React.ElementType; key: string }) => {
     const Icon = item.icon;
     const label = t[item.key as keyof typeof t];
-    const dataNeeded = ['dashboard', 'cleaning', 'export'].includes(item.tab);
+    const dataNeeded = ['dashboard', 'cleaning', 'export', 'tools'].includes(item.tab);
     const disabled = dataNeeded && !hasData;
 
     return (
