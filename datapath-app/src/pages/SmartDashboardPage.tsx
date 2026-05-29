@@ -1324,12 +1324,12 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
                 setShareUrl(result.url);
                 try { await navigator.clipboard.writeText(result.url); } catch { /* clipboard optional */ }
               } catch (e) {
+                const code = (e as { code?: string })?.code;
+                const msg = e instanceof Error ? e.message : String(e);
                 setShareError(
-                  isAr
-                    ? 'تعذّر إنشاء الرابط. تأكد من الاتصال وحاول مجدداً.'
-                    : 'Could not create link. Check your connection and retry.',
+                  (isAr ? 'تعذّر إنشاء الرابط: ' : 'Could not create link: ') + (code ? `[${code}] ` : '') + msg,
                 );
-                console.error(e);
+                console.error('share error', e);
               } finally {
                 setSharing(false);
               }
