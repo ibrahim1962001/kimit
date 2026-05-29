@@ -98,6 +98,8 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [pbiExporting, setPbiExporting] = useState(false);
   const [pbiHint, setPbiHint] = useState<string | null>(null);
+  const [exportHint, setExportHint] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [pbiModalOpen, setPbiModalOpen] = useState(false);
   const [pbiStep, setPbiStep] = useState<'idle' | 'checking' | 'publishing' | 'opening' | 'done' | 'error'>('idle');
   const [brandLogoDataUrl, setBrandLogoDataUrl] = useState<string>(() => {
@@ -1195,44 +1197,75 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
           <button
             type="button"
             className="sd2-export-btn"
-            title={isAr ? 'تنزيل Excel + فتح داشبورد تفاعلي' : 'Download Excel + open interactive dashboard'}
-            onClick={() =>
-              exportSmartDashboardBundle({
-                filename: `Smart_Dashboard_${info.filename.replace(/\.[^.]+$/, '')}.xlsx`,
-                datasetName: info.filename.replace(/\.[^.]+$/, '') || info.filename,
-                data: rawData,
-                categoryColumn: catCols[0] ?? null,
-                metricColumn: orderedNumCols[0] ?? null,
-                dateColumn: dateCol ?? null,
-                kpis: kpis.map(k => ({ title: k.title, value: k.value, sub: k.sub })),
-                insights: insights.slice(0, 6).map(i => ({ title: i.title, desc: i.desc })),
-                topRows: topBottom.top.slice(0, 10),
-                quality: {
-                  score: qualityGrade.score,
-                  grade: qualityGrade.grade,
-                  fillRate: qualityGrade.fillRate,
-                  dupRate: qualityGrade.dupRate,
-                  outlierPct: qualityGrade.outlierPct,
-                },
-                charts: [...coreCharts, ...extraCharts].map(c => ({
-                  title: c.title,
-                  subtitle: c.subtitle,
-                  option: c.option,
-                })),
-                theme: chartTheme,
-                isAr,
-                sheetTypeLabel: isAr ? meta.labelAr : meta.label,
-                brandLogoDataUrl,
-                user: {
-                  name: userDisplayName,
-                  email: user?.email ?? '',
-                  photoURL: user?.photoURL ?? '',
-                },
-              })
+            disabled={exporting}
+            title={
+              isAr
+                ? 'تنزيل Excel + داشبورد HTML (ZIP على الموبايل)'
+                : 'Download Excel + HTML dashboard (ZIP on mobile)'
             }
+            onClick={async () => {
+              setExporting(true);
+              setExportHint(isAr ? 'جاري التصدير…' : 'Exporting…');
+              try {
+                const result = await exportSmartDashboardBundle({
+                  filename: `Smart_Dashboard_${info.filename.replace(/\.[^.]+$/, '')}.xlsx`,
+                  datasetName: info.filename.replace(/\.[^.]+$/, '') || info.filename,
+                  data: rawData,
+                  categoryColumn: catCols[0] ?? null,
+                  metricColumn: orderedNumCols[0] ?? null,
+                  dateColumn: dateCol ?? null,
+                  kpis: kpis.map(k => ({ title: k.title, value: k.value, sub: k.sub })),
+                  insights: insights.slice(0, 6).map(i => ({ title: i.title, desc: i.desc })),
+                  topRows: topBottom.top.slice(0, 10),
+                  quality: {
+                    score: qualityGrade.score,
+                    grade: qualityGrade.grade,
+                    fillRate: qualityGrade.fillRate,
+                    dupRate: qualityGrade.dupRate,
+                    outlierPct: qualityGrade.outlierPct,
+                  },
+                  charts: [...coreCharts, ...extraCharts].map(c => ({
+                    title: c.title,
+                    subtitle: c.subtitle,
+                    option: c.option,
+                  })),
+                  theme: chartTheme,
+                  isAr,
+                  sheetTypeLabel: isAr ? meta.labelAr : meta.label,
+                  brandLogoDataUrl,
+                  user: {
+                    name: userDisplayName,
+                    email: user?.email ?? '',
+                    photoURL: user?.photoURL ?? '',
+                  },
+                });
+                setExportHint(
+                  result.mode === 'zip'
+                    ? isAr
+                      ? 'تم تنزيل ZIP — فك الضغط وافتح ملف .html (مع إنترنت)'
+                      : 'ZIP downloaded — unzip and open the .html file (internet required)'
+                    : isAr
+                      ? 'تم تنزيل Excel وملف HTML — افتح ملف .html من التحميلات'
+                      : 'Excel + HTML downloaded — open the .html file from Downloads',
+                );
+              } catch {
+                setExportHint(isAr ? 'فشل التصدير. حاول مرة أخرى.' : 'Export failed. Please try again.');
+              } finally {
+                setExporting(false);
+                window.setTimeout(() => setExportHint(null), 10_000);
+              }
+            }}
           >
-            <Download size={14} /> {isAr ? 'تصدير Excel + داشبورد' : 'Export Excel + Dashboard'}
+            <Download size={14} />
+            {exporting
+              ? isAr
+                ? 'جاري التصدير…'
+                : 'Exporting…'
+              : isAr
+                ? 'تصدير Excel + داشبورد'
+                : 'Export Excel + Dashboard'}
           </button>
+          {exportHint && <div className="sd2-pbi-hint">{exportHint}</div>}
         </div>
       </header>
 

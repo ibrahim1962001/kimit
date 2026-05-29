@@ -1,4 +1,6 @@
-import { exportSmartDashboardExcel, type SmartDashboardExcelPayload } from './exportUtils';
+import JSZip from 'jszip';
+import * as XLSX from 'xlsx';
+import { buildSmartDashboardWorkbook, type SmartDashboardExcelPayload } from './exportUtils';
 
 export interface SmartDashboardExportChart {
   title: string;
@@ -18,6 +20,11 @@ export interface SmartDashboardBundlePayload extends SmartDashboardExcelPayload 
     photoURL?: string;
   };
 }
+
+export type SmartDashboardBundleResult = {
+  mode: 'zip' | 'files';
+  baseName: string;
+};
 
 function escapeHtml(s: string): string {
   return s
@@ -88,13 +95,18 @@ export function buildStandaloneDashboardHtml(payload: SmartDashboardBundlePayloa
     )
     .join('');
 
+  const loadErrorAr =
+    'تعذّر تحميل مكتبة الرسوم. تأكد من اتصال الإنترنت ثم أعد فتح هذا الملف في Chrome أو Safari.';
+  const loadErrorEn =
+    'Could not load chart library. Connect to the internet and reopen this file in Chrome or Safari.';
+
   return `<!DOCTYPE html>
 <html lang="${isAr ? 'ar' : 'en'}" dir="${isAr ? 'rtl' : 'ltr'}">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>KIMIT — ${escapeHtml(payload.datasetName)}</title>
-  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"><\/script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" crossorigin="anonymous"><\/script>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -102,6 +114,7 @@ export function buildStandaloneDashboardHtml(payload: SmartDashboardBundlePayloa
       font-family: "Segoe UI", system-ui, sans-serif;
       background: ${dark ? '#0f172a' : '#f1f5f9'};
       color: ${dark ? '#e2e8f0' : '#0f172a'};
+      -webkit-text-size-adjust: 100%;
     }
     .wrap { max-width: 1280px; margin: 0 auto; padding: 24px 20px 48px; }
     .hero {
@@ -198,9 +211,19 @@ export function buildStandaloneDashboardHtml(payload: SmartDashboardBundlePayloa
       font-size: 0.75rem;
       font-weight: 600;
     }
+    .load-error {
+      background: ${dark ? '#422006' : '#fff7ed'};
+      color: ${dark ? '#fdba74' : '#9a3412'};
+      border: 1px solid ${dark ? '#ea580c' : '#fed7aa'};
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
     .kpi-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
       gap: 12px;
       margin-bottom: 20px;
     }
@@ -215,7 +238,7 @@ export function buildStandaloneDashboardHtml(payload: SmartDashboardBundlePayloa
     .kpi-sub { font-size: 0.75rem; color: ${dark ? '#94a3b8' : '#64748b'}; margin-top: 4px; }
     .charts {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       gap: 16px;
     }
     .chart-card {
@@ -223,11 +246,11 @@ export function buildStandaloneDashboardHtml(payload: SmartDashboardBundlePayloa
       border: 1px solid ${dark ? '#334155' : '#e2e8f0'};
       border-radius: 14px;
       padding: 14px 14px 8px;
-      min-height: 320px;
+      min-height: 300px;
     }
     .chart-card h3 { margin: 0 0 4px; font-size: 0.95rem; }
     .chart-sub { margin: 0 0 8px; font-size: 0.78rem; color: ${dark ? '#94a3b8' : '#64748b'}; }
-    .chart-host { width: 100%; height: 280px; }
+    .chart-host { width: 100%; height: 280px; min-height: 200px; }
     .footer-site {
       margin-top: 20px;
       display: flex;
@@ -246,6 +269,15 @@ export function buildStandaloneDashboardHtml(payload: SmartDashboardBundlePayloa
       color: ${dark ? '#cbd5e1' : '#334155'};
       font-weight: 600;
     }
+    @media (max-width: 640px) {
+      .wrap { padding: 16px 12px 32px; }
+      .hero { padding: 16px; border-radius: 12px; }
+      .charts { grid-template-columns: 1fr; }
+      .chart-card { min-height: 260px; }
+      .chart-host { height: 220px; }
+      .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .hero-user-name, .hero-user-email { max-width: 120px; }
+    }
   </style>
 </head>
 <body>
@@ -259,6 +291,7 @@ export function buildStandaloneDashboardHtml(payload: SmartDashboardBundlePayloa
       </div>
       <span class="badge">${escapeHtml(payload.sheetTypeLabel || (isAr ? 'عام' : 'General'))}</span>
     </header>
+    <div id="load-error-slot"></div>
     ${kpiHtml ? `<div class="kpi-grid">${kpiHtml}</div>` : ''}
     <div class="charts">${chartCards}</div>
     <p class="footer-site">
@@ -272,57 +305,138 @@ export function buildStandaloneDashboardHtml(payload: SmartDashboardBundlePayloa
   <script type="application/json" id="kimit-payload">${embed.replace(/</g, '\\u003c')}<\/script>
   <script>
     const payload = JSON.parse(document.getElementById('kimit-payload').textContent);
+    const loadErrorMsg = ${JSON.stringify(isAr ? loadErrorAr : loadErrorEn)};
     const instances = [];
+
+    function showLoadError() {
+      var slot = document.getElementById('load-error-slot');
+      if (!slot || slot.dataset.filled) return;
+      slot.dataset.filled = '1';
+      slot.innerHTML = '<p class="load-error">' + loadErrorMsg + '</p>';
+    }
+
     function initCharts() {
+      if (!window.echarts) {
+        showLoadError();
+        return;
+      }
       payload.charts.forEach(function (chart, i) {
-        const el = document.getElementById('chart-' + i);
-        if (!el || !window.echarts) return;
-        const inst = echarts.init(el, null, { renderer: 'canvas' });
+        var el = document.getElementById('chart-' + i);
+        if (!el) return;
+        var inst = echarts.init(el, null, { renderer: 'canvas' });
         inst.setOption(chart.option, true);
         instances.push(inst);
       });
+      window.setTimeout(function () {
+        instances.forEach(function (c) { c.resize(); });
+      }, 350);
     }
+
+    function waitForEcharts(attempts) {
+      if (window.echarts) {
+        initCharts();
+        return;
+      }
+      if (attempts <= 0) {
+        showLoadError();
+        return;
+      }
+      window.setTimeout(function () { waitForEcharts(attempts - 1); }, 250);
+    }
+
+    function onReady() {
+      waitForEcharts(24);
+    }
+
     window.addEventListener('resize', function () {
       instances.forEach(function (c) { c.resize(); });
     });
+    window.addEventListener('orientationchange', function () {
+      window.setTimeout(function () {
+        instances.forEach(function (c) { c.resize(); });
+      }, 300);
+    });
+
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initCharts);
+      document.addEventListener('DOMContentLoaded', onReady);
     } else {
-      initCharts();
+      onReady();
     }
   <\/script>
 </body>
 </html>`;
 }
 
-export function downloadTextFile(content: string, filename: string, mime = 'text/html;charset=utf-8'): void {
-  const blob = new Blob([content], { type: mime });
+function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
+  link.style.display = 'none';
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-export function openHtmlDashboardInBrowser(html: string, isAr = false): void {
-  const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
-  const win = window.open(url, '_blank', 'noopener,noreferrer');
-  if (!win) {
-    alert(
-      isAr
-        ? 'اسمح بالنوافذ المنبثقة لعرض الداشبورد، أو افتح ملف .html الذي تم تنزيله.'
-        : 'Please allow pop-ups to view the interactive dashboard, or open the downloaded .html file.',
-    );
+function isMobileExportContext(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  if (/Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua)) {
+    return true;
   }
-  window.setTimeout(() => URL.revokeObjectURL(url), 120_000);
+  return typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches;
 }
 
-/** One click: Excel workbook + interactive HTML dashboard (opens in browser). */
-export function exportSmartDashboardBundle(payload: SmartDashboardBundlePayload): void {
+function buildExportReadme(baseName: string, isAr?: boolean): string {
+  if (isAr) {
+    return [
+      'KIMIT — تصدير الداشبورد الذكي',
+      '',
+      '1. فك ضغط هذا الملف.',
+      `2. افتح "${baseName}.html" في Chrome أو Safari (يحتاج إنترنت لعرض الرسوم).`,
+      `3. ملف "${baseName}.xlsx" يحتوي على البيانات والجداول.`,
+    ].join('\n');
+  }
+  return [
+    'KIMIT — Smart Dashboard export',
+    '',
+    '1. Unzip this file.',
+    `2. Open "${baseName}.html" in Chrome or Safari (internet required for charts).`,
+    `3. "${baseName}.xlsx" contains data and pivot-ready sheets.`,
+  ].join('\n');
+}
+
+const delay = (ms: number) => new Promise<void>(resolve => window.setTimeout(resolve, ms));
+
+/** Excel workbook + interactive HTML dashboard (ZIP on mobile, separate files on desktop). */
+export async function exportSmartDashboardBundle(
+  payload: SmartDashboardBundlePayload,
+): Promise<SmartDashboardBundleResult> {
   const baseName = (payload.filename ?? `Smart_Dashboard_${payload.datasetName}`).replace(/\.xlsx$/i, '');
-  exportSmartDashboardExcel({ ...payload, filename: `${baseName}.xlsx` });
   const html = buildStandaloneDashboardHtml(payload);
-  downloadTextFile(html, `${baseName}.html`);
-  openHtmlDashboardInBrowser(html, payload.isAr);
+  const workbook = buildSmartDashboardWorkbook({ ...payload, filename: `${baseName}.xlsx` });
+
+  if (isMobileExportContext()) {
+    const zip = new JSZip();
+    zip.file(
+      `${baseName}.xlsx`,
+      XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }),
+    );
+    zip.file(`${baseName}.html`, html);
+    zip.file('README.txt', buildExportReadme(baseName, payload.isAr));
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    downloadBlob(zipBlob, `${baseName}.zip`);
+    return { mode: 'zip', baseName };
+  }
+
+  XLSX.writeFile(workbook, `${baseName}.xlsx`);
+  await delay(450);
+  downloadBlob(new Blob([html], { type: 'text/html;charset=utf-8' }), `${baseName}.html`);
+  return { mode: 'files', baseName };
+}
+
+/** @deprecated Use exportSmartDashboardBundle — kept for direct HTML-only downloads. */
+export function downloadTextFile(content: string, filename: string, mime = 'text/html;charset=utf-8'): void {
+  downloadBlob(new Blob([content], { type: mime }), filename);
 }

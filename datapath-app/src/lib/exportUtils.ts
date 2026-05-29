@@ -67,7 +67,7 @@ const toNumber = (value: unknown): number => {
   return Number.isFinite(num) ? num : 0;
 };
 
-export const exportSmartDashboardExcel = (payload: SmartDashboardExcelPayload): void => {
+export function buildSmartDashboardWorkbook(payload: SmartDashboardExcelPayload): XLSX.WorkBook {
   const {
     datasetName,
     data,
@@ -173,7 +173,12 @@ export const exportSmartDashboardExcel = (payload: SmartDashboardExcelPayload): 
   notesSheet['!cols'] = [{ wch: 88 }];
   XLSX.utils.book_append_sheet(workbook, notesSheet, 'How_To_Use');
 
-  XLSX.writeFile(workbook, payload.filename ?? `Smart_Dashboard_${datasetName}.xlsx`);
+  return workbook;
+}
+
+export const exportSmartDashboardExcel = (payload: SmartDashboardExcelPayload): void => {
+  const workbook = buildSmartDashboardWorkbook(payload);
+  XLSX.writeFile(workbook, payload.filename ?? `Smart_Dashboard_${payload.datasetName}.xlsx`);
 };
 
 
