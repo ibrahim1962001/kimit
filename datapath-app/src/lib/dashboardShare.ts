@@ -98,7 +98,10 @@ export async function createSharedDashboard(
     views: 0,
   };
   if (payload.sheetTypeLabel) clean.sheetTypeLabel = payload.sheetTypeLabel;
-  if (payload.brandLogoDataUrl) clean.brandLogoDataUrl = payload.brandLogoDataUrl;
+  // Firestore caps a single field at ~1 MiB; only embed small logos.
+  if (payload.brandLogoDataUrl && payload.brandLogoDataUrl.length <= 200_000) {
+    clean.brandLogoDataUrl = payload.brandLogoDataUrl;
+  }
   if (payload.ownerName) clean.ownerName = payload.ownerName;
 
   await setDoc(doc(db, COLLECTION, id), clean);
