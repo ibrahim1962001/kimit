@@ -1063,6 +1063,7 @@
 .exp-dash-overlay {
   position: fixed;
   inset: 0;
+  width: 100%;
   z-index: 10050;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -1208,8 +1209,17 @@
 }
 .exp-dash-kpi-value { font-size: 1.2rem; font-weight: 700; margin-top: 4px; }
 .exp-dash-kpi-sub { font-size: 12px; opacity: 0.7; margin-top: 4px; }
-.exp-dash-charts { margin-bottom: 20px; }
-.exp-dash-chart-card { min-height: 280px; }
+/* Fluid chart grid that adapts to any width (phone, tablet, desktop). */
+.exp-dash-charts.sd2-charts-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.exp-dash-chart-card {
+  min-height: 280px;
+  min-width: 0;
+}
+.exp-dash-chart-card .echarts-for-react { width: 100% !important; }
 .exp-dash-footer { text-align: center; font-size: 11px; opacity: 0.65; margin-top: 8px; }
 
 @media (max-width: 640px) {

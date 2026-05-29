@@ -396,7 +396,10 @@ function App() {
   // Public, standalone shared dashboard view — no sidebar, no login, no dataset.
   if (tab === 'shared') {
     return (
-      <div className={`app ${lang === 'ar' ? 'rtl' : 'ltr'} min-h-screen`}>
+      <div
+        className={lang === 'ar' ? 'rtl' : 'ltr'}
+        style={{ minHeight: '100vh', width: '100%' }}
+      >
         <Suspense fallback={<PageFallback />}>
           <SharedDashboardPage />
         </Suspense>
