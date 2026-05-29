@@ -53,6 +53,9 @@ const ComparisonPage = lazy(() =>
 const DataToolsPage = lazy(() =>
   import('./pages/DataToolsPage').then(m => ({ default: m.DataToolsPage })),
 );
+const SharedDashboardPage = lazy(() =>
+  import('./pages/SharedDashboardPage').then(m => ({ default: m.SharedDashboardPage })),
+);
 const SavedFilesPage = lazy(() =>
   import('./pages/SavedFilesPage').then(m => ({ default: m.SavedFilesPage })),
 );
@@ -105,13 +108,15 @@ function App() {
       setCurrentUser(user);
     });
     
-    // Session Persistence 1.1
+    // Session Persistence 1.1 — but never hijack a public shared link.
+    const onSharedRoute = tabFromPathname(window.location.pathname) === 'shared';
     get('kimit_session_dataset').then((savedDataset) => {
       if (savedDataset) {
         setDataset(savedDataset);
-        setTabState('smart-dashboard');
-        navigateToTab('smart-dashboard', true);
-        // Toast is not shown here directly to avoid UI blocking early, but we could.
+        if (!onSharedRoute) {
+          setTabState('smart-dashboard');
+          navigateToTab('smart-dashboard', true);
+        }
       }
     });
     
@@ -387,6 +392,17 @@ function App() {
       tab === 'export' ||
       tab === 'tools' ||
       tab === 'smart-dashboard');
+
+  // Public, standalone shared dashboard view — no sidebar, no login, no dataset.
+  if (tab === 'shared') {
+    return (
+      <div className={`app ${lang === 'ar' ? 'rtl' : 'ltr'} min-h-screen`}>
+        <Suspense fallback={<PageFallback />}>
+          <SharedDashboardPage />
+        </Suspense>
+      </div>
+    );
+  }
 
   return (
     <div className={`app ${lang === 'ar' ? 'rtl' : 'ltr'} flex flex-col min-h-screen relative`}>

@@ -1,0 +1,22 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Publicly shareable, read-only dashboards.
+    // Anyone can read a snapshot by its hard-to-guess id, and anyone can
+    // create one. Updates/deletes are blocked from clients.
+    match /shared_dashboards/{shareId} {
+      allow read: if true;
+      allow create: if request.resource.data.charts is list
+                    && request.resource.data.charts.size() <= 40;
+      allow update, delete: if false;
+    }
+
+    // Preserve existing open behavior for all other collections used by the
+    // app (chat, content, users). Tighten these in a dedicated security pass.
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

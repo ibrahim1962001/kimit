@@ -12,7 +12,8 @@ export type AppTab =
   | 'compare'
   | 'tools'
   | 'smart-dashboard'
-  | 'dashboard-preview';
+  | 'dashboard-preview'
+  | 'shared';
 
 const TAB_TO_PATH: Record<AppTab, string> = {
   home: '/',
@@ -29,6 +30,7 @@ const TAB_TO_PATH: Record<AppTab, string> = {
   tools: '/tools',
   'smart-dashboard': '/smart-dashboard',
   'dashboard-preview': '/dashboard-preview',
+  shared: '/shared',
 };
 
 const PATH_TO_TAB: Record<string, AppTab> = Object.fromEntries(

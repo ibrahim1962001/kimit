@@ -39,7 +39,8 @@ import {
   SMART_CAT_META,
   type SmartDashboardLayout,
 } from '../lib/smartDashboardUtils';
-import { ArrowLeft, Download, RefreshCw, LayoutDashboard, Filter, X, Sun, Moon, BarChart2 } from 'lucide-react';
+import { ArrowLeft, Download, RefreshCw, LayoutDashboard, Filter, X, Sun, Moon, BarChart2, Share2, Copy } from 'lucide-react';
+import { createSharedDashboard } from '../lib/dashboardShare';
 import './smart-dashboard-redesign.css';
 
 interface Props { onBack: () => void; }
@@ -108,6 +109,9 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
   const [exportHint, setExportHint] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportPreview, setExportPreview] = useState<SmartDashboardBundlePayload | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [shareError, setShareError] = useState<string | null>(null);
   const [pbiModalOpen, setPbiModalOpen] = useState(false);
   const [pbiStep, setPbiStep] = useState<'idle' | 'checking' | 'publishing' | 'opening' | 'done' | 'error'>('idle');
   const [brandLogoDataUrl, setBrandLogoDataUrl] = useState<string>(() => {
@@ -1293,6 +1297,61 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
                 : 'Export Excel + Dashboard'}
           </button>
           {exportHint && <div className="sd2-pbi-hint">{exportHint}</div>}
+          <button
+            type="button"
+            className="sd2-export-btn"
+            disabled={sharing}
+            title={isAr ? 'إنشاء رابط مشاركة عام للوحة' : 'Create a public share link for this dashboard'}
+            onClick={async () => {
+              setSharing(true);
+              setShareError(null);
+              setShareUrl(null);
+              try {
+                const result = await createSharedDashboard({
+                  datasetName: info.filename.replace(/\.[^.]+$/, '') || info.filename,
+                  theme: chartTheme,
+                  isAr,
+                  sheetTypeLabel: isAr ? meta.labelAr : meta.label,
+                  brandLogoDataUrl: brandLogoDataUrl || undefined,
+                  ownerName: userDisplayName,
+                  kpis: kpis.map(k => ({ title: k.title, value: k.value, sub: k.sub })),
+                  charts: [...coreCharts, ...extraCharts].map(c => ({
+                    title: c.title,
+                    subtitle: c.subtitle,
+                    option: c.option,
+                  })),
+                });
+                setShareUrl(result.url);
+                try { await navigator.clipboard.writeText(result.url); } catch { /* clipboard optional */ }
+              } catch (e) {
+                setShareError(
+                  isAr
+                    ? 'تعذّر إنشاء الرابط. تأكد من الاتصال وحاول مجدداً.'
+                    : 'Could not create link. Check your connection and retry.',
+                );
+                console.error(e);
+              } finally {
+                setSharing(false);
+              }
+            }}
+          >
+            <Share2 size={14} />
+            {sharing ? (isAr ? 'جاري الإنشاء…' : 'Creating…') : isAr ? 'مشاركة برابط' : 'Share link'}
+          </button>
+          {shareUrl && (
+            <div className="sd2-share-box">
+              <input readOnly value={shareUrl} onFocus={e => e.currentTarget.select()} />
+              <button
+                type="button"
+                onClick={() => { void navigator.clipboard.writeText(shareUrl); }}
+                title={isAr ? 'نسخ' : 'Copy'}
+              >
+                <Copy size={14} /> {isAr ? 'نسخ' : 'Copy'}
+              </button>
+              <a href={shareUrl} target="_blank" rel="noopener noreferrer">{isAr ? 'فتح' : 'Open'}</a>
+            </div>
+          )}
+          {shareError && <div className="sd2-pbi-hint" style={{ color: '#ef4444' }}>{shareError}</div>}
         </div>
       </header>
 
