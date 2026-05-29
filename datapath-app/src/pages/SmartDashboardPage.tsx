@@ -4,6 +4,7 @@ import { AdSpace } from '../components/AdSpace';
 import { useKimitData } from '../hooks/useKimitData';
 import { useUser } from '../contexts/UserContext';
 import { exportSmartDashboardBundle } from '../lib/smartDashboardHtmlExport';
+import { openExportedDashboardPreview } from '../lib/smartDashboardExportPreview';
 import { datasetsApi } from '../api/datasets.api';
 import {
   barOpt,
@@ -1200,60 +1201,66 @@ export const SmartDashboardPage: React.FC<Props> = ({ onBack }) => {
             disabled={exporting}
             title={
               isAr
-                ? 'تنزيل Excel + داشبورد HTML (ZIP على الموبايل)'
-                : 'Download Excel + HTML dashboard (ZIP on mobile)'
+                ? 'فتح معاينة الداشبورد + تنزيل Excel/HTML'
+                : 'Open dashboard preview + download Excel/HTML'
             }
-            onClick={async () => {
+            onClick={() => {
+              const bundlePayload = {
+                filename: `Smart_Dashboard_${info.filename.replace(/\.[^.]+$/, '')}.xlsx`,
+                datasetName: info.filename.replace(/\.[^.]+$/, '') || info.filename,
+                data: rawData,
+                categoryColumn: catCols[0] ?? null,
+                metricColumn: orderedNumCols[0] ?? null,
+                dateColumn: dateCol ?? null,
+                kpis: kpis.map(k => ({ title: k.title, value: k.value, sub: k.sub })),
+                insights: insights.slice(0, 6).map(i => ({ title: i.title, desc: i.desc })),
+                topRows: topBottom.top.slice(0, 10),
+                quality: {
+                  score: qualityGrade.score,
+                  grade: qualityGrade.grade,
+                  fillRate: qualityGrade.fillRate,
+                  dupRate: qualityGrade.dupRate,
+                  outlierPct: qualityGrade.outlierPct,
+                },
+                charts: [...coreCharts, ...extraCharts].map(c => ({
+                  title: c.title,
+                  subtitle: c.subtitle,
+                  option: c.option,
+                })),
+                theme: chartTheme,
+                isAr,
+                sheetTypeLabel: isAr ? meta.labelAr : meta.label,
+                brandLogoDataUrl,
+                user: {
+                  name: userDisplayName,
+                  email: user?.email ?? '',
+                  photoURL: user?.photoURL ?? '',
+                },
+              };
+              openExportedDashboardPreview(bundlePayload);
               setExporting(true);
-              setExportHint(isAr ? 'جاري التصدير…' : 'Exporting…');
-              try {
-                const result = await exportSmartDashboardBundle({
-                  filename: `Smart_Dashboard_${info.filename.replace(/\.[^.]+$/, '')}.xlsx`,
-                  datasetName: info.filename.replace(/\.[^.]+$/, '') || info.filename,
-                  data: rawData,
-                  categoryColumn: catCols[0] ?? null,
-                  metricColumn: orderedNumCols[0] ?? null,
-                  dateColumn: dateCol ?? null,
-                  kpis: kpis.map(k => ({ title: k.title, value: k.value, sub: k.sub })),
-                  insights: insights.slice(0, 6).map(i => ({ title: i.title, desc: i.desc })),
-                  topRows: topBottom.top.slice(0, 10),
-                  quality: {
-                    score: qualityGrade.score,
-                    grade: qualityGrade.grade,
-                    fillRate: qualityGrade.fillRate,
-                    dupRate: qualityGrade.dupRate,
-                    outlierPct: qualityGrade.outlierPct,
-                  },
-                  charts: [...coreCharts, ...extraCharts].map(c => ({
-                    title: c.title,
-                    subtitle: c.subtitle,
-                    option: c.option,
-                  })),
-                  theme: chartTheme,
-                  isAr,
-                  sheetTypeLabel: isAr ? meta.labelAr : meta.label,
-                  brandLogoDataUrl,
-                  user: {
-                    name: userDisplayName,
-                    email: user?.email ?? '',
-                    photoURL: user?.photoURL ?? '',
-                  },
-                });
-                setExportHint(
-                  result.mode === 'zip'
-                    ? isAr
-                      ? 'تم تنزيل ZIP — فك الضغط وافتح ملف .html (مع إنترنت)'
-                      : 'ZIP downloaded — unzip and open the .html file (internet required)'
-                    : isAr
-                      ? 'تم تنزيل Excel وملف HTML — افتح ملف .html من التحميلات'
-                      : 'Excel + HTML downloaded — open the .html file from Downloads',
-                );
-              } catch {
-                setExportHint(isAr ? 'فشل التصدير. حاول مرة أخرى.' : 'Export failed. Please try again.');
-              } finally {
-                setExporting(false);
-                window.setTimeout(() => setExportHint(null), 10_000);
-              }
+              setExportHint(isAr ? 'تم فتح المعاينة — جاري التنزيل…' : 'Preview opened — downloading…');
+              void (async () => {
+                try {
+                  const result = await exportSmartDashboardBundle(bundlePayload, {
+                    openPreview: false,
+                  });
+                  setExportHint(
+                    result.mode === 'zip'
+                      ? isAr
+                        ? 'تم تنزيل ZIP في الخلفية'
+                        : 'ZIP downloaded in background'
+                      : isAr
+                        ? 'تم تنزيل Excel و HTML في الخلفية'
+                        : 'Excel + HTML downloaded in background',
+                  );
+                } catch {
+                  setExportHint(isAr ? 'فشل التنزيل. المعاينة مفتوحة.' : 'Download failed. Preview is still open.');
+                } finally {
+                  setExporting(false);
+                  window.setTimeout(() => setExportHint(null), 10_000);
+                }
+              })();
             }}
           >
             <Download size={14} />

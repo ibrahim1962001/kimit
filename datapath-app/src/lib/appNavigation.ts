@@ -10,7 +10,8 @@ export type AppTab =
   | 'faq'
   | 'guide'
   | 'compare'
-  | 'smart-dashboard';
+  | 'smart-dashboard'
+  | 'dashboard-preview';
 
 const TAB_TO_PATH: Record<AppTab, string> = {
   home: '/',
@@ -25,6 +26,7 @@ const TAB_TO_PATH: Record<AppTab, string> = {
   guide: '/guide',
   compare: '/compare',
   'smart-dashboard': '/smart-dashboard',
+  'dashboard-preview': '/dashboard-preview',
 };
 
 const PATH_TO_TAB: Record<string, AppTab> = Object.fromEntries(

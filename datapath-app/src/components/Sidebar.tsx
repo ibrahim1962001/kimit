@@ -8,14 +8,13 @@ import { useUser } from '../contexts/UserContext';
 import { exportToExcel } from '../lib/exportUtils';
 import { getAppLang } from '../lib/i18n';
 import { LangSwitch } from './LangSwitch';
-
-type Tab = 'home' | 'dashboard' | 'cleaning' | 'chat' | 'export' | 'files' | 'about' | 'privacy' | 'faq' | 'guide' | 'compare' | 'smart-dashboard';
+import type { AppTab } from '../lib/appNavigation';
 
 interface Props {
-  tab: Tab;
-  
+  tab: AppTab;
+
   hasData: boolean;
-  onTab: (t: Tab) => void;
+  onTab: (t: AppTab) => void;
  
   onClose: () => void;
   onClearSession?: () => void;
@@ -63,7 +62,7 @@ const T = {
   },
 };
 
-const mainItems: { tab: Tab; icon: React.ElementType; key: string }[] = [
+const mainItems: { tab: AppTab; icon: React.ElementType; key: string }[] = [
   { tab: 'home', icon: Home, key: 'home' },
   { tab: 'dashboard', icon: LayoutDashboard, key: 'dashboard' },
   { tab: 'cleaning', icon: Shield, key: 'cleaning' },
@@ -72,7 +71,7 @@ const mainItems: { tab: Tab; icon: React.ElementType; key: string }[] = [
   { tab: 'export', icon: Download, key: 'export' },
 ];
 
-const supportItems: { tab: Tab; icon: React.ElementType; key: string }[] = [
+const supportItems: { tab: AppTab; icon: React.ElementType; key: string }[] = [
   { tab: 'guide', icon: BookOpen, key: 'guide' },
   { tab: 'faq', icon: HelpCircle, key: 'faq' },
   { tab: 'about', icon: Info, key: 'about' },
@@ -126,7 +125,7 @@ const SmartDashBtn: React.FC<{ active: boolean; onClick: () => void }> = ({ acti
 };
 
 // ── Sidebar Dashboard Panel ─────────────────────────────────────
-const DashboardPanel: React.FC<{ onTab: (t: Tab) => void }> = ({ onTab }) => {
+const DashboardPanel: React.FC<{ onTab: (t: AppTab) => void }> = ({ onTab }) => {
   const { info } = useKimitData();
   const [open, setOpen] = useState(true);
 
@@ -338,7 +337,7 @@ export const Sidebar: React.FC<Props> = ({ tab, hasData, onTab, onClose, onClear
   const { creditBalance, plan } = useUser();
   const t = getAppLang() === 'ar' ? T.ar : T.en;
 
-  const renderBtn = (item: { tab: Tab; icon: React.ElementType; key: string }) => {
+  const renderBtn = (item: { tab: AppTab; icon: React.ElementType; key: string }) => {
     const Icon = item.icon;
     const label = t[item.key as keyof typeof t];
     const dataNeeded = ['dashboard', 'cleaning', 'export'].includes(item.tab);

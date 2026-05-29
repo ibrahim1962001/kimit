@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
 import { buildSmartDashboardWorkbook, type SmartDashboardExcelPayload } from './exportUtils';
+import { openExportedDashboardPreview } from './smartDashboardExportPreview';
 
 export interface SmartDashboardExportChart {
   title: string;
@@ -22,8 +23,14 @@ export interface SmartDashboardBundlePayload extends SmartDashboardExcelPayload 
 }
 
 export type SmartDashboardBundleResult = {
-  mode: 'zip' | 'files';
+  mode: 'zip' | 'files' | 'preview-only';
   baseName: string;
+  previewOpened: boolean;
+};
+
+export type SmartDashboardBundleOptions = {
+  /** When false, only download files (e.g. re-download from preview page). Default true. */
+  openPreview?: boolean;
 };
 
 function escapeHtml(s: string): string {
@@ -409,11 +416,18 @@ function buildExportReadme(baseName: string, isAr?: boolean): string {
 
 const delay = (ms: number) => new Promise<void>(resolve => window.setTimeout(resolve, ms));
 
-/** Excel workbook + interactive HTML dashboard (ZIP on mobile, separate files on desktop). */
+/** Excel + HTML download; opens in-app live preview first (mobile-safe). */
 export async function exportSmartDashboardBundle(
   payload: SmartDashboardBundlePayload,
+  options: SmartDashboardBundleOptions = {},
 ): Promise<SmartDashboardBundleResult> {
+  const openPreview = options.openPreview !== false;
   const baseName = (payload.filename ?? `Smart_Dashboard_${payload.datasetName}`).replace(/\.xlsx$/i, '');
+
+  if (openPreview) {
+    openExportedDashboardPreview(payload);
+  }
+
   const html = buildStandaloneDashboardHtml(payload);
   const workbook = buildSmartDashboardWorkbook({ ...payload, filename: `${baseName}.xlsx` });
 
@@ -427,13 +441,13 @@ export async function exportSmartDashboardBundle(
     zip.file('README.txt', buildExportReadme(baseName, payload.isAr));
     const zipBlob = await zip.generateAsync({ type: 'blob' });
     downloadBlob(zipBlob, `${baseName}.zip`);
-    return { mode: 'zip', baseName };
+    return { mode: 'zip', baseName, previewOpened: openPreview };
   }
 
   XLSX.writeFile(workbook, `${baseName}.xlsx`);
   await delay(450);
   downloadBlob(new Blob([html], { type: 'text/html;charset=utf-8' }), `${baseName}.html`);
-  return { mode: 'files', baseName };
+  return { mode: 'files', baseName, previewOpened: openPreview };
 }
 
 /** @deprecated Use exportSmartDashboardBundle — kept for direct HTML-only downloads. */
