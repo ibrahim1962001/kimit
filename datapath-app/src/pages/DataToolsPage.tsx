@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import ReactECharts from 'echarts-for-react';
 import {
   Calculator, Table2, GitMerge, TrendingUp, Layers, Wrench, Plus, Check, AlertTriangle, Upload,
-  Wand2, CalendarClock, CopyCheck,
+  Wand2, CalendarClock, CopyCheck, Filter, Scissors, Replace, Boxes, PackagePlus,
 } from 'lucide-react';
 import { useKimitData } from '../hooks/useKimitData';
 import { isArabic } from '../lib/i18n';
@@ -21,10 +21,17 @@ import {
   DATE_PART_LABELS, type DatePart,
 } from '../lib/dateTransforms';
 import { findFuzzyDuplicates, removeFuzzyDuplicates } from '../lib/fuzzyDedupe';
+import {
+  filterRows, countFilter, splitColumn, findReplace, binColumn,
+  fillMissing, countMissing, FILTER_OP_LABELS, FILL_LABELS,
+  type FilterOp, type FillStrategy,
+} from '../lib/transformExtra';
 import type { DataRow } from '../types';
 import './data-tools.css';
 
-type ToolId = 'clean' | 'date' | 'dedupe' | 'calc' | 'pivot' | 'join' | 'regression' | 'cluster';
+type ToolId =
+  | 'clean' | 'date' | 'dedupe' | 'fill' | 'filter' | 'split' | 'replace' | 'bin'
+  | 'calc' | 'pivot' | 'join' | 'regression' | 'cluster';
 
 export const DataToolsPage: React.FC = () => {
   const isAr = isArabic();
@@ -53,8 +60,13 @@ export const DataToolsPage: React.FC = () => {
 
   const TOOLS: { id: ToolId; icon: React.ElementType; en: string; ar: string }[] = [
     { id: 'clean', icon: Wand2, en: 'Clean Column', ar: 'تنظيف عمود' },
+    { id: 'fill', icon: PackagePlus, en: 'Fill Missing', ar: 'ملء الناقص' },
     { id: 'date', icon: CalendarClock, en: 'Date Tools', ar: 'أدوات التاريخ' },
     { id: 'dedupe', icon: CopyCheck, en: 'Smart Dedupe', ar: 'إزالة التكرار الذكي' },
+    { id: 'filter', icon: Filter, en: 'Filter Rows', ar: 'تصفية الصفوف' },
+    { id: 'split', icon: Scissors, en: 'Split Column', ar: 'تقسيم عمود' },
+    { id: 'replace', icon: Replace, en: 'Find & Replace', ar: 'بحث واستبدال' },
+    { id: 'bin', icon: Boxes, en: 'Bin Numbers', ar: 'تجميع نطاقات' },
     { id: 'calc', icon: Calculator, en: 'Calculated Column', ar: 'عمود محسوب' },
     { id: 'pivot', icon: Table2, en: 'Pivot Table', ar: 'جدول محوري' },
     { id: 'join', icon: GitMerge, en: 'Join / Merge', ar: 'دمج ملفين' },
@@ -101,6 +113,21 @@ export const DataToolsPage: React.FC = () => {
         )}
         {tool === 'dedupe' && (
           <DedupeTool isAr={isAr} columns={columns} data={data} onApply={applyNewData} notify={notify} />
+        )}
+        {tool === 'fill' && (
+          <FillTool isAr={isAr} columns={columns} data={data} onApply={applyNewData} notify={notify} />
+        )}
+        {tool === 'filter' && (
+          <FilterTool isAr={isAr} columns={columns} data={data} onApply={applyNewData} notify={notify} />
+        )}
+        {tool === 'split' && (
+          <SplitTool isAr={isAr} columns={columns} data={data} onApply={applyNewData} notify={notify} />
+        )}
+        {tool === 'replace' && (
+          <ReplaceTool isAr={isAr} columns={columns} data={data} onApply={applyNewData} notify={notify} />
+        )}
+        {tool === 'bin' && (
+          <BinTool isAr={isAr} columns={columns} numericColumns={numericColumns} data={data} onApply={applyNewData} notify={notify} />
         )}
         {tool === 'calc' && (
           <CalcTool isAr={isAr} columns={columns} data={data} onApply={applyNewData} notify={notify} />
@@ -476,6 +503,278 @@ const DedupeTool: React.FC<ToolProps> = ({ isAr, columns, data, onApply, notify 
           )}
         </div>
       )}
+    </div>
+  );
+};
+
+// ── Tool: Fill Missing ────────────────────────────────────────────────
+const FillTool: React.FC<ToolProps> = ({ isAr, columns, data, onApply, notify }) => {
+  const [column, setColumn] = useState(columns[0] ?? '');
+  const [strategy, setStrategy] = useState<FillStrategy>('mean');
+  const [constant, setConstant] = useState('');
+  const missing = useMemo(() => (column ? countMissing(data, column) : 0), [data, column]);
+
+  const apply = () => {
+    const { data: out, filled } = fillMissing(data, column, strategy, constant);
+    onApply(out);
+    notify(isAr ? `تم ملء ${filled} قيمة ناقصة في "${column}"` : `Filled ${filled} missing values in "${column}"`);
+  };
+
+  return (
+    <div className="dtool-panel">
+      <p className="dtool-hint">{isAr ? 'يملأ الخلايا الفارغة بإستراتيجية تختارها لكل عمود.' : 'Fill empty cells with a strategy you choose per column.'}</p>
+      <div className="dtool-grid4">
+        <div className="dtool-row">
+          <label>{isAr ? 'العمود' : 'Column'}</label>
+          <select value={column} onChange={e => setColumn(e.target.value)}>
+            {columns.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="dtool-row">
+          <label>{isAr ? 'الإستراتيجية' : 'Strategy'}</label>
+          <select value={strategy} onChange={e => setStrategy(e.target.value as FillStrategy)}>
+            {(Object.keys(FILL_LABELS) as FillStrategy[]).map(s => (
+              <option key={s} value={s}>{isAr ? FILL_LABELS[s].ar : FILL_LABELS[s].en}</option>
+            ))}
+          </select>
+        </div>
+        {strategy === 'constant' && (
+          <div className="dtool-row">
+            <label>{isAr ? 'القيمة' : 'Value'}</label>
+            <input value={constant} onChange={e => setConstant(e.target.value)} />
+          </div>
+        )}
+      </div>
+      <p className="dtool-note">{isAr ? `${missing} قيمة ناقصة في هذا العمود.` : `${missing} missing values in this column.`}</p>
+      <div className="dtool-actions">
+        <button type="button" className="dtool-btn-primary" disabled={missing === 0} onClick={apply}>
+          <PackagePlus size={15} /> {isAr ? 'ملء الناقص' : 'Fill missing'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ── Tool: Filter Rows ─────────────────────────────────────────────────
+const FilterTool: React.FC<ToolProps> = ({ isAr, columns, data, onApply, notify }) => {
+  const [column, setColumn] = useState(columns[0] ?? '');
+  const [op, setOp] = useState<FilterOp>('contains');
+  const [value, setValue] = useState('');
+  const [value2, setValue2] = useState('');
+  const [mode, setMode] = useState<'keep' | 'drop'>('keep');
+
+  const noValue = op === 'empty' || op === 'notEmpty';
+  const matched = useMemo(
+    () => (column ? countFilter(data, column, op, value, value2) : 0),
+    [data, column, op, value, value2],
+  );
+
+  const apply = () => {
+    const { data: out } = filterRows(data, column, op, value, value2, mode);
+    onApply(out);
+    notify(isAr ? `النتيجة: ${out.length} صف` : `Result: ${out.length} rows`);
+  };
+
+  return (
+    <div className="dtool-panel">
+      <p className="dtool-hint">{isAr ? 'احتفظ أو احذف الصفوف حسب شرط على عمود.' : 'Keep or drop rows by a condition on a column.'}</p>
+      <div className="dtool-grid4">
+        <div className="dtool-row">
+          <label>{isAr ? 'العمود' : 'Column'}</label>
+          <select value={column} onChange={e => setColumn(e.target.value)}>
+            {columns.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="dtool-row">
+          <label>{isAr ? 'الشرط' : 'Condition'}</label>
+          <select value={op} onChange={e => setOp(e.target.value as FilterOp)}>
+            {(Object.keys(FILTER_OP_LABELS) as FilterOp[]).map(o => (
+              <option key={o} value={o}>{isAr ? FILTER_OP_LABELS[o].ar : FILTER_OP_LABELS[o].en}</option>
+            ))}
+          </select>
+        </div>
+        {!noValue && (
+          <div className="dtool-row">
+            <label>{isAr ? 'القيمة' : 'Value'}</label>
+            <input value={value} onChange={e => setValue(e.target.value)} />
+          </div>
+        )}
+        {op === 'between' && (
+          <div className="dtool-row">
+            <label>{isAr ? 'إلى' : 'and'}</label>
+            <input value={value2} onChange={e => setValue2(e.target.value)} />
+          </div>
+        )}
+        <div className="dtool-row">
+          <label>{isAr ? 'الإجراء' : 'Action'}</label>
+          <select value={mode} onChange={e => setMode(e.target.value as 'keep' | 'drop')}>
+            <option value="keep">{isAr ? 'احتفظ بالمطابق' : 'Keep matching'}</option>
+            <option value="drop">{isAr ? 'احذف المطابق' : 'Drop matching'}</option>
+          </select>
+        </div>
+      </div>
+      <p className="dtool-note">
+        {isAr ? `${matched} صف يطابق الشرط من ${data.length}.` : `${matched} of ${data.length} rows match.`}
+      </p>
+      <div className="dtool-actions">
+        <button type="button" className="dtool-btn-primary" onClick={apply}>
+          <Filter size={15} /> {isAr ? 'طبّق التصفية' : 'Apply filter'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ── Tool: Split Column ────────────────────────────────────────────────
+const SplitTool: React.FC<ToolProps> = ({ isAr, columns, data, onApply, notify }) => {
+  const [column, setColumn] = useState(columns[0] ?? '');
+  const [delimiter, setDelimiter] = useState(',');
+  const [maxParts, setMaxParts] = useState(0);
+
+  const preview = useMemo(() => {
+    const d = delimiter === '\\t' ? '\t' : delimiter;
+    const sample = data.find(r => String(r[column] ?? '').includes(d));
+    return sample ? String(sample[column]).split(d).map(s => s.trim()) : [];
+  }, [data, column, delimiter]);
+
+  const apply = () => {
+    const { data: out, newColumns } = splitColumn(data, column, delimiter, maxParts);
+    onApply(out);
+    notify(isAr ? `تم إنشاء ${newColumns.length} عمود` : `Created ${newColumns.length} columns`);
+  };
+
+  return (
+    <div className="dtool-panel">
+      <p className="dtool-hint">{isAr ? 'قسّم عموداً نصياً إلى عدة أعمدة حسب فاصل (فاصلة، مسافة، شرطة...).' : 'Split a text column into multiple columns by a delimiter (comma, space, dash...).'}</p>
+      <div className="dtool-grid4">
+        <div className="dtool-row">
+          <label>{isAr ? 'العمود' : 'Column'}</label>
+          <select value={column} onChange={e => setColumn(e.target.value)}>
+            {columns.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="dtool-row">
+          <label>{isAr ? 'الفاصل' : 'Delimiter'}</label>
+          <input value={delimiter} onChange={e => setDelimiter(e.target.value)} placeholder=", or | or - or \t" />
+        </div>
+        <div className="dtool-row">
+          <label>{isAr ? 'أقصى أعمدة (0=تلقائي)' : 'Max parts (0=auto)'}</label>
+          <input type="number" min={0} value={maxParts} onChange={e => setMaxParts(Number(e.target.value))} />
+        </div>
+      </div>
+      <div className="dtool-quick">
+        {[',', ';', '|', ' ', '-', '/', '\\t'].map(d => (
+          <button key={d} type="button" className="dtool-fn" onClick={() => setDelimiter(d)}>{d === ' ' ? '␣' : d}</button>
+        ))}
+      </div>
+      {preview.length > 0 && (
+        <div className="dtool-preview">
+          <strong>{isAr ? 'معاينة:' : 'Preview:'}</strong>
+          <div className="dtool-preview-vals">{preview.map((p, i) => <span key={i}>{p || '—'}</span>)}</div>
+        </div>
+      )}
+      <div className="dtool-actions">
+        <button type="button" className="dtool-btn-primary" onClick={apply}>
+          <Scissors size={15} /> {isAr ? 'قسّم العمود' : 'Split column'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ── Tool: Find & Replace ──────────────────────────────────────────────
+const ReplaceTool: React.FC<ToolProps> = ({ isAr, columns, data, onApply, notify }) => {
+  const [column, setColumn] = useState(columns[0] ?? '');
+  const [find, setFind] = useState('');
+  const [replace, setReplace] = useState('');
+  const [regex, setRegex] = useState(false);
+  const [caseSensitive, setCaseSensitive] = useState(false);
+  const [wholeCell, setWholeCell] = useState(false);
+
+  const apply = () => {
+    const { data: out, changed } = findReplace(data, column, find, replace, { regex, caseSensitive, wholeCell });
+    onApply(out);
+    notify(isAr ? `تم تغيير ${changed} خلية` : `Changed ${changed} cells`);
+  };
+
+  return (
+    <div className="dtool-panel">
+      <p className="dtool-hint">{isAr ? 'ابحث واستبدل نصاً داخل عمود (يدعم Regex والتطابق الكامل).' : 'Find and replace text within a column (supports Regex and whole-cell match).'}</p>
+      <div className="dtool-grid4">
+        <div className="dtool-row">
+          <label>{isAr ? 'العمود' : 'Column'}</label>
+          <select value={column} onChange={e => setColumn(e.target.value)}>
+            {columns.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="dtool-row">
+          <label>{isAr ? 'بحث عن' : 'Find'}</label>
+          <input value={find} onChange={e => setFind(e.target.value)} />
+        </div>
+        <div className="dtool-row">
+          <label>{isAr ? 'استبدل بـ' : 'Replace with'}</label>
+          <input value={replace} onChange={e => setReplace(e.target.value)} />
+        </div>
+      </div>
+      <label className="dtool-check"><input type="checkbox" checked={regex} onChange={e => setRegex(e.target.checked)} /> {isAr ? 'تعبير نمطي (Regex)' : 'Regular expression'}</label>
+      <label className="dtool-check"><input type="checkbox" checked={caseSensitive} onChange={e => setCaseSensitive(e.target.checked)} /> {isAr ? 'حساس لحالة الأحرف' : 'Case sensitive'}</label>
+      <label className="dtool-check"><input type="checkbox" checked={wholeCell} onChange={e => setWholeCell(e.target.checked)} /> {isAr ? 'مطابقة الخلية كاملة' : 'Match whole cell'}</label>
+      <div className="dtool-actions">
+        <button type="button" className="dtool-btn-primary" disabled={!find} onClick={apply}>
+          <Replace size={15} /> {isAr ? 'استبدل' : 'Replace'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ── Tool: Bin Numbers ─────────────────────────────────────────────────
+interface BinProps extends ToolProps { numericColumns: string[]; }
+const BinTool: React.FC<BinProps> = ({ isAr, numericColumns, data, onApply, notify }) => {
+  const [column, setColumn] = useState(numericColumns[0] ?? '');
+  const [bins, setBins] = useState(4);
+
+  const preview = useMemo(() => {
+    if (!column) return null;
+    return binColumn(data, column, bins).edges;
+  }, [data, column, bins]);
+
+  const apply = () => {
+    const { data: out, newColumn } = binColumn(data, column, bins);
+    onApply(out);
+    notify(isAr ? `تمت إضافة العمود ${newColumn}` : `Added ${newColumn}`);
+  };
+
+  if (numericColumns.length === 0) {
+    return <div className="dtool-panel"><p className="dtool-note">{isAr ? 'لا توجد أعمدة رقمية.' : 'No numeric columns available.'}</p></div>;
+  }
+
+  return (
+    <div className="dtool-panel">
+      <p className="dtool-hint">{isAr ? 'حوّل عموداً رقمياً إلى فئات (نطاقات) متساوية، مثل الأعمار أو الأسعار.' : 'Convert a numeric column into equal-width category ranges (e.g. ages, prices).'}</p>
+      <div className="dtool-grid4">
+        <div className="dtool-row">
+          <label>{isAr ? 'العمود الرقمي' : 'Numeric column'}</label>
+          <select value={column} onChange={e => setColumn(e.target.value)}>
+            {numericColumns.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="dtool-row dtool-row--inline">
+          <label>{isAr ? 'عدد النطاقات' : 'Bins'}</label>
+          <input type="number" min={2} max={12} value={bins} onChange={e => setBins(Math.max(2, Math.min(12, Number(e.target.value))))} />
+        </div>
+      </div>
+      {preview && preview.length > 0 && (
+        <div className="dtool-preview">
+          <strong>{isAr ? 'الحدود:' : 'Edges:'}</strong>
+          <div className="dtool-preview-vals">{preview.map((e, i) => <span key={i}>{e}</span>)}</div>
+        </div>
+      )}
+      <div className="dtool-actions">
+        <button type="button" className="dtool-btn-primary" onClick={apply}>
+          <Boxes size={15} /> {isAr ? 'أنشئ النطاقات' : 'Create bins'}
+        </button>
+      </div>
     </div>
   );
 };

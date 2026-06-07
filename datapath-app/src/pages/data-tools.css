@@ -103,6 +103,7 @@
 .dtool-chip:hover { border-color: #0d9488; }
 .dtool-chip.is-on { background: #0d9488; color: #fff; border-color: #0d9488; }
 
+.dtool-quick { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
 .dtool-funcs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .dtool-fn {
   padding: 4px 9px;
