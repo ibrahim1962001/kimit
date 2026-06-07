@@ -250,6 +250,28 @@
   color: #0d9488;
 }
 
+.dtool-dupe-groups { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.dtool-dupe-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  background: var(--bg, #f8fafc);
+}
+.dtool-dupe-count {
+  flex-shrink: 0;
+  font-weight: 800;
+  font-size: 12px;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+  border-radius: 8px;
+  padding: 3px 8px;
+}
+.dtool-dupe-vals { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.dtool-dupe-vals span { color: #475569; }
+
 @media (max-width: 640px) {
   .dtools { padding: 12px 12px 32px; }
   .dtools-tab { flex: 1 1 auto; justify-content: center; }

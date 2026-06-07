@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import ReactECharts from 'echarts-for-react';
 import {
   Calculator, Table2, GitMerge, TrendingUp, Layers, Wrench, Plus, Check, AlertTriangle, Upload,
-  Wand2, CalendarClock,
+  Wand2, CalendarClock, CopyCheck,
 } from 'lucide-react';
 import { useKimitData } from '../hooks/useKimitData';
 import { isArabic } from '../lib/i18n';
@@ -20,10 +20,11 @@ import {
   dateParseRatio, convertColumnToDate, splitDateTimeColumn, extractDatePartColumn,
   DATE_PART_LABELS, type DatePart,
 } from '../lib/dateTransforms';
+import { findFuzzyDuplicates, removeFuzzyDuplicates } from '../lib/fuzzyDedupe';
 import type { DataRow } from '../types';
 import './data-tools.css';
 
-type ToolId = 'clean' | 'date' | 'calc' | 'pivot' | 'join' | 'regression' | 'cluster';
+type ToolId = 'clean' | 'date' | 'dedupe' | 'calc' | 'pivot' | 'join' | 'regression' | 'cluster';
 
 export const DataToolsPage: React.FC = () => {
   const isAr = isArabic();
@@ -53,6 +54,7 @@ export const DataToolsPage: React.FC = () => {
   const TOOLS: { id: ToolId; icon: React.ElementType; en: string; ar: string }[] = [
     { id: 'clean', icon: Wand2, en: 'Clean Column', ar: 'تنظيف عمود' },
     { id: 'date', icon: CalendarClock, en: 'Date Tools', ar: 'أدوات التاريخ' },
+    { id: 'dedupe', icon: CopyCheck, en: 'Smart Dedupe', ar: 'إزالة التكرار الذكي' },
     { id: 'calc', icon: Calculator, en: 'Calculated Column', ar: 'عمود محسوب' },
     { id: 'pivot', icon: Table2, en: 'Pivot Table', ar: 'جدول محوري' },
     { id: 'join', icon: GitMerge, en: 'Join / Merge', ar: 'دمج ملفين' },
@@ -96,6 +98,9 @@ export const DataToolsPage: React.FC = () => {
         )}
         {tool === 'date' && (
           <DateTool isAr={isAr} columns={columns} data={data} onApply={applyNewData} notify={notify} />
+        )}
+        {tool === 'dedupe' && (
+          <DedupeTool isAr={isAr} columns={columns} data={data} onApply={applyNewData} notify={notify} />
         )}
         {tool === 'calc' && (
           <CalcTool isAr={isAr} columns={columns} data={data} onApply={applyNewData} notify={notify} />
@@ -377,6 +382,100 @@ const DateTool: React.FC<ToolProps> = ({ isAr, columns, data, onApply, notify })
           {isAr ? `أضف ${column}_${part}` : `Add ${column}_${part}`}
         </button>
       </div>
+    </div>
+  );
+};
+
+// ── Tool: Smart Dedupe (fuzzy duplicate detection) ────────────────────
+const DedupeTool: React.FC<ToolProps> = ({ isAr, columns, data, onApply, notify }) => {
+  const [keyCols, setKeyCols] = useState<string[]>(columns.slice(0, 1));
+  const [threshold, setThreshold] = useState(0.85);
+  const [result, setResult] = useState<ReturnType<typeof findFuzzyDuplicates> | null>(null);
+  const [scanning, setScanning] = useState(false);
+
+  const toggleCol = (c: string) => {
+    setKeyCols(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
+    setResult(null);
+  };
+
+  const scan = () => {
+    if (keyCols.length === 0) return;
+    setScanning(true);
+    setTimeout(() => {
+      setResult(findFuzzyDuplicates(data, keyCols, threshold));
+      setScanning(false);
+    }, 30);
+  };
+
+  const remove = () => {
+    const { data: out, removed } = removeFuzzyDuplicates(data, keyCols, threshold);
+    onApply(out);
+    notify(isAr ? `تم حذف ${removed} صف مكرر متشابه` : `Removed ${removed} near-duplicate rows`);
+    setResult(null);
+  };
+
+  return (
+    <div className="dtool-panel">
+      <p className="dtool-hint">
+        {isAr
+          ? 'يكتشف الصفوف المكررة حتى لو فيها اختلاف بسيط في الكتابة (مسافات، حالة الأحرف، أخطاء إملائية). اختر العمود/الأعمدة المميِّزة.'
+          : 'Detects duplicate rows even with minor differences (spacing, casing, typos). Pick the identifying column(s).'}
+      </p>
+      <div className="dtool-row">
+        <label>{isAr ? 'أعمدة المطابقة' : 'Match columns'}</label>
+        <div className="dtool-chips">
+          {columns.map(c => (
+            <button key={c} type="button" className={`dtool-chip${keyCols.includes(c) ? ' is-on' : ''}`} onClick={() => toggleCol(c)}>{c}</button>
+          ))}
+        </div>
+      </div>
+      <div className="dtool-row dtool-row--inline">
+        <label>{isAr ? `حساسية التشابه: ${Math.round(threshold * 100)}%` : `Similarity: ${Math.round(threshold * 100)}%`}</label>
+        <input
+          type="range" min={0.6} max={1} step={0.05} value={threshold}
+          onChange={e => { setThreshold(Number(e.target.value)); setResult(null); }}
+          style={{ flex: 1 }}
+        />
+      </div>
+      <p className="dtool-note">
+        {isAr ? '100% = تطابق تام بعد التوحيد، أقل = يقبل اختلافات أكبر.' : '100% = exact after normalization, lower = allows bigger differences.'}
+      </p>
+
+      <div className="dtool-actions">
+        <button type="button" className="dtool-btn-primary" disabled={scanning || keyCols.length === 0} onClick={scan}>
+          <CopyCheck size={15} /> {scanning ? (isAr ? 'جاري الفحص…' : 'Scanning…') : isAr ? 'افحص التكرارات' : 'Scan duplicates'}
+        </button>
+      </div>
+
+      {result && (
+        <div className="dtool-result">
+          <div className="dtool-metrics">
+            <div className="dtool-metric"><span>{isAr ? 'مجموعات' : 'Groups'}</span><b>{result.groups.length}</b></div>
+            <div className="dtool-metric"><span>{isAr ? 'صفوف زائدة' : 'Removable'}</span><b style={{ color: result.duplicateRows ? '#ef4444' : '#10b981' }}>{result.duplicateRows}</b></div>
+          </div>
+          {result.groups.length > 0 ? (
+            <>
+              <div className="dtool-dupe-groups">
+                {result.groups.slice(0, 8).map((g, i) => (
+                  <div key={i} className="dtool-dupe-group">
+                    <span className="dtool-dupe-count">×{g.rowIndices.length}</span>
+                    <div className="dtool-dupe-vals">
+                      {g.values.map((v, j) => <span key={j}>{v}</span>)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="dtool-actions">
+                <button type="button" className="dtool-btn-primary" onClick={remove}>
+                  {isAr ? `احذف ${result.duplicateRows} مكرر (احتفظ بالأول)` : `Remove ${result.duplicateRows} duplicates (keep first)`}
+                </button>
+              </div>
+            </>
+          ) : (
+            <p className="dtool-note">{isAr ? '✅ لا توجد تكرارات متشابهة بهذه الحساسية.' : '✅ No near-duplicates at this similarity.'}</p>
+          )}
+        </div>
+      )}
     </div>
   );
 };
