@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Sparkles, EyeOff, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ShieldCheck, Sparkles, EyeOff, ChevronLeft, ChevronRight, Wand2 } from 'lucide-react';
 import type { DatasetInfo, DataRow } from '../types';
 import { analyzeDataset } from '../lib/dataUtils';
 import { AdSpace } from '../components/AdSpace';
@@ -94,6 +94,13 @@ export const CleaningPage: React.FC<Props> = ({ info, onClean, onUpdate }) => {
           </button>
           <button className="clean-action-btn secondary" onClick={handleAnonymize}>
             <ShieldCheck size={16} /> Anonymize Data ✓
+          </button>
+          <button
+            className="clean-action-btn secondary"
+            onClick={() => window.dispatchEvent(new CustomEvent('kimit:navigate', { detail: 'tools' }))}
+            title="Fix messy values (12k, $99, Free), dates, and custom columns"
+          >
+            <Wand2 size={16} /> Smart Column Tools
           </button>
         </div>
         <div className="clean-topbar-title">

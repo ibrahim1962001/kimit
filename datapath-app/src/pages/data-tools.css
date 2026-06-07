@@ -215,6 +215,41 @@
 .dtool-coef th { background: var(--bg, #f8fafc); }
 .dtool-coef td:first-child, .dtool-coef th:first-child { text-align: start; }
 
+.dtool-subhead {
+  font-size: 13px;
+  font-weight: 800;
+  margin: 4px 0 10px;
+  color: #0d9488;
+}
+.dtool-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+.dtool-check input { width: 16px; height: 16px; accent-color: #0d9488; }
+.dtool-divider {
+  height: 1px;
+  background: var(--border, #e2e8f0);
+  margin: 18px 0;
+}
+.dtool-report { margin: 14px 0; }
+.dtool-samples { margin-top: 12px; font-size: 13px; }
+.dtool-samples-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.dtool-sample {
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: var(--bg, #f1f5f9);
+  border: 1px solid var(--border, #e2e8f0);
+  font-size: 12px;
+}
+.dtool-sample code {
+  font-family: monospace;
+  color: #0d9488;
+}
+
 @media (max-width: 640px) {
   .dtools { padding: 12px 12px 32px; }
   .dtools-tab { flex: 1 1 auto; justify-content: center; }

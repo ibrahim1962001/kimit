@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import ReactECharts from 'echarts-for-react';
 import {
   Calculator, Table2, GitMerge, TrendingUp, Layers, Wrench, Plus, Check, AlertTriangle, Upload,
+  Wand2, CalendarClock,
 } from 'lucide-react';
 import { useKimitData } from '../hooks/useKimitData';
 import { isArabic } from '../lib/i18n';
@@ -11,15 +12,23 @@ import { compileFormula, addCalculatedColumn, FormulaError } from '../lib/formul
 import { computePivot, pivotToRows, AGG_LABELS, type AggFn } from '../lib/pivotEngine';
 import { joinDatasets, type JoinType } from '../lib/joinEngine';
 import { linearRegression, kMeans } from '../lib/modelingEngine';
+import {
+  analyzeNumericColumn, normalizeNumericColumn, standardizeTextColumn,
+  type NumericNormalizeOptions, type TextCase,
+} from '../lib/columnCleaning';
+import {
+  dateParseRatio, convertColumnToDate, splitDateTimeColumn, extractDatePartColumn,
+  DATE_PART_LABELS, type DatePart,
+} from '../lib/dateTransforms';
 import type { DataRow } from '../types';
 import './data-tools.css';
 
-type ToolId = 'calc' | 'pivot' | 'join' | 'regression' | 'cluster';
+type ToolId = 'clean' | 'date' | 'calc' | 'pivot' | 'join' | 'regression' | 'cluster';
 
 export const DataToolsPage: React.FC = () => {
   const isAr = isArabic();
   const { info, setDataset } = useKimitData();
-  const [tool, setTool] = useState<ToolId>('calc');
+  const [tool, setTool] = useState<ToolId>('clean');
   const [flash, setFlash] = useState<string | null>(null);
 
   const columns = useMemo(() => info?.columns.map(c => c.name) ?? [], [info]);
@@ -42,6 +51,8 @@ export const DataToolsPage: React.FC = () => {
   if (!info) return null;
 
   const TOOLS: { id: ToolId; icon: React.ElementType; en: string; ar: string }[] = [
+    { id: 'clean', icon: Wand2, en: 'Clean Column', ar: 'تنظيف عمود' },
+    { id: 'date', icon: CalendarClock, en: 'Date Tools', ar: 'أدوات التاريخ' },
     { id: 'calc', icon: Calculator, en: 'Calculated Column', ar: 'عمود محسوب' },
     { id: 'pivot', icon: Table2, en: 'Pivot Table', ar: 'جدول محوري' },
     { id: 'join', icon: GitMerge, en: 'Join / Merge', ar: 'دمج ملفين' },
@@ -80,6 +91,12 @@ export const DataToolsPage: React.FC = () => {
       {flash && <div className="dtools-flash"><Check size={15} /> {flash}</div>}
 
       <div className="dtools-body">
+        {tool === 'clean' && (
+          <CleanColumnTool isAr={isAr} columns={columns} data={data} onApply={applyNewData} notify={notify} />
+        )}
+        {tool === 'date' && (
+          <DateTool isAr={isAr} columns={columns} data={data} onApply={applyNewData} notify={notify} />
+        )}
         {tool === 'calc' && (
           <CalcTool isAr={isAr} columns={columns} data={data} onApply={applyNewData} notify={notify} />
         )}
@@ -176,6 +193,189 @@ const CalcTool: React.FC<ToolProps> = ({ isAr, columns, data, onApply, notify })
       <div className="dtool-actions">
         <button type="button" className="dtool-btn-ghost" onClick={runPreview}>{isAr ? 'معاينة' : 'Preview'}</button>
         <button type="button" className="dtool-btn-primary" onClick={apply}><Plus size={15} /> {isAr ? 'إضافة العمود' : 'Add column'}</button>
+      </div>
+    </div>
+  );
+};
+
+// ── Tool: Clean Column (smart numeric / text normalization) ───────────
+const CleanColumnTool: React.FC<ToolProps> = ({ isAr, columns, data, onApply, notify }) => {
+  const [column, setColumn] = useState(columns[0] ?? '');
+  const [textToZero, setTextToZero] = useState(true);
+  const [percentAsFraction, setPercentAsFraction] = useState(false);
+  const [textCase, setTextCase] = useState<TextCase>('trim');
+
+  const opts: NumericNormalizeOptions = { textToZero, percentAsFraction };
+  const report = useMemo(
+    () => (column ? analyzeNumericColumn(data, column, opts) : null),
+    [data, column, textToZero, percentAsFraction],
+  );
+
+  const applyNumeric = () => {
+    const { data: out, changed } = normalizeNumericColumn(data, column, opts);
+    onApply(out);
+    notify(isAr ? `تم توحيد ${changed} قيمة في "${column}"` : `Normalized ${changed} values in "${column}"`);
+  };
+
+  const applyText = () => {
+    const { data: out, changed } = standardizeTextColumn(data, column, textCase);
+    onApply(out);
+    notify(isAr ? `تم تنظيف ${changed} قيمة نصية في "${column}"` : `Cleaned ${changed} text values in "${column}"`);
+  };
+
+  return (
+    <div className="dtool-panel">
+      <p className="dtool-hint">
+        {isAr
+          ? 'يكتشف ويصلح القيم المختلطة في العمود تلقائياً: 12k → 12000، $99.99 → 99.99، 1,234 → 1234، Free → 0، والنِسَب المئوية.'
+          : 'Auto-detect and fix mixed values: 12k → 12000, $99.99 → 99.99, 1,234 → 1234, Free → 0, and percentages.'}
+      </p>
+      <div className="dtool-row">
+        <label>{isAr ? 'العمود' : 'Column'}</label>
+        <select value={column} onChange={e => setColumn(e.target.value)}>
+          {columns.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
+
+      <div className="dtool-subhead">{isAr ? 'تنظيف أرقام' : 'Numeric cleanup'}</div>
+      <label className="dtool-check">
+        <input type="checkbox" checked={textToZero} onChange={e => setTextToZero(e.target.checked)} />
+        {isAr ? 'حوّل Free / N/A إلى صفر (بدل فراغ)' : 'Convert Free / N/A to 0 (else blank)'}
+      </label>
+      <label className="dtool-check">
+        <input type="checkbox" checked={percentAsFraction} onChange={e => setPercentAsFraction(e.target.checked)} />
+        {isAr ? 'اعتبر 45% = 0.45 (بدل 45)' : 'Treat 45% as 0.45 (else 45)'}
+      </label>
+
+      {report && (
+        <div className="dtool-report">
+          <div className="dtool-metrics">
+            <div className="dtool-metric"><span>{isAr ? 'سليمة' : 'Clean'}</span><b>{report.cleanNumeric}</b></div>
+            <div className="dtool-metric"><span>{isAr ? 'قابلة للإصلاح' : 'Fixable'}</span><b style={{ color: '#0d9488' }}>{report.fixable}</b></div>
+            <div className="dtool-metric"><span>{isAr ? 'غير رقمية' : 'Non-numeric'}</span><b style={{ color: report.unparseable ? '#ef4444' : 'inherit' }}>{report.unparseable}</b></div>
+          </div>
+          {report.samples.length > 0 && (
+            <div className="dtool-samples">
+              <strong>{isAr ? 'معاينة الإصلاح:' : 'Fix preview:'}</strong>
+              <div className="dtool-samples-list">
+                {report.samples.map((s, i) => (
+                  <span key={i} className="dtool-sample"><code>{s.from}</code> → <code>{s.to}</code></span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="dtool-actions">
+        <button type="button" className="dtool-btn-primary" onClick={applyNumeric}>
+          <Wand2 size={15} /> {isAr ? 'توحيد كأرقام' : 'Normalize as numbers'}
+        </button>
+      </div>
+
+      <div className="dtool-divider" />
+      <div className="dtool-subhead">{isAr ? 'تنظيف نصوص' : 'Text cleanup'}</div>
+      <div className="dtool-row">
+        <label>{isAr ? 'التنسيق' : 'Format'}</label>
+        <select value={textCase} onChange={e => setTextCase(e.target.value as TextCase)}>
+          <option value="trim">{isAr ? 'إزالة الفراغات الزائدة فقط' : 'Trim spaces only'}</option>
+          <option value="lower">{isAr ? 'أحرف صغيرة' : 'lowercase'}</option>
+          <option value="upper">{isAr ? 'أحرف كبيرة' : 'UPPERCASE'}</option>
+          <option value="title">{isAr ? 'أول حرف كبير' : 'Title Case'}</option>
+        </select>
+      </div>
+      <div className="dtool-actions">
+        <button type="button" className="dtool-btn-ghost" onClick={applyText}>
+          {isAr ? 'تطبيق على النص' : 'Apply to text'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ── Tool: Date Tools ──────────────────────────────────────────────────
+const DateTool: React.FC<ToolProps> = ({ isAr, columns, data, onApply, notify }) => {
+  const dateCandidates = useMemo(
+    () => columns.filter(c => dateParseRatio(data, c) >= 0.6),
+    [columns, data],
+  );
+  const [column, setColumn] = useState(dateCandidates[0] ?? columns[0] ?? '');
+  const [withTime, setWithTime] = useState(false);
+  const [part, setPart] = useState<DatePart>('year');
+
+  const ratio = useMemo(() => (column ? dateParseRatio(data, column) : 0), [data, column]);
+
+  const convert = () => {
+    const { data: out, converted, failed } = convertColumnToDate(data, column, withTime);
+    onApply(out);
+    notify(isAr ? `تم تحويل ${converted} تاريخ (${failed} فشل)` : `Converted ${converted} dates (${failed} failed)`);
+  };
+  const split = () => {
+    const { data: out, converted } = splitDateTimeColumn(data, column);
+    onApply(out);
+    notify(isAr ? `تم فصل ${converted} صف إلى تاريخ + وقت` : `Split ${converted} rows into date + time`);
+  };
+  const extract = () => {
+    const { data: out, newColumn, converted } = extractDatePartColumn(data, column, part);
+    onApply(out);
+    notify(isAr ? `تمت إضافة العمود ${newColumn} (${converted})` : `Added ${newColumn} (${converted})`);
+  };
+
+  return (
+    <div className="dtool-panel">
+      <p className="dtool-hint">
+        {isAr
+          ? 'حوّل أعمدة التاريخ/الوقت: توحيد كتاريخ، فصل التاريخ عن الوقت، أو استخراج السنة/الشهر/اليوم في عمود جديد.'
+          : 'Transform date/time columns: normalize to date, split date from time, or extract year/month/day into a new column.'}
+      </p>
+      <div className="dtool-row">
+        <label>{isAr ? 'عمود التاريخ' : 'Date column'}</label>
+        <select value={column} onChange={e => setColumn(e.target.value)}>
+          {columns.map(c => (
+            <option key={c} value={c}>{c}{dateCandidates.includes(c) ? ' 🗓️' : ''}</option>
+          ))}
+        </select>
+      </div>
+      <p className="dtool-note">
+        {isAr
+          ? `${Math.round(ratio * 100)}% من القيم تُقرأ كتاريخ صالح.`
+          : `${Math.round(ratio * 100)}% of values parse as valid dates.`}
+      </p>
+
+      <div className="dtool-divider" />
+      <div className="dtool-subhead">{isAr ? '1) توحيد كتاريخ' : '1) Normalize to date'}</div>
+      <label className="dtool-check">
+        <input type="checkbox" checked={withTime} onChange={e => setWithTime(e.target.checked)} />
+        {isAr ? 'احتفظ بالوقت أيضاً' : 'Keep time too'}
+      </label>
+      <div className="dtool-actions">
+        <button type="button" className="dtool-btn-primary" onClick={convert}>
+          <CalendarClock size={15} /> {isAr ? 'توحيد التاريخ' : 'Normalize date'}
+        </button>
+      </div>
+
+      <div className="dtool-divider" />
+      <div className="dtool-subhead">{isAr ? '2) فصل التاريخ والوقت' : '2) Split date & time'}</div>
+      <div className="dtool-actions">
+        <button type="button" className="dtool-btn-ghost" onClick={split}>
+          {isAr ? `أنشئ ${column}_date و ${column}_time` : `Create ${column}_date & ${column}_time`}
+        </button>
+      </div>
+
+      <div className="dtool-divider" />
+      <div className="dtool-subhead">{isAr ? '3) استخراج مكوّن' : '3) Extract a part'}</div>
+      <div className="dtool-row">
+        <label>{isAr ? 'المكوّن' : 'Part'}</label>
+        <select value={part} onChange={e => setPart(e.target.value as DatePart)}>
+          {(Object.keys(DATE_PART_LABELS) as DatePart[]).map(p => (
+            <option key={p} value={p}>{isAr ? DATE_PART_LABELS[p].ar : DATE_PART_LABELS[p].en}</option>
+          ))}
+        </select>
+      </div>
+      <div className="dtool-actions">
+        <button type="button" className="dtool-btn-ghost" onClick={extract}>
+          {isAr ? `أضف ${column}_${part}` : `Add ${column}_${part}`}
+        </button>
       </div>
     </div>
   );
