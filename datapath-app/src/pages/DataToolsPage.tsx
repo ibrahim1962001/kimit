@@ -3,6 +3,7 @@ import ReactECharts from 'echarts-for-react';
 import {
   Calculator, Table2, GitMerge, TrendingUp, Layers, Wrench, Plus, Check, AlertTriangle, Upload,
   Wand2, CalendarClock, CopyCheck, Filter, Scissors, Replace, Boxes, PackagePlus,
+  Columns3, ArrowDownUp, Crosshair, Binary, Ruler, Trash2,
 } from 'lucide-react';
 import { useKimitData } from '../hooks/useKimitData';
 import { isArabic } from '../lib/i18n';
@@ -26,11 +27,17 @@ import {
   fillMissing, countMissing, FILTER_OP_LABELS, FILL_LABELS,
   type FilterOp, type FillStrategy,
 } from '../lib/transformExtra';
+import {
+  renameColumn, dropColumn, duplicateColumn, sortRows,
+  detectOutliers, handleOutliers, oneHotEncode, scaleColumn,
+  type OutlierMethod, type OutlierAction, type ScaleMethod,
+} from '../lib/columnOps2';
 import type { DataRow } from '../types';
 import './data-tools.css';
 
 type ToolId =
   | 'clean' | 'date' | 'dedupe' | 'fill' | 'filter' | 'split' | 'replace' | 'bin'
+  | 'columns' | 'sort' | 'outliers' | 'onehot' | 'scale'
   | 'calc' | 'pivot' | 'join' | 'regression' | 'cluster';
 
 export const DataToolsPage: React.FC = () => {
@@ -67,6 +74,11 @@ export const DataToolsPage: React.FC = () => {
     { id: 'split', icon: Scissors, en: 'Split Column', ar: 'تقسيم عمود' },
     { id: 'replace', icon: Replace, en: 'Find & Replace', ar: 'بحث واستبدال' },
     { id: 'bin', icon: Boxes, en: 'Bin Numbers', ar: 'تجميع نطاقات' },
+    { id: 'columns', icon: Columns3, en: 'Columns', ar: 'إدارة الأعمدة' },
+    { id: 'sort', icon: ArrowDownUp, en: 'Sort', ar: 'ترتيب' },
+    { id: 'outliers', icon: Crosshair, en: 'Outliers', ar: 'القيم الشاذة' },
+    { id: 'onehot', icon: Binary, en: 'One-Hot Encode', ar: 'ترميز One-Hot' },
+    { id: 'scale', icon: Ruler, en: 'Scale / Normalize', ar: 'تطبيع رقمي' },
     { id: 'calc', icon: Calculator, en: 'Calculated Column', ar: 'عمود محسوب' },
     { id: 'pivot', icon: Table2, en: 'Pivot Table', ar: 'جدول محوري' },
     { id: 'join', icon: GitMerge, en: 'Join / Merge', ar: 'دمج ملفين' },
@@ -128,6 +140,21 @@ export const DataToolsPage: React.FC = () => {
         )}
         {tool === 'bin' && (
           <BinTool isAr={isAr} columns={columns} numericColumns={numericColumns} data={data} onApply={applyNewData} notify={notify} />
+        )}
+        {tool === 'columns' && (
+          <ColumnsTool isAr={isAr} columns={columns} data={data} onApply={applyNewData} notify={notify} />
+        )}
+        {tool === 'sort' && (
+          <SortTool isAr={isAr} columns={columns} data={data} onApply={applyNewData} notify={notify} />
+        )}
+        {tool === 'outliers' && (
+          <OutlierTool isAr={isAr} columns={columns} numericColumns={numericColumns} data={data} onApply={applyNewData} notify={notify} />
+        )}
+        {tool === 'onehot' && (
+          <OneHotTool isAr={isAr} columns={columns} data={data} onApply={applyNewData} notify={notify} />
+        )}
+        {tool === 'scale' && (
+          <ScaleTool isAr={isAr} columns={columns} numericColumns={numericColumns} data={data} onApply={applyNewData} notify={notify} />
         )}
         {tool === 'calc' && (
           <CalcTool isAr={isAr} columns={columns} data={data} onApply={applyNewData} notify={notify} />
@@ -773,6 +800,243 @@ const BinTool: React.FC<BinProps> = ({ isAr, numericColumns, data, onApply, noti
       <div className="dtool-actions">
         <button type="button" className="dtool-btn-primary" onClick={apply}>
           <Boxes size={15} /> {isAr ? 'أنشئ النطاقات' : 'Create bins'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ── Tool: Columns Manager (rename / drop / duplicate) ─────────────────
+const ColumnsTool: React.FC<ToolProps> = ({ isAr, columns, data, onApply, notify }) => {
+  const [column, setColumn] = useState(columns[0] ?? '');
+  const [newName, setNewName] = useState('');
+
+  const doRename = () => {
+    if (!newName.trim()) return;
+    onApply(renameColumn(data, column, newName.trim()));
+    notify(isAr ? `أعيدت تسمية "${column}" إلى "${newName}"` : `Renamed "${column}" to "${newName}"`);
+    setNewName('');
+  };
+  const doDrop = () => {
+    onApply(dropColumn(data, column));
+    notify(isAr ? `تم حذف العمود "${column}"` : `Dropped column "${column}"`);
+  };
+  const doDuplicate = () => {
+    const { data: out, newColumn } = duplicateColumn(data, column);
+    onApply(out);
+    notify(isAr ? `تم نسخ العمود إلى "${newColumn}"` : `Duplicated to "${newColumn}"`);
+  };
+
+  return (
+    <div className="dtool-panel">
+      <p className="dtool-hint">{isAr ? 'أعد تسمية عمود، أو احذفه، أو انسخه.' : 'Rename, delete, or duplicate a column.'}</p>
+      <div className="dtool-grid4">
+        <div className="dtool-row">
+          <label>{isAr ? 'العمود' : 'Column'}</label>
+          <select value={column} onChange={e => setColumn(e.target.value)}>
+            {columns.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="dtool-row">
+          <label>{isAr ? 'الاسم الجديد' : 'New name'}</label>
+          <input value={newName} onChange={e => setNewName(e.target.value)} placeholder={column} />
+        </div>
+      </div>
+      <div className="dtool-actions">
+        <button type="button" className="dtool-btn-primary" disabled={!newName.trim()} onClick={doRename}>
+          <Columns3 size={15} /> {isAr ? 'إعادة تسمية' : 'Rename'}
+        </button>
+        <button type="button" className="dtool-btn-ghost" onClick={doDuplicate}>{isAr ? 'نسخ العمود' : 'Duplicate'}</button>
+        <button type="button" className="dtool-btn-ghost" onClick={doDrop} style={{ color: '#ef4444' }}>
+          <Trash2 size={14} /> {isAr ? 'حذف العمود' : 'Delete'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ── Tool: Sort ────────────────────────────────────────────────────────
+const SortTool: React.FC<ToolProps> = ({ isAr, columns, data, onApply, notify }) => {
+  const [column, setColumn] = useState(columns[0] ?? '');
+  const [dir, setDir] = useState<'asc' | 'desc'>('asc');
+  const apply = () => {
+    onApply(sortRows(data, column, dir));
+    notify(isAr ? `تم الترتيب حسب "${column}"` : `Sorted by "${column}"`);
+  };
+  return (
+    <div className="dtool-panel">
+      <p className="dtool-hint">{isAr ? 'رتّب الصفوف تصاعدياً أو تنازلياً حسب عمود.' : 'Sort rows ascending or descending by a column.'}</p>
+      <div className="dtool-grid4">
+        <div className="dtool-row">
+          <label>{isAr ? 'العمود' : 'Column'}</label>
+          <select value={column} onChange={e => setColumn(e.target.value)}>
+            {columns.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="dtool-row">
+          <label>{isAr ? 'الاتجاه' : 'Direction'}</label>
+          <select value={dir} onChange={e => setDir(e.target.value as 'asc' | 'desc')}>
+            <option value="asc">{isAr ? 'تصاعدي ▲' : 'Ascending ▲'}</option>
+            <option value="desc">{isAr ? 'تنازلي ▼' : 'Descending ▼'}</option>
+          </select>
+        </div>
+      </div>
+      <div className="dtool-actions">
+        <button type="button" className="dtool-btn-primary" onClick={apply}>
+          <ArrowDownUp size={15} /> {isAr ? 'رتّب' : 'Sort'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ── Tool: Outliers ────────────────────────────────────────────────────
+interface NumProps extends ToolProps { numericColumns: string[]; }
+const OutlierTool: React.FC<NumProps> = ({ isAr, numericColumns, data, onApply, notify }) => {
+  const [column, setColumn] = useState(numericColumns[0] ?? '');
+  const [method, setMethod] = useState<OutlierMethod>('iqr');
+  const [action, setAction] = useState<OutlierAction>('cap');
+
+  const bounds = useMemo(() => (column ? detectOutliers(data, column, method) : null), [data, column, method]);
+
+  const apply = () => {
+    const { data: out, affected } = handleOutliers(data, column, method, action);
+    onApply(out);
+    notify(isAr ? `تمت معالجة ${affected} قيمة شاذة` : `Handled ${affected} outliers`);
+  };
+
+  if (numericColumns.length === 0) {
+    return <div className="dtool-panel"><p className="dtool-note">{isAr ? 'لا توجد أعمدة رقمية.' : 'No numeric columns.'}</p></div>;
+  }
+
+  return (
+    <div className="dtool-panel">
+      <p className="dtool-hint">{isAr ? 'اكتشف القيم المتطرفة وعالِجها: تثبيت عند الحد، حذف الصف، أو تفريغ الخلية.' : 'Detect extreme values and handle them: cap at bound, remove row, or set null.'}</p>
+      <div className="dtool-grid4">
+        <div className="dtool-row">
+          <label>{isAr ? 'العمود' : 'Column'}</label>
+          <select value={column} onChange={e => setColumn(e.target.value)}>
+            {numericColumns.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="dtool-row">
+          <label>{isAr ? 'الطريقة' : 'Method'}</label>
+          <select value={method} onChange={e => setMethod(e.target.value as OutlierMethod)}>
+            <option value="iqr">IQR (1.5×)</option>
+            <option value="zscore">Z-Score (3σ)</option>
+          </select>
+        </div>
+        <div className="dtool-row">
+          <label>{isAr ? 'الإجراء' : 'Action'}</label>
+          <select value={action} onChange={e => setAction(e.target.value as OutlierAction)}>
+            <option value="cap">{isAr ? 'تثبيت عند الحد' : 'Cap at bound'}</option>
+            <option value="remove">{isAr ? 'حذف الصف' : 'Remove row'}</option>
+            <option value="null">{isAr ? 'تفريغ الخلية' : 'Set to null'}</option>
+          </select>
+        </div>
+      </div>
+      {bounds && (
+        <p className="dtool-note">
+          {isAr
+            ? `الحدود: ${bounds.lower} إلى ${bounds.upper} — ${bounds.count} قيمة شاذة.`
+            : `Bounds: ${bounds.lower} to ${bounds.upper} — ${bounds.count} outliers.`}
+        </p>
+      )}
+      <div className="dtool-actions">
+        <button type="button" className="dtool-btn-primary" disabled={!bounds || bounds.count === 0} onClick={apply}>
+          <Crosshair size={15} /> {isAr ? 'عالِج الشاذة' : 'Handle outliers'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ── Tool: One-Hot Encode ──────────────────────────────────────────────
+const OneHotTool: React.FC<ToolProps> = ({ isAr, columns, data, onApply, notify }) => {
+  const [column, setColumn] = useState(columns[0] ?? '');
+  const [topN, setTopN] = useState(10);
+
+  const uniqueCount = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of data) if (r[column] !== null && r[column] !== undefined && r[column] !== '') s.add(String(r[column]));
+    return s.size;
+  }, [data, column]);
+
+  const apply = () => {
+    const { data: out, newColumns } = oneHotEncode(data, column, topN);
+    onApply(out);
+    notify(isAr ? `تم إنشاء ${newColumns.length} عمود ثنائي` : `Created ${newColumns.length} binary columns`);
+  };
+
+  return (
+    <div className="dtool-panel">
+      <p className="dtool-hint">{isAr ? 'حوّل عموداً فئوياً إلى أعمدة ثنائية (0/1) لكل فئة — مفيد للنمذجة والتعلم الآلي.' : 'Convert a categorical column into binary (0/1) columns per category — useful for ML.'}</p>
+      <div className="dtool-grid4">
+        <div className="dtool-row">
+          <label>{isAr ? 'العمود' : 'Column'}</label>
+          <select value={column} onChange={e => setColumn(e.target.value)}>
+            {columns.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="dtool-row dtool-row--inline">
+          <label>{isAr ? 'أعلى N فئة' : 'Top N categories'}</label>
+          <input type="number" min={2} max={50} value={topN} onChange={e => setTopN(Math.max(2, Number(e.target.value)))} />
+        </div>
+      </div>
+      <p className="dtool-note">
+        {isAr ? `العمود يحتوي ${uniqueCount} قيمة فريدة.` : `Column has ${uniqueCount} unique values.`}
+        {uniqueCount > 50 ? (isAr ? ' (كثير — سيُستخدم الأعلى تكراراً)' : ' (high — top values will be used)') : ''}
+      </p>
+      <div className="dtool-actions">
+        <button type="button" className="dtool-btn-primary" onClick={apply}>
+          <Binary size={15} /> {isAr ? 'رمّز One-Hot' : 'One-Hot encode'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ── Tool: Scale / Normalize ───────────────────────────────────────────
+const ScaleTool: React.FC<NumProps> = ({ isAr, numericColumns, data, onApply, notify }) => {
+  const [column, setColumn] = useState(numericColumns[0] ?? '');
+  const [method, setMethod] = useState<ScaleMethod>('minmax');
+  const [asNew, setAsNew] = useState(true);
+
+  const apply = () => {
+    const { data: out, target } = scaleColumn(data, column, method, asNew);
+    onApply(out);
+    notify(isAr ? `تم التطبيع في "${target}"` : `Scaled into "${target}"`);
+  };
+
+  if (numericColumns.length === 0) {
+    return <div className="dtool-panel"><p className="dtool-note">{isAr ? 'لا توجد أعمدة رقمية.' : 'No numeric columns.'}</p></div>;
+  }
+
+  return (
+    <div className="dtool-panel">
+      <p className="dtool-hint">{isAr ? 'طبّع عموداً رقمياً: Min-Max (0..1) أو Z-Score (متوسط 0، انحراف 1).' : 'Normalize a numeric column: Min-Max (0..1) or Z-Score (mean 0, std 1).'}</p>
+      <div className="dtool-grid4">
+        <div className="dtool-row">
+          <label>{isAr ? 'العمود' : 'Column'}</label>
+          <select value={column} onChange={e => setColumn(e.target.value)}>
+            {numericColumns.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="dtool-row">
+          <label>{isAr ? 'الطريقة' : 'Method'}</label>
+          <select value={method} onChange={e => setMethod(e.target.value as ScaleMethod)}>
+            <option value="minmax">Min-Max (0..1)</option>
+            <option value="zscore">Z-Score</option>
+          </select>
+        </div>
+      </div>
+      <label className="dtool-check">
+        <input type="checkbox" checked={asNew} onChange={e => setAsNew(e.target.checked)} />
+        {isAr ? 'في عمود جديد (بدل استبدال الأصلي)' : 'As a new column (instead of replacing)'}
+      </label>
+      <div className="dtool-actions">
+        <button type="button" className="dtool-btn-primary" onClick={apply}>
+          <Ruler size={15} /> {isAr ? 'طبّع' : 'Scale'}
         </button>
       </div>
     </div>
